@@ -12,10 +12,10 @@
 #define ID_LISTVIEW    105
 
 static constexpr int k_btn_count = 4;
-static const wchar_t* k_labels[k_btn_count]      = { L"Name", L"PID", L"CPU", L"Memory" };
-static const sort_field k_fields[k_btn_count]     = { sort_field::name, sort_field::pid, sort_field::cpu, sort_field::memory };
-static const int k_ids[k_btn_count]               = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
-static const int k_widths[k_btn_count]            = { 100, 60, 60, 90 };
+static const wchar_t* k_labels[k_btn_count]  = { L"Name", L"PID", L"CPU", L"Memory" };
+static const sort_field k_fields[k_btn_count] = { sort_field::name, sort_field::pid, sort_field::cpu, sort_field::memory };
+static const int k_ids[k_btn_count]           = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
+static const int k_widths[k_btn_count]        = { 120, 70, 70, 100 };
 
 static HWND g_hwnd_list = nullptr;
 static HWND g_sort_btns[k_btn_count] = {};
@@ -23,11 +23,23 @@ static sort_field g_sort_by = sort_field::name;
 static bool g_sort_desc = false;
 static std::unordered_map<DWORD, cpu_snapshot> g_snapshots;
 
+// Only the active sort button holds WS_TABSTOP so the group counts as one tab stop.
+static void update_tab_stop() {
+	for (int i = 0; i < k_btn_count; ++i) {
+		LONG_PTR style = GetWindowLongPtr(g_sort_btns[i], GWL_STYLE);
+		if (k_fields[i] == g_sort_by)
+			style |= WS_TABSTOP;
+		else
+			style &= ~WS_TABSTOP;
+		SetWindowLongPtr(g_sort_btns[i], GWL_STYLE, style);
+	}
+}
+
 static void update_sort_labels() {
 	for (int i = 0; i < k_btn_count; ++i) {
 		wchar_t buf[32];
 		if (k_fields[i] == g_sort_by)
-			swprintf_s(buf, L"%s %s", k_labels[i], g_sort_desc ? L"\u25BC" : L"\u25B2");
+			swprintf_s(buf, L"%s (%s)", k_labels[i], g_sort_desc ? L"desc" : L"asc");
 		else
 			wcscpy_s(buf, k_labels[i]);
 		SetWindowText(g_sort_btns[i], buf);
@@ -61,16 +73,20 @@ static void do_refresh() {
 	InvalidateRect(g_hwnd_list, nullptr, FALSE);
 }
 
-// Subclass proc: intercept left/right arrow keys to move focus between sort buttons.
-// Space/Enter reach this too but we let DefSubclassProc handle them so the button
-// sends BN_CLICKED normally.
+// Arrow keys immediately select the adjacent sort; Space/Enter fall through to BN_CLICKED.
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
 	if (msg == WM_KEYDOWN && (wp == VK_LEFT || wp == VK_RIGHT)) {
 		int idx = -1;
 		for (int i = 0; i < k_btn_count; ++i)
 			if (g_sort_btns[i] == hwnd) { idx = i; break; }
 		if (idx >= 0) {
-			int next = (wp == VK_RIGHT) ? (idx + 1) % k_btn_count : (idx + k_btn_count - 1) % k_btn_count;
+			int next = (wp == VK_RIGHT) ? (idx + 1) % k_btn_count
+			                            : (idx + k_btn_count - 1) % k_btn_count;
+			g_sort_by = k_fields[next];
+			g_sort_desc = false;
+			update_sort_labels();
+			update_tab_stop();
+			do_refresh();
 			SetFocus(g_sort_btns[next]);
 			return 0;
 		}
@@ -87,8 +103,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		InitCommonControlsEx(&icc);
 		int btn_x = 4;
 		for (int i = 0; i < k_btn_count; ++i) {
+			// WS_TABSTOP is set dynamically; only the active button carries it.
 			g_sort_btns[i] = CreateWindow(L"BUTTON", k_labels[i],
-				WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+				WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 				btn_x, 4, k_widths[i], 24,
 				hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(k_ids[i])),
 				GetModuleHandle(nullptr), nullptr);
@@ -96,10 +113,11 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			btn_x += k_widths[i] + 4;
 		}
 		update_sort_labels();
+		update_tab_stop(); // gives WS_TABSTOP to button 0 (Name, the initial sort)
 		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, nullptr,
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS,
 			0, 36, 760, 524,
-			hwnd, reinterpret_cast<HMENU>(ID_LISTVIEW),
+			hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_LISTVIEW)),
 			GetModuleHandle(nullptr), nullptr);
 		ListView_SetExtendedListViewStyle(g_hwnd_list,
 			LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_HEADERDRAGDROP);
@@ -120,8 +138,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		return 0;
 	}
 	case WM_COMMAND: {
-		WORD id = LOWORD(wp);
 		if (HIWORD(wp) == BN_CLICKED) {
+			WORD id = LOWORD(wp);
 			for (int i = 0; i < k_btn_count; ++i) {
 				if (k_ids[i] == id) {
 					if (k_fields[i] == g_sort_by)
@@ -131,6 +149,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 						g_sort_desc = false;
 					}
 					update_sort_labels();
+					update_tab_stop();
 					do_refresh();
 					break;
 				}
