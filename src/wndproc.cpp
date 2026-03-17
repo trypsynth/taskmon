@@ -121,6 +121,16 @@ static bool open_item_location(const std::wstring& path) {
 	return reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOW)) > 32;
 }
 
+static bool confirm_end_task(HWND hwnd, const std::wstring& name, DWORD pid) {
+	wchar_t message[512];
+	swprintf_s(
+		message,
+		L"End \"%s\" (PID %lu)?\n\nUnsaved data may be lost.",
+		name.empty() ? L"this process" : name.c_str(),
+		static_cast<unsigned long>(pid));
+	return MessageBoxW(hwnd, message, L"Confirm End Task", MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON2) == IDOK;
+}
+
 // Arrow keys immediately switch the active sort field; Space/Enter fall through to BN_CLICKED.
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
 	if (msg == WM_KEYDOWN) {
@@ -226,6 +236,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				lvi.iItem = selected;
 				lvi.mask = LVIF_PARAM;
 				ListView_GetItem(g_hwnd_list, &lvi);
+				wchar_t name[260]{};
+				ListView_GetItemText(g_hwnd_list, selected, 0, name, static_cast<int>(std::size(name)));
 				DWORD pid = static_cast<DWORD>(lvi.lParam);
 				if (id == ID_CTX_OPEN_LOCATION) {
 					std::wstring path = get_process_path(pid);
@@ -233,8 +245,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 						open_item_location(path);
 					}
 				} else if (id == ID_CTX_END_TASK) {
-					terminate_process(pid);
-					do_refresh();
+					if (confirm_end_task(hwnd, name, pid)) {
+						terminate_process(pid);
+						do_refresh();
+					}
 				}
 			}
 			return 0;
