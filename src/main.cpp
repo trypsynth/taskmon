@@ -2,6 +2,16 @@
 #include "wndproc.hpp"
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
+	HANDLE mutex = CreateMutex(nullptr, TRUE, L"Local\\TaskmonSingleInstance");
+	if (GetLastError() == ERROR_ALREADY_EXISTS) {
+		HWND existing = FindWindow(L"TaskmonWndClass", nullptr);
+		if (existing) {
+			ShowWindow(existing, SW_SHOW);
+			SetForegroundWindow(existing);
+		}
+		if (mutex) CloseHandle(mutex);
+		return 0;
+	}
 	WNDCLASSEX wc{};
 	wc.cbSize = sizeof(wc);
 	wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -32,5 +42,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
 			DispatchMessageW(&msg);
 		}
 	}
+	CloseHandle(mutex);
 	return static_cast<int>(msg.wParam);
 }
