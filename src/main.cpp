@@ -1,14 +1,17 @@
 #include "wndproc.hpp"
 #include <windows.h>
+#include <objbase.h>
 
 static constexpr wchar_t k_mutex_name[] = L"Local\\TaskmonSingleInstance";
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
+	HRESULT com_init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	HANDLE mutex = CreateMutex(nullptr, TRUE, k_mutex_name);
 	if (GetLastError() == ERROR_ALREADY_EXISTS) {
 		HWND existing = FindWindow(k_class_name, nullptr);
 		if (existing) { ShowWindow(existing, SW_SHOW); SetForegroundWindow(existing); }
 		if (mutex) CloseHandle(mutex);
+		if (SUCCEEDED(com_init)) CoUninitialize();
 		return 0;
 	}
 
@@ -39,5 +42,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
 		}
 	}
 	CloseHandle(mutex);
+	if (SUCCEEDED(com_init)) CoUninitialize();
 	return static_cast<int>(msg.wParam);
 }

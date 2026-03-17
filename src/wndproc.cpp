@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <commctrl.h>
 #include <string>
 #include <unordered_map>
@@ -98,6 +99,26 @@ static void do_refresh() {
 	SendMessage(g_hwnd_list, WM_SETREDRAW, TRUE, 0);
 	InvalidateRect(g_hwnd_list, nullptr, FALSE);
 	tray_update_tip(total_cpu, total_mem);
+}
+
+static bool open_item_location(const std::wstring& path) {
+	size_t separator = path.find_last_of(L"\\/");
+	if (separator == std::wstring::npos) return false;
+	std::wstring folder = path.substr(0, separator);
+	PIDLIST_ABSOLUTE folder_pidl = ILCreateFromPathW(folder.c_str());
+	PIDLIST_ABSOLUTE item_pidl = ILCreateFromPathW(path.c_str());
+	if (!folder_pidl || !item_pidl) {
+		if (folder_pidl) ILFree(folder_pidl);
+		if (item_pidl) ILFree(item_pidl);
+		return false;
+	}
+	PCUITEMID_CHILD child = ILFindLastID(item_pidl);
+	PCUITEMID_CHILD children[] = { child };
+	HRESULT hr = SHOpenFolderAndSelectItems(folder_pidl, 1, children, 0);
+	ILFree(item_pidl);
+	ILFree(folder_pidl);
+	if (SUCCEEDED(hr)) return true;
+	return reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOW)) > 32;
 }
 
 // Arrow keys immediately switch the active sort field; Space/Enter fall through to BN_CLICKED.
@@ -209,8 +230,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				if (id == ID_CTX_OPEN_LOCATION) {
 					std::wstring path = get_process_path(pid);
 					if (!path.empty()) {
-						std::wstring args = L"/select,\"" + path + L"\"";
-						ShellExecute(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOW);
+						open_item_location(path);
 					}
 				} else if (id == ID_CTX_END_TASK) {
 					terminate_process(pid);
