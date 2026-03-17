@@ -35,14 +35,28 @@ static void update_tab_stop() {
 	}
 }
 
-static void update_sort_labels() {
+static void update_sort_ui() {
 	for (int i = 0; i < k_btn_count; ++i) {
-		wchar_t buf[32];
-		if (k_fields[i] == g_sort_by)
-			swprintf_s(buf, L"%s (%s)", k_labels[i], g_sort_desc ? L"desc" : L"asc");
+		bool active = (k_fields[i] == g_sort_by);
+		wchar_t buf[64];
+		if (active)
+			swprintf_s(buf, L"%s, %s", k_labels[i], g_sort_desc ? L"descending" : L"ascending");
 		else
 			wcscpy_s(buf, k_labels[i]);
 		SetWindowText(g_sort_btns[i], buf);
+		SendMessage(g_sort_btns[i], BM_SETCHECK, active ? BST_CHECKED : BST_UNCHECKED, 0);
+	}
+
+	// Update column header sort arrows
+	HWND hwnd_header = ListView_GetHeader(g_hwnd_list);
+	for (int i = 0; i < k_btn_count; ++i) {
+		HDITEMW hdi{};
+		hdi.mask = HDI_FORMAT;
+		Header_GetItem(hwnd_header, i, &hdi);
+		hdi.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
+		if (k_fields[i] == g_sort_by)
+			hdi.fmt |= g_sort_desc ? HDF_SORTDOWN : HDF_SORTUP;
+		Header_SetItem(hwnd_header, i, &hdi);
 	}
 }
 
@@ -75,21 +89,25 @@ static void do_refresh() {
 
 // Arrow keys immediately select the adjacent sort; Space/Enter fall through to BN_CLICKED.
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
-	if (msg == WM_KEYDOWN && (wp == VK_LEFT || wp == VK_RIGHT)) {
-		int idx = -1;
-		for (int i = 0; i < k_btn_count; ++i)
-			if (g_sort_btns[i] == hwnd) { idx = i; break; }
-		if (idx >= 0) {
-			int next = (wp == VK_RIGHT) ? (idx + 1) % k_btn_count
-			                            : (idx + k_btn_count - 1) % k_btn_count;
-			g_sort_by = k_fields[next];
-			g_sort_desc = false;
-			update_sort_labels();
-			update_tab_stop();
-			do_refresh();
-			SetFocus(g_sort_btns[next]);
-			return 0;
+	if (msg == WM_KEYDOWN) {
+		if (wp == VK_LEFT || wp == VK_RIGHT) {
+			int idx = -1;
+			for (int i = 0; i < k_btn_count; ++i)
+				if (g_sort_btns[i] == hwnd) { idx = i; break; }
+			if (idx >= 0) {
+				int next = (wp == VK_RIGHT) ? (idx + 1) % k_btn_count
+				                            : (idx + k_btn_count - 1) % k_btn_count;
+				g_sort_by = k_fields[next];
+				g_sort_desc = false;
+				update_sort_ui();
+				update_tab_stop();
+				do_refresh();
+				SetFocus(g_sort_btns[next]);
+				return 0;
+			}
 		}
+		if (wp == VK_UP || wp == VK_DOWN)
+			return 0; // swallow — don't let focus escape to the list
 	}
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
@@ -101,22 +119,20 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		icc.dwSize = sizeof(icc);
 		icc.dwICC = ICC_LISTVIEW_CLASSES;
 		InitCommonControlsEx(&icc);
-		int btn_x = 4;
+		int btn_x = 0;
 		for (int i = 0; i < k_btn_count; ++i) {
 			// WS_TABSTOP is set dynamically; only the active button carries it.
 			g_sort_btns[i] = CreateWindow(L"BUTTON", k_labels[i],
-				WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-				btn_x, 4, k_widths[i], 24,
+				WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
+				btn_x, 0, k_widths[i], 1,
 				hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(k_ids[i])),
 				GetModuleHandle(nullptr), nullptr);
 			SetWindowSubclass(g_sort_btns[i], sort_btn_proc, i, 0);
-			btn_x += k_widths[i] + 4;
+			btn_x += k_widths[i];
 		}
-		update_sort_labels();
-		update_tab_stop(); // gives WS_TABSTOP to button 0 (Name, the initial sort)
 		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, nullptr,
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS,
-			0, 36, 760, 524,
+			0, 1, 760, 559,
 			hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_LISTVIEW)),
 			GetModuleHandle(nullptr), nullptr);
 		ListView_SetExtendedListViewStyle(g_hwnd_list,
@@ -133,6 +149,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		add_col(1, L"PID", 80);
 		add_col(2, L"CPU Percent", 90);
 		add_col(3, L"Memory", 120);
+		update_sort_ui();
+		update_tab_stop();
 		do_refresh();
 		SetFocus(g_hwnd_list);
 		return 0;
@@ -148,7 +166,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 						g_sort_by = k_fields[i];
 						g_sort_desc = false;
 					}
-					update_sort_labels();
+					update_sort_ui();
 					update_tab_stop();
 					do_refresh();
 					break;
@@ -156,6 +174,24 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			}
 		}
 		return 0;
+	}
+	case WM_NOTIFY: {
+		auto* hdr = reinterpret_cast<NMHDR*>(lp);
+		if (hdr->idFrom == static_cast<UINT_PTR>(ID_LISTVIEW) && hdr->code == LVN_COLUMNCLICK) {
+			auto* nmlv = reinterpret_cast<NMLISTVIEW*>(lp);
+			if (nmlv->iSubItem < 0 || nmlv->iSubItem >= k_btn_count) return 0;
+			sort_field clicked = k_fields[nmlv->iSubItem];
+			if (clicked == g_sort_by)
+				g_sort_desc = !g_sort_desc;
+			else {
+				g_sort_by = clicked;
+				g_sort_desc = false;
+			}
+			update_sort_ui();
+			update_tab_stop();
+			do_refresh();
+		}
+		return DefWindowProc(hwnd, msg, wp, lp);
 	}
 	case WM_KEYDOWN:
 		if (wp == VK_F5) do_refresh();
