@@ -125,3 +125,25 @@ std::vector<process_entry> snapshot_processes(std::unordered_map<DWORD, cpu_snap
 	std::ranges::sort(entries, cmp);
 	return entries;
 }
+
+std::wstring get_process_path(DWORD pid) {
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return L"";
+	std::wstring path(MAX_PATH, L'\0');
+	DWORD size = MAX_PATH;
+	if (QueryFullProcessImageNameW(h, 0, path.data(), &size)) {
+		path.resize(size);
+	} else {
+		path.clear();
+	}
+	CloseHandle(h);
+	return path;
+}
+
+bool terminate_process(DWORD pid) {
+	HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+	if (!h) return false;
+	bool success = TerminateProcess(h, 1);
+	CloseHandle(h);
+	return success;
+}

@@ -3,6 +3,8 @@
 #include "tray.hpp"
 #include "process.hpp"
 #include <windows.h>
+#include <windowsx.h>
+#include <shellapi.h>
 #include <commctrl.h>
 #include <string>
 #include <unordered_map>
@@ -14,6 +16,8 @@
 #define ID_LISTVIEW     105
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT    202
+#define ID_CTX_OPEN_LOCATION 301
+#define ID_CTX_END_TASK      302
 #define WM_TRAYICON     (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 
@@ -74,9 +78,10 @@ static void do_refresh() {
 		total_cpu += e.cpu_percent;
 		total_mem += e.working_set;
 		LVITEM lvi{};
-		lvi.mask    = LVIF_TEXT;
+		lvi.mask    = LVIF_TEXT | LVIF_PARAM;
 		lvi.iItem   = i;
 		lvi.pszText = e.name.data();
+		lvi.lParam  = e.pid;
 		ListView_InsertItem(g_hwnd_list, &lvi);
 		auto pid_str = std::to_wstring(e.pid);
 		ListView_SetItemText(g_hwnd_list, i, 1, pid_str.data());
@@ -119,7 +124,13 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 }
 
 static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
-	if (msg == WM_KEYDOWN && wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
+	if (msg == WM_KEYDOWN) {
+		if (wp == 'E' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+			PostMessage(GetParent(hwnd), WM_COMMAND, ID_CTX_END_TASK, 0);
+			return 0;
+		}
+		if (wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
+	}
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
@@ -187,6 +198,27 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (id == ID_TRAY_RESTORE) { tray_restore(); return 0; }
 		if (id == ID_TRAY_EXIT)    { DestroyWindow(hwnd); return 0; }
 		if (id == IDCANCEL)        { PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0); return 0; }
+		if (id == ID_CTX_OPEN_LOCATION || id == ID_CTX_END_TASK) {
+			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+			if (selected != -1) {
+				LVITEM lvi{};
+				lvi.iItem = selected;
+				lvi.mask = LVIF_PARAM;
+				ListView_GetItem(g_hwnd_list, &lvi);
+				DWORD pid = static_cast<DWORD>(lvi.lParam);
+				if (id == ID_CTX_OPEN_LOCATION) {
+					std::wstring path = get_process_path(pid);
+					if (!path.empty()) {
+						std::wstring args = L"/select,\"" + path + L"\"";
+						ShellExecute(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOW);
+					}
+				} else if (id == ID_CTX_END_TASK) {
+					terminate_process(pid);
+					do_refresh();
+				}
+			}
+			return 0;
+		}
 		if (HIWORD(wp) == BN_CLICKED) {
 			for (int i = 0; i < k_sort_count; ++i) {
 				if (k_ids[i] == id) {
@@ -198,6 +230,36 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 					settings_save(g_prefs, k_labels, k_fields);
 					break;
 				}
+			}
+		}
+		return 0;
+	}
+
+	case WM_CONTEXTMENU: {
+		if (reinterpret_cast<HWND>(wp) == g_hwnd_list) {
+			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+			if (selected != -1) {
+				LVITEM lvi{};
+				lvi.iItem = selected;
+				lvi.mask = LVIF_PARAM;
+				ListView_GetItem(g_hwnd_list, &lvi);
+				DWORD pid = static_cast<DWORD>(lvi.lParam);
+				POINT pt;
+				pt.x = GET_X_LPARAM(lp);
+				pt.y = GET_Y_LPARAM(lp);
+				if (pt.x == -1 && pt.y == -1) {
+					RECT rc;
+					ListView_GetItemRect(g_hwnd_list, selected, &rc, LVIR_BOUNDS);
+					MapWindowPoints(g_hwnd_list, HWND_DESKTOP, reinterpret_cast<LPPOINT>(&rc), 2);
+					pt.x = rc.left + (rc.right - rc.left) / 2;
+					pt.y = rc.top + (rc.bottom - rc.top) / 2;
+				}
+				HMENU menu = CreatePopupMenu();
+				std::wstring path = get_process_path(pid);
+				if (!path.empty()) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
+				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tCtrl+E");
+				TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
+				DestroyMenu(menu);
 			}
 		}
 		return 0;

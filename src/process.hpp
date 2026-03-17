@@ -24,3 +24,5 @@ struct cpu_snapshot {
 };
 
 std::vector<process_entry> snapshot_processes(std::unordered_map<DWORD, cpu_snapshot>& prev_snapshots, sort_field sort_by, bool descending = false);
+std::wstring get_process_path(DWORD pid);
+bool terminate_process(DWORD pid);
