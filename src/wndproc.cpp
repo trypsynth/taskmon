@@ -41,7 +41,7 @@ static void update_sort_ui() {
 		bool active = (k_fields[i] == g_sort_by);
 		wchar_t buf[64];
 		if (active)
-			swprintf_s(buf, L"%s, %s", k_labels[i], g_sort_desc ? L"descending" : L"ascending");
+			swprintf_s(buf, L"%s (%s)", k_labels[i], g_sort_desc ? L"descending" : L"ascending");
 		else
 			wcscpy_s(buf, k_labels[i]);
 		SetWindowText(g_sort_btns[i], buf);
@@ -130,6 +130,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		icc.dwSize = sizeof(icc);
 		icc.dwICC = ICC_LISTVIEW_CLASSES;
 		InitCommonControlsEx(&icc);
+		CreateWindow(L"BUTTON", L"Sort by", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 0, 0, 360, 1, hwnd, nullptr, GetModuleHandle(nullptr), nullptr);
 		int btn_x = 0;
 		for (int i = 0; i < k_btn_count; ++i) {
 			// WS_TABSTOP is set dynamically; only the active button carries it.
