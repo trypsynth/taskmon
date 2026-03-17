@@ -10,27 +10,27 @@
 #include <string>
 #include <unordered_map>
 
-#define ID_SORT_NAME    101
-#define ID_SORT_PID     102
-#define ID_SORT_CPU     103
-#define ID_SORT_MEMORY  104
-#define ID_LISTVIEW     105
+#define ID_SORT_NAME 101
+#define ID_SORT_PID 102
+#define ID_SORT_CPU 103
+#define ID_SORT_MEMORY 104
+#define ID_LISTVIEW 105
 #define ID_TRAY_RESTORE 201
-#define ID_TRAY_EXIT    202
+#define ID_TRAY_EXIT 202
 #define ID_CTX_OPEN_LOCATION 301
-#define ID_CTX_END_TASK      302
-#define WM_TRAYICON     (WM_APP + 1)
+#define ID_CTX_END_TASK 302
+#define WM_TRAYICON (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 
-static const wchar_t*  k_labels[k_sort_count] = { L"Name", L"PID", L"CPU", L"Memory" };
+static const wchar_t* k_labels[k_sort_count] = { L"Name", L"PID", L"CPU", L"Memory" };
 static const sort_field k_fields[k_sort_count] = { sort_field::name, sort_field::pid, sort_field::cpu, sort_field::memory };
-static const int        k_ids[k_sort_count]    = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
-static const int        k_widths[k_sort_count] = { 120, 70, 70, 100 };
+static const int k_ids[k_sort_count] = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
+static const int k_widths[k_sort_count] = { 120, 70, 70, 100 };
 
-static HWND      g_hwnd      = nullptr;
-static HWND      g_hwnd_list = nullptr;
-static HWND      g_sort_btns[k_sort_count] = {};
-static HWND      g_last_focus = nullptr;
+static HWND g_hwnd = nullptr;
+static HWND g_hwnd_list = nullptr;
+static HWND g_sort_btns[k_sort_count] = {};
+static HWND g_last_focus = nullptr;
 static sort_prefs g_prefs;
 static std::unordered_map<DWORD, cpu_snapshot> g_snapshots;
 
@@ -53,7 +53,7 @@ static void update_sort_ui() {
 		bool active = (k_fields[i] == g_prefs.field);
 		wchar_t buf[64];
 		if (active) swprintf_s(buf, L"%s (%s)", k_labels[i], cur_desc() ? L"descending" : L"ascending");
-		else        wcscpy_s(buf, k_labels[i]);
+		else wcscpy_s(buf, k_labels[i]);
 		SetWindowText(g_sort_btns[i], buf);
 		SendMessage(g_sort_btns[i], BM_SETCHECK, active ? BST_CHECKED : BST_UNCHECKED, 0);
 	}
@@ -79,10 +79,10 @@ static void do_refresh() {
 		total_cpu += e.cpu_percent;
 		total_mem += e.working_set;
 		LVITEM lvi{};
-		lvi.mask    = LVIF_TEXT | LVIF_PARAM;
-		lvi.iItem   = i;
+		lvi.mask = LVIF_TEXT | LVIF_PARAM;
+		lvi.iItem = i;
 		lvi.pszText = e.name.data();
-		lvi.lParam  = e.pid;
+		lvi.lParam = e.pid;
 		ListView_InsertItem(g_hwnd_list, &lvi);
 		auto pid_str = std::to_wstring(e.pid);
 		ListView_SetItemText(g_hwnd_list, i, 1, pid_str.data());
@@ -133,9 +133,16 @@ static bool confirm_end_task(HWND hwnd, const std::wstring& name, DWORD pid) {
 
 // Arrow keys immediately switch the active sort field; Space/Enter fall through to BN_CLICKED.
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
-	if (msg == WM_GETDLGCODE) return DefSubclassProc(hwnd, msg, wp, lp) | DLGC_WANTARROWS;
+	if (msg == WM_GETDLGCODE) {
+		LRESULT r = DefSubclassProc(hwnd, msg, wp, lp) | DLGC_WANTARROWS;
+		auto* pmsg = reinterpret_cast<MSG*>(lp);
+		if (pmsg && ((pmsg->message == WM_KEYDOWN && pmsg->wParam == VK_RETURN) || (pmsg->message == WM_CHAR && pmsg->wParam == '\r'))) r |= DLGC_WANTMESSAGE;
+		return r;
+	}
+	if (msg == WM_CHAR && wp == '\r') return 0; // suppress beep: TranslateMessage turns VK_RETURN into WM_CHAR('\r')
 	if (msg == WM_KEYDOWN) {
 		if (wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
+		if (wp == VK_RETURN) { PostMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), reinterpret_cast<LPARAM>(hwnd)); return 0; }
 		if (wp == VK_LEFT || wp == VK_RIGHT) {
 			int idx = -1;
 			for (int i = 0; i < k_sort_count; ++i) if (g_sort_btns[i] == hwnd) { idx = i; break; }
@@ -180,12 +187,11 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (LOWORD(wp) == WA_INACTIVE) g_last_focus = GetFocus();
 		else SetFocus(g_last_focus ? g_last_focus : g_hwnd_list);
 		return 0;
-
 	case WM_CREATE: {
 		g_hwnd = hwnd;
 		INITCOMMONCONTROLSEX icc{ sizeof(icc), ICC_LISTVIEW_CLASSES };
 		InitCommonControlsEx(&icc);
-		// Invisible groupbox gives screen readers the "Sort by" group label.
+		// Give screen readers the "Sort by" group label.
 		CreateWindow(L"BUTTON", L"Sort by", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 0, 0, 360, 1, hwnd, nullptr, GetModuleHandle(nullptr), nullptr);
 		int btn_x = 0;
 		for (int i = 0; i < k_sort_count; ++i) {
@@ -200,10 +206,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			LVCOLUMN lvc{ LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM, 0, width, const_cast<LPWSTR>(text), 0, idx };
 			ListView_InsertColumn(g_hwnd_list, idx, &lvc);
 		};
-		add_col(0, L"Name",        260);
-		add_col(1, L"PID",          80);
-		add_col(2, L"CPU Percent",  90);
-		add_col(3, L"Memory",      120);
+		add_col(0, L"Name", 260);
+		add_col(1, L"PID", 80);
+		add_col(2, L"CPU Percent", 90);
+		add_col(3, L"Memory", 120);
 		g_prefs = settings_load(k_labels, k_fields);
 		update_sort_ui();
 		update_tab_stop();
@@ -212,18 +218,16 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		SetFocus(g_hwnd_list);
 		return 0;
 	}
-
 	case WM_HIDE_TO_TRAY:
 		ShowWindow(hwnd, SW_HIDE);
 		return 0;
-
 	case WM_TRAYICON:
 		if (lp == WM_LBUTTONUP) {
 			tray_restore();
 		} else if (lp == WM_RBUTTONUP) {
 			HMENU menu = CreatePopupMenu();
 			AppendMenu(menu, MF_STRING, ID_TRAY_RESTORE, L"Restore");
-			AppendMenu(menu, MF_STRING, ID_TRAY_EXIT,    L"Exit");
+			AppendMenu(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
 			POINT pt;
 			GetCursorPos(&pt);
 			SetForegroundWindow(hwnd);
@@ -232,12 +236,20 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			DestroyMenu(menu);
 		}
 		return 0;
-
 	case WM_COMMAND: {
 		WORD id = LOWORD(wp);
-		if (id == ID_TRAY_RESTORE) { tray_restore(); return 0; }
-		if (id == ID_TRAY_EXIT)    { DestroyWindow(hwnd); return 0; }
-		if (id == IDCANCEL)        { PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0); return 0; }
+		if (id == ID_TRAY_RESTORE) {
+			tray_restore();
+			return 0;
+		}
+		if (id == ID_TRAY_EXIT) {
+			DestroyWindow(hwnd);
+			return 0;
+		}
+		if (id == IDCANCEL) {
+			PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0);
+			return 0;
+		}
 		if (id == ID_CTX_OPEN_LOCATION || id == ID_CTX_END_TASK) {
 			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 			if (selected != -1) {
@@ -250,9 +262,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				DWORD pid = static_cast<DWORD>(lvi.lParam);
 				if (id == ID_CTX_OPEN_LOCATION) {
 					std::wstring path = get_process_path(pid);
-					if (!path.empty()) {
-						open_item_location(path);
-					}
+					if (!path.empty()) open_item_location(path);
 				} else if (id == ID_CTX_END_TASK) {
 					if (confirm_end_task(hwnd, name, pid)) {
 						terminate_process(pid);
@@ -277,7 +287,6 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		return 0;
 	}
-
 	case WM_CONTEXTMENU: {
 		if (reinterpret_cast<HWND>(wp) == g_hwnd_list) {
 			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
@@ -307,7 +316,6 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		return 0;
 	}
-
 	case WM_NOTIFY: {
 		auto* hdr = reinterpret_cast<NMHDR*>(lp);
 		if (hdr->idFrom == static_cast<UINT_PTR>(ID_LISTVIEW) && hdr->code == LVN_COLUMNCLICK) {
@@ -323,12 +331,16 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		return DefWindowProc(hwnd, msg, wp, lp);
 	}
-
 	case WM_KEYDOWN:
-		if (wp == VK_ESCAPE) { PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0); return 0; }
-		if (wp == VK_F5)     { do_refresh(); return 0; }
+		if (wp == VK_ESCAPE) {
+			PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0);
+			return 0;
+		}
+		if (wp == VK_F5) {
+			do_refresh();
+			return 0;
+		}
 		return 0;
-
 	case WM_DESTROY:
 		tray_remove();
 		PostQuitMessage(0);
