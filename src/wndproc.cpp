@@ -75,7 +75,7 @@ static void do_refresh() {
 		auto pid_str = std::to_wstring(e.pid);
 		ListView_SetItemText(g_hwnd_list, i, 1, pid_str.data());
 		wchar_t cpu_buf[16];
-		swprintf_s(cpu_buf, L"%.1f", e.cpu_percent);
+		swprintf_s(cpu_buf, L"%.2f", e.cpu_percent);
 		ListView_SetItemText(g_hwnd_list, i, 2, cpu_buf);
 		wchar_t mem_buf[32];
 		swprintf_s(mem_buf, L"%zu K", e.working_set / 1024);
