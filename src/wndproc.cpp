@@ -133,19 +133,28 @@ static bool confirm_end_task(HWND hwnd, const std::wstring& name, DWORD pid) {
 
 // Arrow keys immediately switch the active sort field; Space/Enter fall through to BN_CLICKED.
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
+	if (msg == WM_GETDLGCODE) return DefSubclassProc(hwnd, msg, wp, lp) | DLGC_WANTARROWS;
 	if (msg == WM_KEYDOWN) {
 		if (wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
 		if (wp == VK_LEFT || wp == VK_RIGHT) {
 			int idx = -1;
 			for (int i = 0; i < k_sort_count; ++i) if (g_sort_btns[i] == hwnd) { idx = i; break; }
 			if (idx >= 0) {
-				int next = (wp == VK_RIGHT) ? (idx + 1) % k_sort_count : (idx + k_sort_count - 1) % k_sort_count;
+				int next = (wp == VK_RIGHT) ? idx + 1 : idx - 1;
+				if (next < 0 || next >= k_sort_count) return 0;
 				g_prefs.field = k_fields[next];
-				update_sort_ui();
+				// Pre-set new button text before focus arrives so the screen reader reads the
+				// correct label in one announcement, not the old button's text change then the new.
+				wchar_t buf[64];
+				swprintf_s(buf, L"%s (%s)", k_labels[next], cur_desc() ? L"descending" : L"ascending");
+				SetWindowText(g_sort_btns[next], buf);
+				SendMessage(g_sort_btns[next], BM_SETCHECK, BST_CHECKED, 0);
 				update_tab_stop();
+				SetFocus(g_sort_btns[next]);
+				// update_sort_ui after focus moves: old button text change is silent, new button text is already correct.
+				update_sort_ui();
 				do_refresh();
 				settings_save(g_prefs, k_labels, k_fields);
-				SetFocus(g_sort_btns[next]);
 				return 0;
 			}
 		}
