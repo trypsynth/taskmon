@@ -7,6 +7,7 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <commctrl.h>
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 
@@ -33,6 +34,7 @@ static HWND g_sort_btns[k_sort_count] = {};
 static HWND g_last_focus = nullptr;
 static sort_prefs g_prefs;
 static std::unordered_map<DWORD, cpu_snapshot> g_snapshots;
+static std::vector<process_entry> g_entries;
 
 // Returns a reference to the desc flag for whichever field is currently active.
 static bool& cur_desc() {
@@ -68,20 +70,19 @@ static void update_sort_ui() {
 	}
 }
 
-static void do_refresh() {
-	auto entries = snapshot_processes(g_snapshots, g_prefs.field, cur_desc());
+static void populate_list(const std::vector<process_entry>& entries) {
 	SendMessage(g_hwnd_list, WM_SETREDRAW, FALSE, 0);
 	ListView_DeleteAllItems(g_hwnd_list);
 	double total_cpu = 0;
 	SIZE_T total_mem = 0;
 	int i = 0;
-	for (auto& e : entries) {
+	for (const auto& e : entries) {
 		total_cpu += e.cpu_percent;
 		total_mem += e.working_set;
 		LVITEM lvi{};
 		lvi.mask = LVIF_TEXT | LVIF_PARAM;
 		lvi.iItem = i;
-		lvi.pszText = e.name.data();
+		lvi.pszText = const_cast<LPWSTR>(e.name.c_str());
 		lvi.lParam = e.pid;
 		ListView_InsertItem(g_hwnd_list, &lvi);
 		auto pid_str = std::to_wstring(e.pid);
@@ -99,6 +100,27 @@ static void do_refresh() {
 	SendMessage(g_hwnd_list, WM_SETREDRAW, TRUE, 0);
 	InvalidateRect(g_hwnd_list, nullptr, FALSE);
 	tray_update_tip(total_cpu, total_mem);
+}
+
+// Re-sort the cached snapshot and redisplay — no process enumeration.
+static void do_sort() {
+	auto sorted = g_entries;
+	std::sort(sorted.begin(), sorted.end(), [](const process_entry& a, const process_entry& b) {
+		switch (g_prefs.field) {
+		case sort_field::name:   return cur_desc() ? _wcsicmp(a.name.c_str(), b.name.c_str()) > 0 : _wcsicmp(a.name.c_str(), b.name.c_str()) < 0;
+		case sort_field::pid:    return cur_desc() ? a.pid > b.pid : a.pid < b.pid;
+		case sort_field::cpu:    return cur_desc() ? a.cpu_percent > b.cpu_percent : a.cpu_percent < b.cpu_percent;
+		case sort_field::memory: return cur_desc() ? a.working_set > b.working_set : a.working_set < b.working_set;
+		default: return false;
+		}
+	});
+	populate_list(sorted);
+}
+
+// Full refresh: re-enumerate processes, update cache, redisplay.
+static void do_refresh() {
+	g_entries = snapshot_processes(g_snapshots, g_prefs.field, cur_desc());
+	populate_list(g_entries);
 }
 
 static bool open_item_location(const std::wstring& path) {
@@ -160,7 +182,7 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 				SetFocus(g_sort_btns[next]);
 				// update_sort_ui after focus moves: old button text change is silent, new button text is already correct.
 				update_sort_ui();
-				do_refresh();
+				do_sort();
 				settings_save(g_prefs, k_labels, k_fields);
 				return 0;
 			}
@@ -279,7 +301,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 					else g_prefs.field = k_fields[i];
 					update_sort_ui();
 					update_tab_stop();
-					do_refresh();
+					do_sort();
 					settings_save(g_prefs, k_labels, k_fields);
 					break;
 				}
@@ -325,7 +347,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				else g_prefs.field = k_fields[nmlv->iSubItem];
 				update_sort_ui();
 				update_tab_stop();
-				do_refresh();
+				do_sort();
 				settings_save(g_prefs, k_labels, k_fields);
 			}
 		}
