@@ -19,6 +19,7 @@ static const int k_widths[k_btn_count]        = { 120, 70, 70, 100 };
 
 static HWND g_hwnd_list = nullptr;
 static HWND g_sort_btns[k_btn_count] = {};
+static HWND g_last_focus = nullptr;
 static sort_field g_sort_by = sort_field::name;
 static bool g_sort_desc = false;
 static std::unordered_map<DWORD, cpu_snapshot> g_snapshots;
@@ -96,6 +97,16 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
+	case WM_ACTIVATE:
+		if (LOWORD(wp) == WA_INACTIVE) {
+			g_last_focus = GetFocus();
+		} else {
+			if (g_last_focus)
+				SetFocus(g_last_focus);
+			else
+				SetFocus(g_hwnd_list);
+		}
+		return 0;
 	case WM_CREATE: {
 		INITCOMMONCONTROLSEX icc{};
 		icc.dwSize = sizeof(icc);
