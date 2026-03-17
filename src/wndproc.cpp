@@ -22,7 +22,48 @@ static HWND g_sort_btns[k_btn_count] = {};
 static HWND g_last_focus = nullptr;
 static sort_field g_sort_by = sort_field::name;
 static bool g_sort_desc = false;
+static bool g_sort_desc_per_field[k_btn_count] = {};
 static std::unordered_map<DWORD, cpu_snapshot> g_snapshots;
+
+static std::wstring ini_path() {
+	wchar_t buf[MAX_PATH];
+	GetModuleFileName(nullptr, buf, MAX_PATH);
+	std::wstring p(buf);
+	auto slash = p.find_last_of(L"\\/");
+	if (slash != std::wstring::npos) p.resize(slash + 1);
+	return p + L"taskmon.ini";
+}
+
+static void load_settings() {
+	auto path = ini_path();
+	const wchar_t* sec = L"sort";
+	wchar_t field_buf[32];
+	GetPrivateProfileString(sec, L"field", k_labels[0], field_buf, 32, path.c_str());
+	for (int i = 0; i < k_btn_count; ++i) {
+		if (_wcsicmp(field_buf, k_labels[i]) == 0) {
+			g_sort_by = k_fields[i];
+			break;
+		}
+	}
+	for (int i = 0; i < k_btn_count; ++i) {
+		wchar_t key[32], val[4];
+		swprintf_s(key, L"%s_desc", k_labels[i]);
+		GetPrivateProfileString(sec, key, L"0", val, 4, path.c_str());
+		g_sort_desc_per_field[i] = (val[0] == L'1');
+		if (k_fields[i] == g_sort_by) g_sort_desc = g_sort_desc_per_field[i];
+	}
+}
+
+static void save_settings() {
+	auto path = ini_path();
+	const wchar_t* sec = L"sort";
+	for (int i = 0; i < k_btn_count; ++i) {
+		if (k_fields[i] == g_sort_by) WritePrivateProfileString(sec, L"field", k_labels[i], path.c_str());
+		wchar_t key[32];
+		swprintf_s(key, L"%s_desc", k_labels[i]);
+		WritePrivateProfileString(sec, key, g_sort_desc_per_field[i] ? L"1" : L"0", path.c_str());
+	}
+}
 
 // Only the active sort button holds WS_TABSTOP so the group counts as one tab stop.
 static void update_tab_stop() {
@@ -99,10 +140,11 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 				int next = (wp == VK_RIGHT) ? (idx + 1) % k_btn_count
 				                            : (idx + k_btn_count - 1) % k_btn_count;
 				g_sort_by = k_fields[next];
-				g_sort_desc = false;
+				g_sort_desc = g_sort_desc_per_field[next];
 				update_sort_ui();
 				update_tab_stop();
 				do_refresh();
+				save_settings();
 				SetFocus(g_sort_btns[next]);
 				return 0;
 			}
@@ -161,6 +203,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		add_col(1, L"PID", 80);
 		add_col(2, L"CPU Percent", 90);
 		add_col(3, L"Memory", 120);
+		load_settings();
 		update_sort_ui();
 		update_tab_stop();
 		do_refresh();
@@ -172,15 +215,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			WORD id = LOWORD(wp);
 			for (int i = 0; i < k_btn_count; ++i) {
 				if (k_ids[i] == id) {
-					if (k_fields[i] == g_sort_by)
+					if (k_fields[i] == g_sort_by) {
 						g_sort_desc = !g_sort_desc;
-					else {
+						g_sort_desc_per_field[i] = g_sort_desc;
+					} else {
 						g_sort_by = k_fields[i];
-						g_sort_desc = false;
+						g_sort_desc = g_sort_desc_per_field[i];
 					}
 					update_sort_ui();
 					update_tab_stop();
 					do_refresh();
+					save_settings();
 					break;
 				}
 			}
@@ -193,15 +238,18 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			auto* nmlv = reinterpret_cast<NMLISTVIEW*>(lp);
 			if (nmlv->iSubItem < 0 || nmlv->iSubItem >= k_btn_count) return 0;
 			sort_field clicked = k_fields[nmlv->iSubItem];
-			if (clicked == g_sort_by)
+			int ci = nmlv->iSubItem;
+			if (clicked == g_sort_by) {
 				g_sort_desc = !g_sort_desc;
-			else {
+				g_sort_desc_per_field[ci] = g_sort_desc;
+			} else {
 				g_sort_by = clicked;
-				g_sort_desc = false;
+				g_sort_desc = g_sort_desc_per_field[ci];
 			}
 			update_sort_ui();
 			update_tab_stop();
 			do_refresh();
+			save_settings();
 		}
 		return DefWindowProc(hwnd, msg, wp, lp);
 	}
