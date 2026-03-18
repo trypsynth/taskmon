@@ -222,29 +222,27 @@ static void create_menu_bar(HWND hwnd) {
 }
 
 static void set_refresh_interval(HWND hwnd, UINT ms) {
+	// validate ms against known options; fall back to 2000 if unrecognised
+	bool found = false;
+	for (int i = 0; i < k_refresh_option_count; ++i) {
+		if (k_refresh_options[i].ms == ms) { found = true; break; }
+	}
+	if (!found) ms = 2000;
 	g_prefs.refresh_ms = ms;
 	KillTimer(hwnd, ID_REFRESH_TIMER);
 	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, nullptr);
-	// Submenu order in create_menu_bar: Refresh(0), separator(1), Auto-refresh(2)
 	HMENU bar  = GetMenu(hwnd);
 	HMENU view = GetSubMenu(bar, 0);
 	HMENU sub  = GetSubMenu(view, 2);
+	if (!bar || !view || !sub) { settings_save(g_prefs, k_labels, k_fields); return; }
+	// Submenu order in create_menu_bar: Refresh(0), separator(1), Auto-refresh(2)
 	UINT first = k_refresh_options[0].id;
 	UINT last  = k_refresh_options[k_refresh_option_count - 1].id;
-	bool matched = false;
 	for (int i = 0; i < k_refresh_option_count; ++i) {
 		if (k_refresh_options[i].ms == ms) {
 			CheckMenuRadioItem(sub, first, last, k_refresh_options[i].id, MF_BYCOMMAND);
-			matched = true;
 			break;
 		}
-	}
-	if (!matched) {
-		// Unrecognised value (e.g. hand-edited INI) — fall back to 2 s default.
-		g_prefs.refresh_ms = 2000;
-		KillTimer(hwnd, ID_REFRESH_TIMER);
-		SetTimer(hwnd, ID_REFRESH_TIMER, 2000, nullptr);
-		CheckMenuRadioItem(sub, first, last, ID_AUTOREFRESH_2S, MF_BYCOMMAND);
 	}
 	settings_save(g_prefs, k_labels, k_fields);
 }
