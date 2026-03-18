@@ -22,10 +22,32 @@
 #define WM_TRAYICON (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 
+#define ID_REFRESH_TIMER  1
+#define ID_VIEW_REFRESH   401
+#define ID_AUTOREFRESH_OFF   501
+#define ID_AUTOREFRESH_1S    502
+#define ID_AUTOREFRESH_2S    503
+#define ID_AUTOREFRESH_5S    504
+#define ID_AUTOREFRESH_10S   505
+#define ID_AUTOREFRESH_30S   506
+#define ID_AUTOREFRESH_1MIN  507
+
 static const wchar_t* k_labels[k_sort_count] = { L"Name", L"PID", L"CPU", L"Memory" };
 static const sort_field k_fields[k_sort_count] = { sort_field::name, sort_field::pid, sort_field::cpu, sort_field::memory };
 static const int k_ids[k_sort_count] = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
 static const int k_widths[k_sort_count] = { 120, 70, 70, 100 };
+
+struct refresh_option { UINT id; UINT ms; const wchar_t* label; };
+static constexpr refresh_option k_refresh_options[] = {
+	{ ID_AUTOREFRESH_OFF,   0,      L"Off"       },
+	{ ID_AUTOREFRESH_1S,    1000,   L"1 second"  },
+	{ ID_AUTOREFRESH_2S,    2000,   L"2 seconds" },
+	{ ID_AUTOREFRESH_5S,    5000,   L"5 seconds" },
+	{ ID_AUTOREFRESH_10S,   10000,  L"10 seconds"},
+	{ ID_AUTOREFRESH_30S,   30000,  L"30 seconds"},
+	{ ID_AUTOREFRESH_1MIN,  60000,  L"1 minute"  },
+};
+static constexpr int k_refresh_option_count = static_cast<int>(std::size(k_refresh_options));
 
 static HWND g_hwnd = nullptr;
 static HWND g_hwnd_list = nullptr;
