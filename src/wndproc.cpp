@@ -208,6 +208,19 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
+static void create_menu_bar(HWND hwnd) {
+	HMENU bar  = CreateMenu();
+	HMENU view = CreatePopupMenu();
+	HMENU sub  = CreatePopupMenu();
+	for (int i = 0; i < k_refresh_option_count; ++i)
+		AppendMenu(sub, MF_STRING, k_refresh_options[i].id, k_refresh_options[i].label);
+	AppendMenu(view, MF_STRING,  ID_VIEW_REFRESH, L"Refresh\tF5");
+	AppendMenu(view, MF_SEPARATOR, 0, nullptr);
+	AppendMenu(view, MF_POPUP, reinterpret_cast<UINT_PTR>(sub), L"Auto-refresh");
+	AppendMenu(bar,  MF_POPUP, reinterpret_cast<UINT_PTR>(view), L"View");
+	SetMenu(hwnd, bar);
+}
+
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
 	case WM_ACTIVATE:
@@ -240,6 +253,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		g_prefs = settings_load(k_labels, k_fields);
 		update_sort_ui();
 		update_tab_stop();
+		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, k_window_title);
 		do_refresh();
 		SetFocus(g_hwnd_list);
