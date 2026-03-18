@@ -231,11 +231,13 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 	g_prefs.refresh_ms = ms;
 	KillTimer(hwnd, ID_REFRESH_TIMER);
 	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, nullptr);
-	HMENU bar  = GetMenu(hwnd);
+	HMENU bar = GetMenu(hwnd);
+	if (!bar) { settings_save(g_prefs, k_labels, k_fields); return; }
 	HMENU view = GetSubMenu(bar, 0);
-	HMENU sub  = GetSubMenu(view, 2);
-	if (!bar || !view || !sub) { settings_save(g_prefs, k_labels, k_fields); return; }
+	if (!view) { settings_save(g_prefs, k_labels, k_fields); return; }
 	// Submenu order in create_menu_bar: Refresh(0), separator(1), Auto-refresh(2)
+	HMENU sub = GetSubMenu(view, 2);
+	if (!sub) { settings_save(g_prefs, k_labels, k_fields); return; }
 	UINT first = k_refresh_options[0].id;
 	UINT last  = k_refresh_options[k_refresh_option_count - 1].id;
 	for (int i = 0; i < k_refresh_option_count; ++i) {
