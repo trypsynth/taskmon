@@ -221,6 +221,34 @@ static void create_menu_bar(HWND hwnd) {
 	SetMenu(hwnd, bar);
 }
 
+static void set_refresh_interval(HWND hwnd, UINT ms) {
+	g_prefs.refresh_ms = ms;
+	KillTimer(hwnd, ID_REFRESH_TIMER);
+	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, nullptr);
+	// Submenu order in create_menu_bar: Refresh(0), separator(1), Auto-refresh(2)
+	HMENU bar  = GetMenu(hwnd);
+	HMENU view = GetSubMenu(bar, 0);
+	HMENU sub  = GetSubMenu(view, 2);
+	UINT first = k_refresh_options[0].id;
+	UINT last  = k_refresh_options[k_refresh_option_count - 1].id;
+	bool matched = false;
+	for (int i = 0; i < k_refresh_option_count; ++i) {
+		if (k_refresh_options[i].ms == ms) {
+			CheckMenuRadioItem(sub, first, last, k_refresh_options[i].id, MF_BYCOMMAND);
+			matched = true;
+			break;
+		}
+	}
+	if (!matched) {
+		// Unrecognised value (e.g. hand-edited INI) — fall back to 2 s default.
+		g_prefs.refresh_ms = 2000;
+		KillTimer(hwnd, ID_REFRESH_TIMER);
+		SetTimer(hwnd, ID_REFRESH_TIMER, 2000, nullptr);
+		CheckMenuRadioItem(sub, first, last, ID_AUTOREFRESH_2S, MF_BYCOMMAND);
+	}
+	settings_save(g_prefs, k_labels, k_fields);
+}
+
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
 	case WM_ACTIVATE:
@@ -256,6 +284,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, k_window_title);
 		do_refresh();
+		set_refresh_interval(hwnd, g_prefs.refresh_ms);
 		SetFocus(g_hwnd_list);
 		return 0;
 	}
@@ -312,6 +341,13 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				}
 			}
 			return 0;
+		}
+		if (id == ID_VIEW_REFRESH) { do_refresh(); return 0; }
+		for (int i = 0; i < k_refresh_option_count; ++i) {
+			if (id == k_refresh_options[i].id) {
+				set_refresh_interval(hwnd, k_refresh_options[i].ms);
+				return 0;
+			}
 		}
 		if (HIWORD(wp) == BN_CLICKED) {
 			for (int i = 0; i < k_sort_count; ++i) {
@@ -372,6 +408,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		return DefWindowProc(hwnd, msg, wp, lp);
 	}
+	case WM_TIMER:
+		if (wp == ID_REFRESH_TIMER) { do_refresh(); return 0; }
+		break;
 	case WM_KEYDOWN:
 		if (wp == VK_ESCAPE) {
 			PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0);
@@ -383,6 +422,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		return 0;
 	case WM_DESTROY:
+		KillTimer(hwnd, ID_REFRESH_TIMER);
 		tray_remove();
 		PostQuitMessage(0);
 		return 0;
