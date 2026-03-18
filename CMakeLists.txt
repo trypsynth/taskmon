@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
-project(taskmon LANGUAGES CXX)
+project(taskmon LANGUAGES C)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-file(GLOB SOURCES CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB SOURCES CONFIGURE_DEPENDS "src/*.c")
 add_executable(taskmon WIN32 ${SOURCES})
 target_compile_definitions(taskmon PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(taskmon PRIVATE comctl32 ole32 shell32)
+if(MSVC)
+	target_compile_options(taskmon PRIVATE /GS- /W4 /Os /Oy)
+	target_link_options(taskmon PRIVATE /NODEFAULTLIB /ENTRY:WinMainCRTStartup /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MERGE:.rdata=.text /MERGE:.pdata=.text)
+endif()
+target_link_libraries(taskmon PRIVATE kernel32  user32 gdi32 shell32 comctl32 ole32 shlwapi ntdll)
