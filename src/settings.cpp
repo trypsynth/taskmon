@@ -25,7 +25,7 @@ sort_prefs settings_load(const wchar_t** labels, const sort_field* fields) {
 		prefs.desc[i] = (val[0] == L'1');
 	}
 	wchar_t ms_buf[16];
-	GetPrivateProfileString(L"refresh", L"interval_ms", L"2000", ms_buf, 16, path.c_str());
+	GetPrivateProfileString(L"refresh", L"interval_ms", L"0", ms_buf, 16, path.c_str());
 	prefs.refresh_ms = static_cast<UINT>(_wtoi(ms_buf));
 	return prefs;
 }
