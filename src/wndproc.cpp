@@ -145,6 +145,7 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	if (msg == WM_CHAR && wp == '\r') return 0; // suppress beep: TranslateMessage turns VK_RETURN into WM_CHAR('\r')
 	if (msg == WM_KEYDOWN) {
 		if (wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
+		if (wp == VK_F5) { do_refresh(); return 0; }
 		if (wp == VK_RETURN) { PostMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), reinterpret_cast<LPARAM>(hwnd)); return 0; }
 		if (wp == VK_LEFT || wp == VK_RIGHT) {
 			int idx = -1;
@@ -180,6 +181,7 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 			return 0;
 		}
 		if (wp == VK_ESCAPE) { PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0); return 0; }
+		if (wp == VK_F5) { do_refresh(); return 0; }
 	}
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
