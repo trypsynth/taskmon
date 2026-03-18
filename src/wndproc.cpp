@@ -75,7 +75,7 @@ static void populate_list(const std::vector<process_entry>& entries) {
 	SIZE_T total_mem = 0;
 	int i = 0;
 	for (const auto& e : entries) {
-		total_cpu += e.cpu_percent;
+		if (e.pid != 0) total_cpu += e.cpu_percent;
 		total_mem += e.working_set;
 		LVITEM lvi{};
 		lvi.mask = LVIF_TEXT | LVIF_PARAM;
