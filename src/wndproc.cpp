@@ -91,11 +91,33 @@ static void update_sort_ui() {
 }
 
 static void populate_list(const std::vector<process_entry>& entries) {
+	DWORD selected_pid = 0;
+	int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+	if (selected != -1) {
+		LVITEM lvi{};
+		lvi.mask = LVIF_PARAM;
+		lvi.iItem = selected;
+		if (ListView_GetItem(g_hwnd_list, &lvi)) {
+			selected_pid = static_cast<DWORD>(lvi.lParam);
+		}
+	}
+	DWORD top_pid = 0;
+	int top_idx = ListView_GetTopIndex(g_hwnd_list);
+	if (top_idx != -1 && ListView_GetItemCount(g_hwnd_list) > 0) {
+		LVITEM lvi{};
+		lvi.mask = LVIF_PARAM;
+		lvi.iItem = top_idx;
+		if (ListView_GetItem(g_hwnd_list, &lvi)) {
+			top_pid = static_cast<DWORD>(lvi.lParam);
+		}
+	}
 	SendMessage(g_hwnd_list, WM_SETREDRAW, FALSE, 0);
 	ListView_DeleteAllItems(g_hwnd_list);
 	double total_cpu = 0;
 	SIZE_T total_mem = 0;
 	int i = 0;
+	int new_selected_idx = -1;
+	int new_top_idx = -1;
 	for (const auto& e : entries) {
 		if (e.pid != 0) total_cpu += e.cpu_percent;
 		total_mem += e.working_set;
@@ -105,6 +127,8 @@ static void populate_list(const std::vector<process_entry>& entries) {
 		lvi.pszText = const_cast<LPWSTR>(e.name.c_str());
 		lvi.lParam = e.pid;
 		ListView_InsertItem(g_hwnd_list, &lvi);
+		if (e.pid == selected_pid) new_selected_idx = i;
+		if (e.pid == top_pid) new_top_idx = i;
 		auto pid_str = std::to_wstring(e.pid);
 		ListView_SetItemText(g_hwnd_list, i, 1, pid_str.data());
 		wchar_t cpu_buf[16];
@@ -115,8 +139,18 @@ static void populate_list(const std::vector<process_entry>& entries) {
 		ListView_SetItemText(g_hwnd_list, i, 3, mem_buf);
 		++i;
 	}
-	if (ListView_GetItemCount(g_hwnd_list) > 0)
+	if (new_selected_idx != -1) {
+		ListView_SetItemState(g_hwnd_list, new_selected_idx, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+	} else if (ListView_GetItemCount(g_hwnd_list) > 0) {
 		ListView_SetItemState(g_hwnd_list, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+	}
+	if (new_top_idx != -1) {
+		RECT rc;
+		if (ListView_GetItemRect(g_hwnd_list, 0, &rc, LVIR_BOUNDS)) {
+			int item_height = rc.bottom - rc.top;
+			ListView_Scroll(g_hwnd_list, 0, new_top_idx * item_height);
+		}
+	}
 	SendMessage(g_hwnd_list, WM_SETREDRAW, TRUE, 0);
 	InvalidateRect(g_hwnd_list, nullptr, FALSE);
 	tray_update_tip(total_cpu, total_mem);
