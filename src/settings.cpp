@@ -24,6 +24,9 @@ sort_prefs settings_load(const wchar_t** labels, const sort_field* fields) {
 		GetPrivateProfileString(L"sort", key, L"0", val, 4, path.c_str());
 		prefs.desc[i] = (val[0] == L'1');
 	}
+	wchar_t ms_buf[16];
+	GetPrivateProfileString(L"refresh", L"interval_ms", L"2000", ms_buf, 16, path.c_str());
+	prefs.refresh_ms = static_cast<UINT>(_wtoi(ms_buf));
 	return prefs;
 }
 
@@ -35,4 +38,7 @@ void settings_save(const sort_prefs& prefs, const wchar_t** labels, const sort_f
 		swprintf_s(key, L"%s_desc", labels[i]);
 		WritePrivateProfileString(L"sort", key, prefs.desc[i] ? L"1" : L"0", path.c_str());
 	}
+	wchar_t ms_str[16];
+	swprintf_s(ms_str, L"%u", prefs.refresh_ms);
+	WritePrivateProfileString(L"refresh", L"interval_ms", ms_str, path.c_str());
 }
