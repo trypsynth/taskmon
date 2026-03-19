@@ -126,7 +126,13 @@ static void populate_list(process_entry* entries, int count) {
 		wchar_t buf[32];
 		wnsprintf(buf, 32, L"%u", e->pid);
 		ListView_SetItemText(g_hwnd_list, i, 1, buf);
-		wnsprintf(buf, 32, L"%.2f", e->cpu_percent);
+		int cpu_whole = (int)e->cpu_percent;
+		int cpu_frac = (int)((e->cpu_percent - cpu_whole) * 100 + 0.5);
+		if (cpu_frac >= 100) {
+			cpu_whole++;
+			cpu_frac = 0;
+		}
+		wnsprintf(buf, 32, L"%d.%02d", cpu_whole, cpu_frac);
 		ListView_SetItemText(g_hwnd_list, i, 2, buf);
 		wnsprintf(buf, 32, L"%u K", (UINT)(e->working_set / 1024));
 		ListView_SetItemText(g_hwnd_list, i, 3, buf);

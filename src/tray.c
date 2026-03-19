@@ -37,12 +37,18 @@ void tray_update_tip(double cpu_pct, SIZE_T mem_bytes) {
 	nid.uID = s_uid;
 	nid.uFlags = NIF_TIP;
 	int mem_mb = (int)(mem_bytes / (1024 * 1024));
+	int cpu_whole = (int)cpu_pct;
+	int cpu_frac = (int)((cpu_pct - cpu_whole) * 10 + 0.5);
+	if (cpu_frac >= 10) {
+		cpu_whole++;
+		cpu_frac = 0;
+	}
 	if (mem_mb > 1024) {
 		int mem_gb_int = mem_mb / 1024;
 		int mem_gb_frac = (mem_mb % 1024) * 10 / 1024;
-		wnsprintf(nid.szTip, 128, L"%s, CPU %.1f%%, %d.%d GB memory used", s_name, cpu_pct, mem_gb_int, mem_gb_frac);
+		wnsprintf(nid.szTip, 128, L"%s, CPU %d.%d%%, %d.%d GB memory used", s_name, cpu_whole, cpu_frac, mem_gb_int, mem_gb_frac);
 	} else {
-		wnsprintf(nid.szTip, 128, L"%s, CPU %.1f%%, %d MB memory used", s_name, cpu_pct, mem_mb);
+		wnsprintf(nid.szTip, 128, L"%s, CPU %d.%d%%, %d MB memory used", s_name, cpu_whole, cpu_frac, mem_mb);
 	}
 	Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
