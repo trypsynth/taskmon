@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(taskmon LANGUAGES C)
 
-file(GLOB SOURCES CONFIGURE_DEPENDS "src/*.c")
+file(GLOB SOURCES CONFIGURE_DEPENDS "src/*.c" "src/*.rc")
 add_executable(taskmon WIN32 ${SOURCES})
 target_compile_definitions(taskmon PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 if(MSVC)

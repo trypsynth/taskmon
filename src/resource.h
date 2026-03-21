@@ -1,0 +1,5 @@
+#pragma once
+#define IDR_ACCEL 100
+#define IDD_SETTINGS 101
+#define IDC_REFRESH_COMBO 1001
+#define ID_VIEW_SETTINGS 402

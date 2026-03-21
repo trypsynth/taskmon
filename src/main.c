@@ -1,4 +1,5 @@
 #include "wndproc.h"
+#include "resource.h"
 #include <windows.h>
 #include <objbase.h>
 
@@ -42,9 +43,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show)
 	}
 	ShowWindow(hwnd, show);
 	UpdateWindow(hwnd);
+	HACCEL haccel = LoadAccelerators(instance, MAKEINTRESOURCE(IDR_ACCEL));
 	MSG msg = {0};
 	while (GetMessage(&msg, NULL, 0, 0)) {
-		if (!IsDialogMessage(hwnd, &msg)) {
+		if (!TranslateAccelerator(hwnd, haccel, &msg) && !IsDialogMessage(hwnd, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}

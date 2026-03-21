@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "tray.h"
 #include "process.h"
+#include "resource.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -21,11 +22,6 @@
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 #define ID_REFRESH_TIMER 1
 #define ID_VIEW_REFRESH 401
-#define ID_AUTOREFRESH_OFF 501
-#define ID_AUTOREFRESH_5S 502
-#define ID_AUTOREFRESH_10S 503
-#define ID_AUTOREFRESH_30S 504
-#define ID_AUTOREFRESH_1MIN 505
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
 const wchar_t WINDOW_TITLE[] = L"Taskmon";
@@ -34,19 +30,9 @@ static const sort_field FIELDS[SORT_COUNT] = {SORT_FIELD_NAME, SORT_FIELD_PID, S
 static const int IDS[SORT_COUNT] = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
 static const int widths[SORT_COUNT] = { 120, 70, 70, 100 };
 
-typedef struct {
-	UINT id;
-	UINT ms;
-	const wchar_t* label;
-} refresh_option;
-static const refresh_option REFRESH_OPTIONS[] = {
-	{ ID_AUTOREFRESH_OFF, 0, L"Off" },
-	{ ID_AUTOREFRESH_5S, 5000, L"5 seconds" },
-	{ ID_AUTOREFRESH_10S, 10000, L"10 seconds"},
-	{ ID_AUTOREFRESH_30S, 30000, L"30 seconds"},
-	{ ID_AUTOREFRESH_1MIN, 60000, L"1 minute" },
-};
-#define REFRESH_OPTION_COUNT (sizeof(REFRESH_OPTIONS) / sizeof(REFRESH_OPTIONS[0]))
+static const UINT REFRESH_MS[] = { 0, 5000, 10000, 30000, 60000 };
+static const wchar_t* REFRESH_LABELS[] = { L"Off", L"5 seconds", L"10 seconds", L"30 seconds", L"1 minute" };
+#define REFRESH_OPTION_COUNT (sizeof(REFRESH_MS) / sizeof(REFRESH_MS[0]))
 
 static HWND g_hwnd = NULL;
 static HWND g_hwnd_list = NULL;
@@ -183,6 +169,18 @@ static BOOL open_item_location(const wchar_t* path) {
 	return (INT_PTR)ShellExecute(NULL, L"open", folder, NULL, NULL, SW_SHOW) > 32;
 }
 
+static void set_refresh_interval(HWND hwnd, UINT ms) {
+	BOOL found = FALSE;
+	for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
+		if (REFRESH_MS[i] == ms) { found = TRUE; break; }
+	}
+	if (!found) ms = 0;
+	g_prefs.refresh_ms = ms;
+	KillTimer(hwnd, ID_REFRESH_TIMER);
+	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, NULL);
+	settings_save(&g_prefs, LABELS, FIELDS);
+}
+
 static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
 	wchar_t message[512];
 	wnsprintf(message, 512, L"End \"%s\" (PID %u)?\n\nUnsaved data may be lost.", name[0] ? name : L"this process", pid);
@@ -257,54 +255,49 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
+static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) {
+	UNREFERENCED_PARAMETER(lp);
+	switch (msg) {
+	case WM_INITDIALOG: {
+		HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
+		int sel = 0;
+		for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
+			SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)REFRESH_LABELS[i]);
+			if (REFRESH_MS[i] == g_prefs.refresh_ms) sel = i;
+		}
+		SendMessage(combo, CB_SETCURSEL, sel, 0);
+		return TRUE;
+	}
+	case WM_COMMAND:
+		if (LOWORD(wp) == IDOK) {
+			HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
+			int sel = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
+			if (sel >= 0 && sel < REFRESH_OPTION_COUNT)
+				set_refresh_interval(g_hwnd, REFRESH_MS[sel]);
+			EndDialog(hdlg, IDOK);
+			return TRUE;
+		}
+		if (LOWORD(wp) == IDCANCEL) {
+			EndDialog(hdlg, IDCANCEL);
+			return TRUE;
+		}
+		break;
+	}
+	return FALSE;
+}
+
+static void open_settings(HWND hwnd) {
+	DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTINGS), hwnd, settings_dlg_proc);
+}
+
 static void create_menu_bar(HWND hwnd) {
 	HMENU bar = CreateMenu();
 	HMENU view = CreatePopupMenu();
-	HMENU sub = CreatePopupMenu();
-	for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) AppendMenu(sub, MF_STRING, REFRESH_OPTIONS[i].id, REFRESH_OPTIONS[i].label);
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
-	AppendMenu(view, MF_POPUP, (UINT_PTR)sub, L"Auto-refresh");
+	AppendMenu(view, MF_STRING, ID_VIEW_SETTINGS, L"Settings...\tCtrl+,");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)view, L"View");
 	SetMenu(hwnd, bar);
-}
-
-static void set_refresh_interval(HWND hwnd, UINT ms) {
-	BOOL found = FALSE;
-	for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
-		if (REFRESH_OPTIONS[i].ms == ms) {
-			found = TRUE;
-			break;
-		}
-	}
-	if (!found) ms = 0;
-	g_prefs.refresh_ms = ms;
-	KillTimer(hwnd, ID_REFRESH_TIMER);
-	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, NULL);
-	HMENU bar = GetMenu(hwnd);
-	if (!bar) {
-		settings_save(&g_prefs, LABELS, FIELDS);
-		return;
-	}
-	HMENU view = GetSubMenu(bar, 0);
-	if (!view) {
-		settings_save(&g_prefs, LABELS, FIELDS);
-		return;
-	}
-	HMENU sub = GetSubMenu(view, 2);
-	if (!sub) {
-		settings_save(&g_prefs, LABELS, FIELDS);
-		return;
-	}
-	UINT first = REFRESH_OPTIONS[0].id;
-	UINT last = REFRESH_OPTIONS[REFRESH_OPTION_COUNT - 1].id;
-	for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
-		if (REFRESH_OPTIONS[i].ms == ms) {
-			CheckMenuRadioItem(sub, first, last, REFRESH_OPTIONS[i].id, MF_BYCOMMAND);
-			break;
-		}
-	}
-	settings_save(&g_prefs, LABELS, FIELDS);
 }
 
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -402,11 +395,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			do_refresh();
 			return 0;
 		}
-		for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
-			if (id == REFRESH_OPTIONS[i].id) {
-				set_refresh_interval(hwnd, REFRESH_OPTIONS[i].ms);
-				return 0;
-			}
+		if (id == ID_VIEW_SETTINGS) {
+			open_settings(hwnd);
+			return 0;
 		}
 		if (HIWORD(wp) == BN_CLICKED) {
 			for (int i = 0; i < SORT_COUNT; ++i) {
