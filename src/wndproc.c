@@ -21,7 +21,6 @@
 #define WM_TRAYICON (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 #define ID_REFRESH_TIMER 1
-#define ID_VIEW_REFRESH 401
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
 const wchar_t WINDOW_TITLE[] = L"Taskmon";
@@ -200,10 +199,6 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 			PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
 			return 0;
 		}
-		if (wp == VK_F5) {
-			do_refresh();
-			return 0;
-		}
 		if (wp == VK_RETURN) {
 			PostMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
 			return 0;
@@ -245,10 +240,6 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 		}
 		if (wp == VK_ESCAPE) {
 			PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
-			return 0;
-		}
-		if (wp == VK_F5) {
-			do_refresh();
 			return 0;
 		}
 	}
