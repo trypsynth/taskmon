@@ -29,10 +29,6 @@ static const sort_field FIELDS[SORT_COUNT] = {SORT_FIELD_NAME, SORT_FIELD_PID, S
 static const int IDS[SORT_COUNT] = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
 static const int widths[SORT_COUNT] = { 120, 70, 70, 100 };
 
-static const UINT REFRESH_MS[] = { 0, 5000, 10000, 30000, 60000 };
-static const wchar_t* REFRESH_LABELS[] = { L"Off", L"5 seconds", L"10 seconds", L"30 seconds", L"1 minute" };
-#define REFRESH_OPTION_COUNT (sizeof(REFRESH_MS) / sizeof(REFRESH_MS[0]))
-
 static HWND g_hwnd = NULL;
 static HWND g_hwnd_list = NULL;
 static HWND g_sort_btns[SORT_COUNT] = {0};
@@ -246,41 +242,6 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
-static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) {
-	UNREFERENCED_PARAMETER(lp);
-	switch (msg) {
-	case WM_INITDIALOG: {
-		HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
-		int sel = 0;
-		for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
-			SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)REFRESH_LABELS[i]);
-			if (REFRESH_MS[i] == g_prefs.refresh_ms) sel = i;
-		}
-		SendMessage(combo, CB_SETCURSEL, sel, 0);
-		return TRUE;
-	}
-	case WM_COMMAND:
-		if (LOWORD(wp) == IDOK) {
-			HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
-			int sel = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
-			if (sel >= 0 && sel < REFRESH_OPTION_COUNT)
-				set_refresh_interval(g_hwnd, REFRESH_MS[sel]);
-			EndDialog(hdlg, IDOK);
-			return TRUE;
-		}
-		if (LOWORD(wp) == IDCANCEL) {
-			EndDialog(hdlg, IDCANCEL);
-			return TRUE;
-		}
-		break;
-	}
-	return FALSE;
-}
-
-static void open_settings(HWND hwnd) {
-	DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTINGS), hwnd, settings_dlg_proc);
-}
-
 static void create_menu_bar(HWND hwnd) {
 	HMENU bar = CreateMenu();
 	HMENU view = CreatePopupMenu();
@@ -387,7 +348,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			return 0;
 		}
 		if (id == ID_VIEW_SETTINGS) {
-			open_settings(hwnd);
+			UINT ms = open_settings(hwnd, g_prefs.refresh_ms);
+			if (ms != (UINT)-1) set_refresh_interval(hwnd, ms);
 			return 0;
 		}
 		if (HIWORD(wp) == BN_CLICKED) {
