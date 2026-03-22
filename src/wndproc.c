@@ -14,7 +14,6 @@
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
 #define ID_CTX_OPEN_LOCATION 301
-#define ID_CTX_END_TASK 302
 #define WM_TRAYICON (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 #define ID_REFRESH_TIMER 1
@@ -251,10 +250,6 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
 	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
 	if (msg == WM_KEYDOWN) {
-		if (wp == VK_DELETE) {
-			PostMessage(GetParent(hwnd), WM_COMMAND, ID_CTX_END_TASK, 0);
-			return 0;
-		}
 		if (wp == VK_ESCAPE) {
 			PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
 			return 0;
@@ -475,7 +470,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				wchar_t path[MAX_PATH];
 				get_process_path(pid, path, MAX_PATH);
 				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
-				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tCtrl+E");
+				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tDelete");
 				TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
 				DestroyMenu(menu);
 			}
