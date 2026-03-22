@@ -17,6 +17,7 @@
 #define ID_CTX_OPEN_LOCATION 301
 #define WM_TRAYICON (WM_APP + 1)
 #define ID_REFRESH_TIMER 1
+#define ID_PRIME_TIMER   2
 #define ID_HOTKEY_TOGGLE 1
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
@@ -104,7 +105,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		apply_columns();
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
-		do_refresh();
+		// Prime the snapshot table so the first real refresh has deltas to work from.
+		// Discard results — the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
+		{
+			int count = 0;
+			process_entry* primed = snapshot_processes(g_snapshots, &count, g_prefs.field, g_prefs.desc[(int)g_prefs.field]);
+			if (primed) free_process_entries(primed);
+		}
+		SetTimer(hwnd, ID_PRIME_TIMER, 250, NULL);
 		set_refresh_interval(hwnd, g_prefs.refresh_ms);
 		SetFocus(g_hwnd_list);
 		return 0;
@@ -262,6 +270,11 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		return DefWindowProc(hwnd, msg, wp, lp);
 	}
 	case WM_TIMER:
+		if (wp == ID_PRIME_TIMER) {
+			KillTimer(hwnd, ID_PRIME_TIMER);
+			do_refresh();
+			return 0;
+		}
 		if (wp == ID_REFRESH_TIMER) {
 			do_refresh();
 			return 0;
