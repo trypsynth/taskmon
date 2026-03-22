@@ -13,6 +13,7 @@ typedef enum {
 
 typedef struct {
 	const wchar_t* label;
+	const wchar_t* header;
 	int width;
 	sort_field field;
 	BOOL always_visible;

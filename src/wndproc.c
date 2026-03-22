@@ -296,7 +296,7 @@ static void apply_columns() {
 		g_sort_btn_count++;
 		LVCOLUMN lvc = {0};
 		lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-		lvc.pszText = (wchar_t*)COLUMNS[i].label;
+		lvc.pszText = (wchar_t*)COLUMNS[i].header;
 		lvc.cx = COLUMNS[i].width;
 		lvc.iSubItem = lv_col;
 		ListView_InsertColumn(g_hwnd_list, lv_col, &lvc);
