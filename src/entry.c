@@ -32,11 +32,9 @@ void* memmove(void* dest, const void* src, size_t count) {
 
 // Global handle used by other parts
 HINSTANCE g_instance;
-
 // Magic symbol required by MSVC when using floating point in CRT-less build
 int _fltused = 0x9875;
 
-// Forward declaration of the actual WinMain
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show);
 
 void __stdcall WinMainCRTStartup() {

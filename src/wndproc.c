@@ -398,6 +398,21 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 					if (confirm_end_task(hwnd, name, pid)) {
 						terminate_process(pid);
 						do_refresh();
+						// If the process is gone, select the nearest item to where it was
+						int count = ListView_GetItemCount(g_hwnd_list);
+						BOOL pid_still_present = FALSE;
+						for (int i = 0; i < count && !pid_still_present; i++) {
+							LVITEM lvi2 = {0};
+							lvi2.mask = LVIF_PARAM;
+							lvi2.iItem = i;
+							ListView_GetItem(g_hwnd_list, &lvi2);
+							if ((DWORD)lvi2.lParam == pid) pid_still_present = TRUE;
+						}
+						if (!pid_still_present && count > 0) {
+							int new_sel = selected < count ? selected : count - 1;
+							ListView_SetItemState(g_hwnd_list, new_sel, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+							ListView_EnsureVisible(g_hwnd_list, new_sel, FALSE);
+						}
 					}
 				}
 			}
