@@ -30,13 +30,16 @@ void tray_remove() {
 	Shell_NotifyIcon(NIM_DELETE, &nid);
 }
 
-void tray_update_tip(double cpu_pct, SIZE_T mem_bytes) {
+void tray_update_tip(double cpu_pct) {
 	NOTIFYICONDATA nid = {0};
 	nid.cbSize = sizeof(nid);
 	nid.hWnd = s_hwnd;
 	nid.uID = s_uid;
 	nid.uFlags = NIF_TIP;
-	int mem_mb = (int)(mem_bytes / (1024 * 1024));
+	MEMORYSTATUSEX ms = {0};
+	ms.dwLength = sizeof(ms);
+	GlobalMemoryStatusEx(&ms);
+	int mem_mb = (int)((ms.ullTotalPhys - ms.ullAvailPhys) / (1024 * 1024));
 	int cpu_whole = (int)cpu_pct;
 	int cpu_frac = (int)((cpu_pct - cpu_whole) * 10 + 0.5);
 	if (cpu_frac >= 10) {

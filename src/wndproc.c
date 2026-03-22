@@ -113,13 +113,11 @@ static void populate_list(process_entry* entries, int count) {
 	SendMessage(g_hwnd_list, WM_SETREDRAW, FALSE, 0);
 	ListView_DeleteAllItems(g_hwnd_list);
 	double total_cpu = 0;
-	SIZE_T total_mem = 0;
 	int new_selected_idx = -1;
 	int new_top_idx = -1;
 	for (int i = 0; i < count; i++) {
 		process_entry* e = &entries[i];
 		if (e->pid != 0) total_cpu += e->cpu_percent;
-		total_mem += e->working_set;
 		LVITEM lvi = {0};
 		lvi.mask = LVIF_TEXT | LVIF_PARAM;
 		lvi.iItem = i;
@@ -148,7 +146,7 @@ static void populate_list(process_entry* entries, int count) {
 	}
 	SendMessage(g_hwnd_list, WM_SETREDRAW, TRUE, 0);
 	InvalidateRect(g_hwnd_list, NULL, FALSE);
-	tray_update_tip(total_cpu, total_mem);
+	tray_update_tip(total_cpu);
 }
 
 static void do_refresh() {
