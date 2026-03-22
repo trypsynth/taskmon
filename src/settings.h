@@ -8,6 +8,7 @@ typedef enum {
 	COL_MEMORY,
 	COL_THREADS,
 	COL_HANDLES,
+	COL_STARTTIME,
 	COL_COUNT,
 } column_id;
 

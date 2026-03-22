@@ -8,6 +8,7 @@ typedef enum {
 	SORT_FIELD_MEMORY,
 	SORT_FIELD_THREADS,
 	SORT_FIELD_HANDLES,
+	SORT_FIELD_STARTTIME,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -18,6 +19,7 @@ typedef struct {
 	SIZE_T working_set;
 	DWORD threads;
 	DWORD handles;
+	ULONGLONG start_time;
 } process_entry;
 
 typedef struct {

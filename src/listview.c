@@ -27,6 +27,21 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_HANDLES:
 		wnsprintf(buf, len, L"%u", e->handles);
 		break;
+	case COL_STARTTIME: {
+		if (!e->start_time) { buf[0] = L'\0'; break; }
+		FILETIME ft, lft;
+		ft.dwLowDateTime  = (DWORD)(e->start_time & 0xFFFFFFFF);
+		ft.dwHighDateTime = (DWORD)(e->start_time >> 32);
+		FileTimeToLocalFileTime(&ft, &lft);
+		SYSTEMTIME st, now;
+		FileTimeToSystemTime(&lft, &st);
+		GetLocalTime(&now);
+		if (st.wYear == now.wYear && st.wMonth == now.wMonth && st.wDay == now.wDay)
+			wnsprintf(buf, len, L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
+		else
+			wnsprintf(buf, len, L"%02d/%02d %02d:%02d", st.wMonth, st.wDay, st.wHour, st.wMinute);
+		break;
+	}
 	default:
 		buf[0] = L'\0';
 		break;

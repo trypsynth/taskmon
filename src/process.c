@@ -118,6 +118,9 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_HANDLES:
 		res = (a->handles < b->handles) ? -1 : (a->handles > b->handles);
 		break;
+	case SORT_FIELD_STARTTIME:
+		res = (a->start_time < b->start_time) ? -1 : (a->start_time > b->start_time);
+		break;
 	default:
 		break;
 	}
@@ -171,6 +174,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->working_set = spi->WorkingSetSize;
 		e->threads = spi->NumberOfThreads;
 		e->handles = spi->HandleCount;
+		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {
