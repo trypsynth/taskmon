@@ -15,6 +15,8 @@
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
 #define ID_CTX_OPEN_LOCATION   301
+#define ID_CTX_SUSPEND         303
+#define ID_CTX_RESUME          304
 #define ID_CTX_PRIORITY_BASE   310  // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
 
 static const struct { DWORD cls; const wchar_t* label; } PRIORITY_CLASSES[] = {
@@ -160,6 +162,19 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0);
 			return 0;
 		}
+		if (id == ID_CTX_SUSPEND || id == ID_CTX_RESUME) {
+			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+			if (selected != -1) {
+				LVITEM lvi = {0};
+				lvi.iItem = selected;
+				lvi.mask = LVIF_PARAM;
+				ListView_GetItem(g_hwnd_list, &lvi);
+				if (id == ID_CTX_SUSPEND) suspend_process((DWORD)lvi.lParam);
+				else                       resume_process((DWORD)lvi.lParam);
+				do_refresh();
+			}
+			return 0;
+		}
 		if (id == ID_CTX_OPEN_LOCATION || id == ID_CTX_END_TASK) {
 			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 			if (selected != -1) {
@@ -268,6 +283,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				wchar_t path[MAX_PATH];
 				get_process_path(pid, path, MAX_PATH);
 				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
+				if (is_process_suspended(pid))
+					AppendMenu(menu, MF_STRING, ID_CTX_RESUME,  L"Resume");
+				else
+					AppendMenu(menu, MF_STRING, ID_CTX_SUSPEND, L"Suspend");
 				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tDelete");
 				HMENU pri_menu = CreatePopupMenu();
 				DWORD cur_cls = 0;

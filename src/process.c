@@ -30,6 +30,10 @@ typedef struct SPI {
 } SPI;
 
 typedef NTSTATUS (NTAPI *PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
+typedef NTSTATUS (NTAPI *PFN_NtProc)(HANDLE);
+
+static DWORD g_suspended_pids[SNAPSHOT_CAPACITY];
+static int   g_suspended_count = 0;
 
 static void* heap_alloc(SIZE_T size) {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
@@ -179,6 +183,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->handles = spi->HandleCount;
 		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
 		e->base_priority = spi->BasePriority;
+		e->suspended = is_process_suspended(pid);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {
@@ -231,6 +236,44 @@ BOOL terminate_process(DWORD pid) {
 	BOOL success = TerminateProcess(h, 1);
 	CloseHandle(h);
 	return success;
+}
+
+BOOL is_process_suspended(DWORD pid) {
+	for (int i = 0; i < g_suspended_count; i++)
+		if (g_suspended_pids[i] == pid) return TRUE;
+	return FALSE;
+}
+
+BOOL suspend_process(DWORD pid) {
+	static PFN_NtProc fn = NULL;
+	if (!fn) fn = (PFN_NtProc)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtSuspendProcess");
+	if (!fn) return FALSE;
+	HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+	if (!h) return FALSE;
+	BOOL ok = NT_SUCCESS(fn(h));
+	CloseHandle(h);
+	if (ok && g_suspended_count < SNAPSHOT_CAPACITY)
+		g_suspended_pids[g_suspended_count++] = pid;
+	return ok;
+}
+
+BOOL resume_process(DWORD pid) {
+	static PFN_NtProc fn = NULL;
+	if (!fn) fn = (PFN_NtProc)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtResumeProcess");
+	if (!fn) return FALSE;
+	HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+	if (!h) return FALSE;
+	BOOL ok = NT_SUCCESS(fn(h));
+	CloseHandle(h);
+	if (ok) {
+		for (int i = 0; i < g_suspended_count; i++) {
+			if (g_suspended_pids[i] == pid) {
+				g_suspended_pids[i] = g_suspended_pids[--g_suspended_count];
+				break;
+			}
+		}
+	}
+	return ok;
 }
 
 BOOL set_process_priority(DWORD pid, DWORD priority_class) {

@@ -22,6 +22,7 @@ typedef struct {
 	DWORD handles;
 	ULONGLONG start_time;
 	int base_priority;
+	BOOL suspended;
 } process_entry;
 
 typedef struct {
@@ -43,3 +44,6 @@ void sort_process_entries(process_entry* entries, int count, sort_field field, B
 void get_process_path(DWORD pid, wchar_t* path, DWORD size);
 BOOL terminate_process(DWORD pid);
 BOOL set_process_priority(DWORD pid, DWORD priority_class);
+BOOL is_process_suspended(DWORD pid);
+BOOL suspend_process(DWORD pid);
+BOOL resume_process(DWORD pid);
