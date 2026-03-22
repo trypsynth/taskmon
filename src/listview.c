@@ -27,6 +27,20 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_HANDLES:
 		wnsprintf(buf, len, L"%u", e->handles);
 		break;
+	case COL_PRIORITY: {
+		const wchar_t* label;
+		switch (e->base_priority) {
+		case  4: label = L"Idle";         break;
+		case  6: label = L"Below Normal"; break;
+		case  8: label = L"Normal";       break;
+		case 10: label = L"Above Normal"; break;
+		case 13: label = L"High";         break;
+		case 24: label = L"Realtime";     break;
+		default: wnsprintf(buf, len, L"%d", e->base_priority); return;
+		}
+		lstrcpyn(buf, label, len);
+		break;
+	}
 	case COL_STARTTIME: {
 		if (!e->start_time) { buf[0] = L'\0'; break; }
 		FILETIME ft, lft;

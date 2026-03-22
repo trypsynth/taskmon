@@ -9,6 +9,7 @@ typedef enum {
 	SORT_FIELD_THREADS,
 	SORT_FIELD_HANDLES,
 	SORT_FIELD_STARTTIME,
+	SORT_FIELD_PRIORITY,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -20,6 +21,7 @@ typedef struct {
 	DWORD threads;
 	DWORD handles;
 	ULONGLONG start_time;
+	int base_priority;
 } process_entry;
 
 typedef struct {
@@ -40,3 +42,4 @@ void free_process_entries(process_entry* entries);
 void sort_process_entries(process_entry* entries, int count, sort_field field, BOOL descending);
 void get_process_path(DWORD pid, wchar_t* path, DWORD size);
 BOOL terminate_process(DWORD pid);
+BOOL set_process_priority(DWORD pid, DWORD priority_class);

@@ -10,7 +10,8 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"Memory", L"Memory", 120, SORT_FIELD_MEMORY, FALSE, TRUE },
 	{ L"Threads", L"Threads", 70, SORT_FIELD_THREADS, FALSE, FALSE },
 	{ L"Handles", L"Handles",  70, SORT_FIELD_HANDLES,   FALSE, FALSE },
-	{ L"Started", L"Started", 100, SORT_FIELD_STARTTIME, FALSE, FALSE },
+	{ L"Started",  L"Started",  100, SORT_FIELD_STARTTIME, FALSE, FALSE },
+	{ L"Priority", L"Priority", 100, SORT_FIELD_PRIORITY,  FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

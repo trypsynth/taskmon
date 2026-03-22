@@ -14,7 +14,18 @@
 #define ID_LISTVIEW 105
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
-#define ID_CTX_OPEN_LOCATION 301
+#define ID_CTX_OPEN_LOCATION   301
+#define ID_CTX_PRIORITY_BASE   310  // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
+
+static const struct { DWORD cls; const wchar_t* label; } PRIORITY_CLASSES[] = {
+	{ IDLE_PRIORITY_CLASS,          L"Idle"         },
+	{ BELOW_NORMAL_PRIORITY_CLASS,  L"Below Normal" },
+	{ NORMAL_PRIORITY_CLASS,        L"Normal"       },
+	{ ABOVE_NORMAL_PRIORITY_CLASS,  L"Above Normal" },
+	{ HIGH_PRIORITY_CLASS,          L"High"         },
+	{ REALTIME_PRIORITY_CLASS,      L"Realtime"     },
+};
+#define PRIORITY_CLASS_COUNT 6
 #define WM_TRAYICON (WM_APP + 1)
 #define ID_REFRESH_TIMER 1
 #define ID_PRIME_TIMER   2
@@ -186,6 +197,18 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			}
 			return 0;
 		}
+		if (id >= ID_CTX_PRIORITY_BASE && id < ID_CTX_PRIORITY_BASE + PRIORITY_CLASS_COUNT) {
+			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+			if (selected != -1) {
+				LVITEM lvi = {0};
+				lvi.iItem = selected;
+				lvi.mask = LVIF_PARAM;
+				ListView_GetItem(g_hwnd_list, &lvi);
+				set_process_priority((DWORD)lvi.lParam, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
+				do_refresh();
+			}
+			return 0;
+		}
 		if (id == ID_VIEW_REFRESH) {
 			do_refresh();
 			return 0;
@@ -246,6 +269,15 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				get_process_path(pid, path, MAX_PATH);
 				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
 				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tDelete");
+				HMENU pri_menu = CreatePopupMenu();
+				DWORD cur_cls = 0;
+				HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+				if (ph) { cur_cls = GetPriorityClass(ph); CloseHandle(ph); }
+				for (int i = 0; i < PRIORITY_CLASS_COUNT; ++i) {
+					UINT flags = MF_STRING | (PRIORITY_CLASSES[i].cls == cur_cls ? MF_CHECKED : 0);
+					AppendMenu(pri_menu, flags, ID_CTX_PRIORITY_BASE + i, PRIORITY_CLASSES[i].label);
+				}
+				AppendMenu(menu, MF_POPUP, (UINT_PTR)pri_menu, L"Priority");
 				TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
 				DestroyMenu(menu);
 			}

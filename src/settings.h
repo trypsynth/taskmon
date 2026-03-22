@@ -9,6 +9,7 @@ typedef enum {
 	COL_THREADS,
 	COL_HANDLES,
 	COL_STARTTIME,
+	COL_PRIORITY,
 	COL_COUNT,
 } column_id;
 

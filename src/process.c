@@ -121,6 +121,9 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_STARTTIME:
 		res = (a->start_time < b->start_time) ? -1 : (a->start_time > b->start_time);
 		break;
+	case SORT_FIELD_PRIORITY:
+		res = (a->base_priority < b->base_priority) ? -1 : (a->base_priority > b->base_priority);
+		break;
 	default:
 		break;
 	}
@@ -175,6 +178,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->threads = spi->NumberOfThreads;
 		e->handles = spi->HandleCount;
 		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
+		e->base_priority = spi->BasePriority;
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {
@@ -225,6 +229,14 @@ BOOL terminate_process(DWORD pid) {
 	HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
 	if (!h) return FALSE;
 	BOOL success = TerminateProcess(h, 1);
+	CloseHandle(h);
+	return success;
+}
+
+BOOL set_process_priority(DWORD pid, DWORD priority_class) {
+	HANDLE h = OpenProcess(PROCESS_SET_INFORMATION, FALSE, pid);
+	if (!h) return FALSE;
+	BOOL success = SetPriorityClass(h, priority_class);
 	CloseHandle(h);
 	return success;
 }
