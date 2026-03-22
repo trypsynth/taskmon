@@ -251,7 +251,7 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
 	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
 	if (msg == WM_KEYDOWN) {
-		if (wp == 'E' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+		if (wp == VK_DELETE) {
 			PostMessage(GetParent(hwnd), WM_COMMAND, ID_CTX_END_TASK, 0);
 			return 0;
 		}
