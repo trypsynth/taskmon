@@ -52,8 +52,10 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		GetLocalTime(&now);
 		if (st.wYear == now.wYear && st.wMonth == now.wMonth && st.wDay == now.wDay)
 			wnsprintf(buf, len, L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-		else
+		else if (st.wYear == now.wYear)
 			wnsprintf(buf, len, L"%02d/%02d %02d:%02d", st.wMonth, st.wDay, st.wHour, st.wMinute);
+		else
+			wnsprintf(buf, len, L"%02d/%02d/%04d %02d:%02d", st.wMonth, st.wDay, st.wYear, st.wHour, st.wMinute);
 		break;
 	}
 	case COL_DISK_IO: {
