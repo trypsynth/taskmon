@@ -41,17 +41,17 @@ void tray_update_tip(double cpu_pct) {
 	GlobalMemoryStatusEx(&ms);
 	int mem_mb = (int)((ms.ullTotalPhys - ms.ullAvailPhys) / (1024 * 1024));
 	int cpu_whole = (int)cpu_pct;
-	int cpu_frac = (int)((cpu_pct - cpu_whole) * 10 + 0.5);
-	if (cpu_frac >= 10) {
+	int cpu_frac = (int)((cpu_pct - cpu_whole) * 100.0 + 0.5);
+	if (cpu_frac >= 100) {
 		cpu_whole++;
 		cpu_frac = 0;
 	}
 	if (mem_mb > 1024) {
 		int mem_gb_int = mem_mb / 1024;
-		int mem_gb_frac = (mem_mb % 1024) * 10 / 1024;
-		wnsprintf(nid.szTip, 128, L"%s, CPU %d.%d%%, %d.%d GB memory used", s_name, cpu_whole, cpu_frac, mem_gb_int, mem_gb_frac);
+		int mem_gb_frac = (mem_mb % 1024) * 100 / 1024;
+		wnsprintf(nid.szTip, 128, L"CPU %d.%02d%%, %d.%02d GB memory used", cpu_whole, cpu_frac, mem_gb_int, mem_gb_frac);
 	} else {
-		wnsprintf(nid.szTip, 128, L"%s, CPU %d.%d%%, %d MB memory used", s_name, cpu_whole, cpu_frac, mem_mb);
+		wnsprintf(nid.szTip, 128, L"CPU %d.%02d%%, %d MB memory used", cpu_whole, cpu_frac, mem_mb);
 	}
 	Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
