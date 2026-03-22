@@ -195,8 +195,8 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
 	if (g_prefs.skip_kill_confirm) return TRUE;
 	wchar_t message[512];
-	wnsprintf(message, 512, L"End \"%s\" (PID %u)?\n\nUnsaved data may be lost.", name[0] ? name : L"this process", pid);
-	return MessageBox(hwnd, message, L"Confirm End Task", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2) == IDYES;
+	wnsprintf(message, 512, L"Do you want to end process \"%s\" (PID %u)?\n\nUnsaved data may be lost.", name[0] ? name : L"this process", pid);
+	return MessageBox(hwnd, message, L"Confirm", MB_ICONINFORMATION | MB_YESNO | MB_DEFBUTTON2) == IDYES;
 }
 
 static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
