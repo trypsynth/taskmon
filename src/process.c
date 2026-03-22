@@ -112,6 +112,14 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_MEMORY:
 		res = (a->working_set < b->working_set) ? -1 : (a->working_set > b->working_set);
 		break;
+	case SORT_FIELD_THREADS:
+		res = (a->threads < b->threads) ? -1 : (a->threads > b->threads);
+		break;
+	case SORT_FIELD_HANDLES:
+		res = (a->handles < b->handles) ? -1 : (a->handles > b->handles);
+		break;
+	default:
+		break;
 	}
 	return descending ? -res : res;
 }
@@ -161,6 +169,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->pid = pid;
 		e->cpu_percent = 0.0;
 		e->working_set = spi->WorkingSetSize;
+		e->threads = spi->NumberOfThreads;
+		e->handles = spi->HandleCount;
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {

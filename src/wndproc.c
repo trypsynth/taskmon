@@ -9,10 +9,7 @@
 #include <commctrl.h>
 #include <shlwapi.h>
 
-#define ID_SORT_NAME 101
-#define ID_SORT_PID 102
-#define ID_SORT_CPU 103
-#define ID_SORT_MEMORY 104
+#define ID_SORT_BASE 110
 #define ID_LISTVIEW 105
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
@@ -24,48 +21,75 @@
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
 const wchar_t WINDOW_TITLE[] = L"Taskmon";
-static const wchar_t* LABELS[SORT_COUNT] = { L"Name", L"PID", L"CPU", L"Memory" };
-static const sort_field FIELDS[SORT_COUNT] = {SORT_FIELD_NAME, SORT_FIELD_PID, SORT_FIELD_CPU, SORT_FIELD_MEMORY};
-static const int IDS[SORT_COUNT] = { ID_SORT_NAME, ID_SORT_PID, ID_SORT_CPU, ID_SORT_MEMORY };
-static const int widths[SORT_COUNT] = { 120, 70, 70, 100 };
 
 static HWND g_hwnd = NULL;
 static HWND g_hwnd_list = NULL;
-static HWND g_sort_btns[SORT_COUNT] = {0};
+static HWND g_hwnd_sort_group = NULL;
+static HWND g_sort_btns[COL_COUNT] = {0};
+static column_id g_sort_btn_cols[COL_COUNT] = {0};
+static int g_sort_btn_count = 0;
 static HWND g_last_focus = NULL;
 static sort_prefs g_prefs;
 static snapshot_entry g_snapshots[SNAPSHOT_CAPACITY] = {0};
 
 static BOOL* cur_desc() {
-	for (int i = 0; i < SORT_COUNT; ++i) if (FIELDS[i] == g_prefs.field) return &g_prefs.desc[i];
-	return &g_prefs.desc[0];
+	return &g_prefs.desc[(int)g_prefs.field];
 }
 
 static void update_tab_stop() {
-	for (int i = 0; i < SORT_COUNT; ++i) {
+	for (int i = 0; i < g_sort_btn_count; ++i) {
 		LONG_PTR style = GetWindowLongPtr(g_sort_btns[i], GWL_STYLE);
-		style = (FIELDS[i] == g_prefs.field) ? (style | WS_TABSTOP) : (style & ~WS_TABSTOP);
+		style = (COLUMNS[g_sort_btn_cols[i]].field == g_prefs.field) ? (style | WS_TABSTOP) : (style & ~WS_TABSTOP);
 		SetWindowLongPtr(g_sort_btns[i], GWL_STYLE, style);
 	}
 }
 
 static void update_sort_ui() {
-	for (int i = 0; i < SORT_COUNT; ++i) {
-		BOOL active = (FIELDS[i] == g_prefs.field);
+	for (int i = 0; i < g_sort_btn_count; ++i) {
+		column_id cid = g_sort_btn_cols[i];
+		BOOL active = (COLUMNS[cid].field == g_prefs.field);
 		wchar_t buf[64];
-		if (active) wnsprintf(buf, 64, L"%s (%s)", LABELS[i], *cur_desc() ? L"descending" : L"ascending");
-		else lstrcpy(buf, LABELS[i]);
+		if (active) wnsprintf(buf, 64, L"%s (%s)", COLUMNS[cid].label, *cur_desc() ? L"descending" : L"ascending");
+		else lstrcpy(buf, COLUMNS[cid].label);
 		SetWindowText(g_sort_btns[i], buf);
 		SendMessage(g_sort_btns[i], BM_SETCHECK, active ? BST_CHECKED : BST_UNCHECKED, 0);
 	}
 	HWND header = ListView_GetHeader(g_hwnd_list);
-	for (int i = 0; i < SORT_COUNT; ++i) {
+	for (int i = 0; i < g_sort_btn_count; ++i) {
+		column_id cid = g_sort_btn_cols[i];
 		HDITEM hdi = {0};
 		hdi.mask = HDI_FORMAT;
 		Header_GetItem(header, i, &hdi);
 		hdi.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
-		if (FIELDS[i] == g_prefs.field) hdi.fmt |= *cur_desc() ? HDF_SORTDOWN : HDF_SORTUP;
+		if (COLUMNS[cid].field == g_prefs.field) hdi.fmt |= *cur_desc() ? HDF_SORTDOWN : HDF_SORTUP;
 		Header_SetItem(header, i, &hdi);
+	}
+}
+
+static void format_column(const process_entry* e, column_id cid, wchar_t* buf, int len) {
+	switch (cid) {
+	case COL_PID:
+		wnsprintf(buf, len, L"%u", e->pid);
+		break;
+	case COL_CPU: {
+		int whole = (int)e->cpu_percent;
+		int frac = (int)((e->cpu_percent - whole) * 100 + 0.5);
+		if (frac >= 100) { whole++; frac = 0; }
+		wnsprintf(buf, len, L"%d.%02d", whole, frac);
+		break;
+	}
+	case COL_MEMORY:
+		wnsprintf(buf, len, L"%u K", (UINT)(e->working_set / 1024));
+		break;
+	case COL_THREADS:
+		wnsprintf(buf, len, L"%u", e->threads);
+		break;
+	case COL_HANDLES:
+		wnsprintf(buf, len, L"%u", e->handles);
+		break;
+	default:
+		buf[0] = L'\0';
+		break;
 	}
 }
 
@@ -104,19 +128,11 @@ static void populate_list(process_entry* entries, int count) {
 		ListView_InsertItem(g_hwnd_list, &lvi);
 		if (e->pid == selected_pid) new_selected_idx = i;
 		if (e->pid == top_pid) new_top_idx = i;
-		wchar_t buf[32];
-		wnsprintf(buf, 32, L"%u", e->pid);
-		ListView_SetItemText(g_hwnd_list, i, 1, buf);
-		int cpu_whole = (int)e->cpu_percent;
-		int cpu_frac = (int)((e->cpu_percent - cpu_whole) * 100 + 0.5);
-		if (cpu_frac >= 100) {
-			cpu_whole++;
-			cpu_frac = 0;
+		wchar_t buf[64];
+		for (int col = 1; col < g_sort_btn_count; ++col) {
+			format_column(e, g_sort_btn_cols[col], buf, 64);
+			ListView_SetItemText(g_hwnd_list, i, col, buf);
 		}
-		wnsprintf(buf, 32, L"%d.%02d", cpu_whole, cpu_frac);
-		ListView_SetItemText(g_hwnd_list, i, 2, buf);
-		wnsprintf(buf, 32, L"%u K", (UINT)(e->working_set / 1024));
-		ListView_SetItemText(g_hwnd_list, i, 3, buf);
 	}
 	if (new_selected_idx != -1) {
 		ListView_SetItemState(g_hwnd_list, new_selected_idx, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
@@ -173,7 +189,7 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 	g_prefs.refresh_ms = ms;
 	KillTimer(hwnd, ID_REFRESH_TIMER);
 	if (ms > 0) SetTimer(hwnd, ID_REFRESH_TIMER, ms, NULL);
-	settings_save(&g_prefs, LABELS, FIELDS);
+	settings_save(&g_prefs);
 }
 
 static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
@@ -182,7 +198,14 @@ static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
 	return MessageBox(hwnd, message, L"Confirm End Task", MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON2) == IDOK;
 }
 
+static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
+	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	if (msg == WM_COMMAND) return SendMessage(g_hwnd, msg, wp, lp);
+	return DefSubclassProc(hwnd, msg, wp, lp);
+}
+
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
+	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
 	if (msg == WM_GETDLGCODE) {
 		LRESULT r = DefSubclassProc(hwnd, msg, wp, lp) | DLGC_WANTARROWS;
 		MSG* pmsg = (MSG*)lp;
@@ -192,34 +215,32 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	if (msg == WM_CHAR && wp == '\r') return 0;
 	if (msg == WM_KEYDOWN) {
 		if (wp == VK_ESCAPE) {
-			PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
+			PostMessage(g_hwnd, WM_HIDE_TO_TRAY, 0, 0);
 			return 0;
 		}
 		if (wp == VK_RETURN) {
-			PostMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
+			PostMessage(g_hwnd, WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
 			return 0;
 		}
 		if (wp == VK_LEFT || wp == VK_RIGHT) {
 			int idx = -1;
-			for (int i = 0; i < SORT_COUNT; ++i) {
-				if (g_sort_btns[i] == hwnd) {
-					idx = i;
-					break;
-				}
+			for (int i = 0; i < g_sort_btn_count; ++i) {
+				if (g_sort_btns[i] == hwnd) { idx = i; break; }
 			}
 			if (idx >= 0) {
 				int next = (wp == VK_RIGHT) ? idx + 1 : idx - 1;
-				if (next < 0 || next >= SORT_COUNT) return 0;
-				g_prefs.field = FIELDS[next];
+				if (next < 0 || next >= g_sort_btn_count) return 0;
+				column_id cid = g_sort_btn_cols[next];
+				g_prefs.field = COLUMNS[cid].field;
 				wchar_t buf[64];
-				wnsprintf(buf, 64, L"%s (%s)", LABELS[next], *cur_desc() ? L"descending" : L"ascending");
+				wnsprintf(buf, 64, L"%s (%s)", COLUMNS[cid].label, *cur_desc() ? L"descending" : L"ascending");
 				SetWindowText(g_sort_btns[next], buf);
 				SendMessage(g_sort_btns[next], BM_SETCHECK, BST_CHECKED, 0);
 				update_tab_stop();
 				SetFocus(g_sort_btns[next]);
 				update_sort_ui();
 				do_refresh();
-				settings_save(&g_prefs, LABELS, FIELDS);
+				settings_save(&g_prefs);
 				return 0;
 			}
 		}
@@ -229,6 +250,7 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 }
 
 static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
+	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
 	if (msg == WM_KEYDOWN) {
 		if (wp == 'E' && (GetKeyState(VK_CONTROL) & 0x8000)) {
 			PostMessage(GetParent(hwnd), WM_COMMAND, ID_CTX_END_TASK, 0);
@@ -240,6 +262,49 @@ static LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 		}
 	}
 	return DefSubclassProc(hwnd, msg, wp, lp);
+}
+
+static void apply_columns() {
+	// Destroy existing sort buttons
+	for (int i = 0; i < g_sort_btn_count; ++i) {
+		DestroyWindow(g_sort_btns[i]);
+		g_sort_btns[i] = NULL;
+	}
+	g_sort_btn_count = 0;
+
+	// Remove list view columns right-to-left
+	int lv_cols = Header_GetItemCount(ListView_GetHeader(g_hwnd_list));
+	for (int i = lv_cols - 1; i >= 0; --i) ListView_DeleteColumn(g_hwnd_list, i);
+
+	// Fall back to Name sort if the current sort column is now hidden
+	if (!g_prefs.visible[(int)g_prefs.field]) g_prefs.field = SORT_FIELD_NAME;
+
+	// Create buttons and columns for each visible column
+	int btn_x = 0;
+	int lv_col = 0;
+	for (int i = 0; i < COL_COUNT; ++i) {
+		if (!g_prefs.visible[i]) continue;
+		g_sort_btns[g_sort_btn_count] = CreateWindow(L"BUTTON", COLUMNS[i].label,
+			WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON,
+			btn_x, 0, COLUMNS[i].width, 1,
+			g_hwnd_sort_group, (HMENU)(INT_PTR)(ID_SORT_BASE + i),
+			GetModuleHandle(NULL), NULL);
+		SetWindowSubclass(g_sort_btns[g_sort_btn_count], sort_btn_proc, g_sort_btn_count, 0);
+		g_sort_btn_cols[g_sort_btn_count] = (column_id)i;
+		btn_x += COLUMNS[i].width;
+		g_sort_btn_count++;
+		LVCOLUMN lvc = {0};
+		lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
+		lvc.pszText = (wchar_t*)COLUMNS[i].label;
+		lvc.cx = COLUMNS[i].width;
+		lvc.iSubItem = lv_col;
+		ListView_InsertColumn(g_hwnd_list, lv_col, &lvc);
+		lv_col++;
+	}
+	// Resize group box to fit the buttons
+	SetWindowPos(g_hwnd_sort_group, NULL, 0, 0, btn_x, 1, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	update_sort_ui();
+	update_tab_stop();
 }
 
 static void create_menu_bar(HWND hwnd) {
@@ -262,25 +327,19 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		g_hwnd = hwnd;
 		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES };
 		InitCommonControlsEx(&icc);
-		CreateWindow(L"BUTTON", L"Sort by", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 0, 0, 360, 1, hwnd, NULL, GetModuleHandle(NULL), NULL);
-		int btn_x = 0;
-		for (int i = 0; i < SORT_COUNT; ++i) {
-			g_sort_btns[i] = CreateWindow(L"BUTTON", LABELS[i], WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON, btn_x, 0, widths[i], 1, hwnd, (HMENU)(INT_PTR)IDS[i], GetModuleHandle(NULL), NULL);
-			SetWindowSubclass(g_sort_btns[i], sort_btn_proc, i, 0);
-			btn_x += widths[i];
-		}
-		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, NULL, WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS, 0, 1, 760, 559, hwnd, (HMENU)(INT_PTR)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
+		g_hwnd_sort_group = CreateWindowEx(WS_EX_CONTROLPARENT, L"BUTTON", L"Sort by",
+			WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+			0, 0, 0, 1, hwnd, NULL, GetModuleHandle(NULL), NULL);
+		SetWindowSubclass(g_hwnd_sort_group, sort_group_proc, 0, 0);
+		// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
+		// use "Processes" as the list's accessible name instead of the group box.
+		CreateWindow(L"STATIC", L"Processes", WS_CHILD | SS_LEFT,
+			0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, L"Processes", WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS, 0, 1, 760, 559, hwnd, (HMENU)(INT_PTR)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
 		SetWindowSubclass(g_hwnd_list, list_key_proc, 0, 0);
 		ListView_SetExtendedListViewStyle(g_hwnd_list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_HEADERDRAGDROP);
-		LVCOLUMN lvc = {0};
-		lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-		lvc.pszText = L"Name"; lvc.cx = 260; lvc.iSubItem = 0; ListView_InsertColumn(g_hwnd_list, 0, &lvc);
-		lvc.pszText = L"PID"; lvc.cx = 80; lvc.iSubItem = 1; ListView_InsertColumn(g_hwnd_list, 1, &lvc);
-		lvc.pszText = L"CPU Percent"; lvc.cx = 90; lvc.iSubItem = 2; ListView_InsertColumn(g_hwnd_list, 2, &lvc);
-		lvc.pszText = L"Memory"; lvc.cx = 120; lvc.iSubItem = 3; ListView_InsertColumn(g_hwnd_list, 3, &lvc);
-		settings_load(&g_prefs, LABELS, FIELDS);
-		update_sort_ui();
-		update_tab_stop();
+		settings_load(&g_prefs);
+		apply_columns();
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
 		do_refresh();
@@ -348,19 +407,29 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			return 0;
 		}
 		if (id == ID_VIEW_SETTINGS) {
-			UINT ms = open_settings(hwnd, g_prefs.refresh_ms);
-			if (ms != (UINT)-1) set_refresh_interval(hwnd, ms);
+			UINT new_ms;
+			BOOL new_visible[COL_COUNT];
+			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, &new_ms, new_visible)) {
+				BOOL cols_changed = FALSE;
+				for (int i = 0; i < COL_COUNT; ++i)
+					if (new_visible[i] != g_prefs.visible[i]) { cols_changed = TRUE; break; }
+				for (int i = 0; i < COL_COUNT; ++i) g_prefs.visible[i] = new_visible[i];
+				if (new_ms != g_prefs.refresh_ms) set_refresh_interval(hwnd, new_ms);
+				if (cols_changed) { apply_columns(); do_refresh(); }
+				settings_save(&g_prefs);
+			}
 			return 0;
 		}
 		if (HIWORD(wp) == BN_CLICKED) {
-			for (int i = 0; i < SORT_COUNT; ++i) {
-				if (IDS[i] == id) {
-					if (FIELDS[i] == g_prefs.field) *cur_desc() = !*cur_desc();
-					else g_prefs.field = FIELDS[i];
+			for (int i = 0; i < g_sort_btn_count; ++i) {
+				if ((ID_SORT_BASE + (int)g_sort_btn_cols[i]) == id) {
+					column_id cid = g_sort_btn_cols[i];
+					if (COLUMNS[cid].field == g_prefs.field) *cur_desc() = !*cur_desc();
+					else g_prefs.field = COLUMNS[cid].field;
 					update_sort_ui();
 					update_tab_stop();
 					do_refresh();
-					settings_save(&g_prefs, LABELS, FIELDS);
+					settings_save(&g_prefs);
 					break;
 				}
 			}
@@ -401,13 +470,15 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		NMHDR* hdr = (NMHDR*)lp;
 		if (hdr->idFrom == (UINT_PTR)ID_LISTVIEW && hdr->code == LVN_COLUMNCLICK) {
 			NMLISTVIEW* nmlv = (NMLISTVIEW*)lp;
-			if (nmlv->iSubItem >= 0 && nmlv->iSubItem < SORT_COUNT) {
-				if (FIELDS[nmlv->iSubItem] == g_prefs.field) *cur_desc() = !*cur_desc();
-				else g_prefs.field = FIELDS[nmlv->iSubItem];
+			int col = nmlv->iSubItem;
+			if (col >= 0 && col < g_sort_btn_count) {
+				column_id cid = g_sort_btn_cols[col];
+				if (COLUMNS[cid].field == g_prefs.field) *cur_desc() = !*cur_desc();
+				else g_prefs.field = COLUMNS[cid].field;
 				update_sort_ui();
 				update_tab_stop();
 				do_refresh();
-				settings_save(&g_prefs, LABELS, FIELDS);
+				settings_save(&g_prefs);
 			}
 		}
 		return DefWindowProc(hwnd, msg, wp, lp);

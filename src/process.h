@@ -6,6 +6,9 @@ typedef enum {
 	SORT_FIELD_PID,
 	SORT_FIELD_CPU,
 	SORT_FIELD_MEMORY,
+	SORT_FIELD_THREADS,
+	SORT_FIELD_HANDLES,
+	SORT_FIELD_COUNT,
 } sort_field;
 
 typedef struct {
@@ -13,6 +16,8 @@ typedef struct {
 	wchar_t name[64];
 	double cpu_percent;
 	SIZE_T working_set;
+	DWORD threads;
+	DWORD handles;
 } process_entry;
 
 typedef struct {

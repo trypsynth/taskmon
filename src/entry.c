@@ -42,11 +42,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show)
 void __stdcall WinMainCRTStartup() {
 	g_instance = GetModuleHandle(NULL);
 	int show = SW_SHOWDEFAULT;
-
 	STARTUPINFOW si;
 	GetStartupInfo(&si);
 	if (si.dwFlags & STARTF_USESHOWWINDOW) show = si.wShowWindow;
-
 	int exit_code = WinMain(g_instance, NULL, NULL, show);
 	ExitProcess(exit_code);
 }
