@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "resource.h"
+#include <commctrl.h>
 #include <shlwapi.h>
 
 const column_def COLUMNS[COL_COUNT] = {
@@ -33,18 +34,30 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 		}
 		SendMessage(combo, CB_SETCURSEL, sel, 0);
 		HFONT font = (HFONT)SendMessage(hdlg, WM_GETFONT, 0, 0);
+		HWND lv = GetDlgItem(hdlg, IDC_COL_LIST);
+		SendMessage(lv, WM_SETFONT, (WPARAM)font, FALSE);
+		ListView_SetExtendedListViewStyle(lv, LVS_EX_CHECKBOXES);
+		LVCOLUMN lvc = {0};
+		lvc.mask = LVCF_WIDTH;
+		lvc.cx = 1000;
+		ListView_InsertColumn(lv, 0, &lvc);
+		int j = 0;
 		for (int i = 0; i < COL_COUNT; ++i) {
-			HWND chk = CreateWindow(L"BUTTON", COLUMNS[i].label, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 12, 36 + i * 11, 170, 10, hdlg, (HMENU)(INT_PTR)(IDC_COL_BASE + i), GetModuleHandle(NULL), NULL);
-			SendMessage(chk, WM_SETFONT, (WPARAM)font, FALSE);
-			SendMessage(chk, BM_SETCHECK, data->visible[i] ? BST_CHECKED : BST_UNCHECKED, 0);
-			if (COLUMNS[i].always_visible) EnableWindow(chk, FALSE);
+			if (COLUMNS[i].always_visible) continue;
+			LVITEM lvi = {0};
+			lvi.mask = LVIF_TEXT | LVIF_PARAM;
+			lvi.iItem = j++;
+			lvi.pszText = (LPWSTR)COLUMNS[i].label;
+			lvi.lParam = i;
+			ListView_InsertItem(lv, &lvi);
+			ListView_SetCheckState(lv, lvi.iItem, data->visible[i]);
 		}
+		if (j > 0) ListView_SetItemState(lv, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
 		HWND skip_chk = CreateWindow(L"BUTTON", L"Disable end task confirmation (not recommended)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_SKIP_CONFIRM, GetModuleHandle(NULL), NULL);
 		SendMessage(skip_chk, WM_SETFONT, (WPARAM)font, FALSE);
 		SendMessage(skip_chk, BM_SETCHECK, data->skip_kill_confirm ? BST_CHECKED : BST_UNCHECKED, 0);
-		// Move OK and Cancel after the checkboxes in Z-order so tab goes combo -> checkboxes -> skip -> OK -> Cancel
-		HWND last_chk = GetDlgItem(hdlg, IDC_COL_BASE + COL_COUNT - 1);
-		SetWindowPos(skip_chk, last_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		// Tab order: combo -> listview -> skip_chk -> OK -> Cancel
+		SetWindowPos(skip_chk, lv, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SetWindowPos(GetDlgItem(hdlg, IDOK), skip_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SetWindowPos(GetDlgItem(hdlg, IDCANCEL), GetDlgItem(hdlg, IDOK), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		return TRUE;
@@ -55,8 +68,14 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 			HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
 			int sel = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
 			data->refresh_ms = (sel >= 0 && sel < REFRESH_OPTION_COUNT) ? REFRESH_MS[sel] : 0;
-			for (int i = 0; i < COL_COUNT; ++i) {
-				if (!COLUMNS[i].always_visible) data->visible[i] = SendMessage(GetDlgItem(hdlg, IDC_COL_BASE + i), BM_GETCHECK, 0, 0) == BST_CHECKED;
+			HWND lv = GetDlgItem(hdlg, IDC_COL_LIST);
+			int lv_count = ListView_GetItemCount(lv);
+			for (int j = 0; j < lv_count; ++j) {
+				LVITEM lvi2 = {0};
+				lvi2.mask = LVIF_PARAM;
+				lvi2.iItem = j;
+				ListView_GetItem(lv, &lvi2);
+				data->visible[(int)lvi2.lParam] = ListView_GetCheckState(lv, j) ? TRUE : FALSE;
 			}
 			data->skip_kill_confirm = SendMessage(GetDlgItem(hdlg, IDC_SKIP_CONFIRM), BM_GETCHECK, 0, 0) == BST_CHECKED;
 			EndDialog(hdlg, 1);
