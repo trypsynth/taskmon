@@ -193,9 +193,10 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 }
 
 static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
+	if (g_prefs.skip_kill_confirm) return TRUE;
 	wchar_t message[512];
 	wnsprintf(message, 512, L"End \"%s\" (PID %u)?\n\nUnsaved data may be lost.", name[0] ? name : L"this process", pid);
-	return MessageBox(hwnd, message, L"Confirm End Task", MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON2) == IDOK;
+	return MessageBox(hwnd, message, L"Confirm End Task", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2) == IDYES;
 }
 
 static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
@@ -409,11 +410,13 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (id == ID_VIEW_SETTINGS) {
 			UINT new_ms;
 			BOOL new_visible[COL_COUNT];
-			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, &new_ms, new_visible)) {
+			BOOL new_skip_confirm;
+			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, g_prefs.skip_kill_confirm, &new_ms, new_visible, &new_skip_confirm)) {
 				BOOL cols_changed = FALSE;
 				for (int i = 0; i < COL_COUNT; ++i)
 					if (new_visible[i] != g_prefs.visible[i]) { cols_changed = TRUE; break; }
 				for (int i = 0; i < COL_COUNT; ++i) g_prefs.visible[i] = new_visible[i];
+				g_prefs.skip_kill_confirm = new_skip_confirm;
 				if (new_ms != g_prefs.refresh_ms) set_refresh_interval(hwnd, new_ms);
 				if (cols_changed) { apply_columns(); do_refresh(); }
 				settings_save(&g_prefs);

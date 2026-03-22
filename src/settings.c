@@ -17,6 +17,7 @@ const wchar_t* const REFRESH_LABELS[REFRESH_OPTION_COUNT] = { L"Off", L"5 second
 typedef struct {
 	UINT refresh_ms;
 	BOOL visible[COL_COUNT];
+	BOOL skip_kill_confirm;
 } settings_dlg_data;
 
 static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) {
@@ -38,9 +39,13 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 			SendMessage(chk, BM_SETCHECK, data->visible[i] ? BST_CHECKED : BST_UNCHECKED, 0);
 			if (COLUMNS[i].always_visible) EnableWindow(chk, FALSE);
 		}
-		// Move OK and Cancel after the checkboxes in Z-order so tab goes combo -> checkboxes -> OK -> Cancel
+		HWND skip_chk = CreateWindow(L"BUTTON", L"Disable end task confirmation (not recommended)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_SKIP_CONFIRM, GetModuleHandle(NULL), NULL);
+		SendMessage(skip_chk, WM_SETFONT, (WPARAM)font, FALSE);
+		SendMessage(skip_chk, BM_SETCHECK, data->skip_kill_confirm ? BST_CHECKED : BST_UNCHECKED, 0);
+		// Move OK and Cancel after the checkboxes in Z-order so tab goes combo -> checkboxes -> skip -> OK -> Cancel
 		HWND last_chk = GetDlgItem(hdlg, IDC_COL_BASE + COL_COUNT - 1);
-		SetWindowPos(GetDlgItem(hdlg, IDOK), last_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		SetWindowPos(skip_chk, last_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		SetWindowPos(GetDlgItem(hdlg, IDOK), skip_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SetWindowPos(GetDlgItem(hdlg, IDCANCEL), GetDlgItem(hdlg, IDOK), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		return TRUE;
 	}
@@ -53,6 +58,7 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 			for (int i = 0; i < COL_COUNT; ++i) {
 				if (!COLUMNS[i].always_visible) data->visible[i] = SendMessage(GetDlgItem(hdlg, IDC_COL_BASE + i), BM_GETCHECK, 0, 0) == BST_CHECKED;
 			}
+			data->skip_kill_confirm = SendMessage(GetDlgItem(hdlg, IDC_SKIP_CONFIRM), BM_GETCHECK, 0, 0) == BST_CHECKED;
 			EndDialog(hdlg, 1);
 			return TRUE;
 		}
@@ -65,14 +71,16 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 	return FALSE;
 }
 
-BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, UINT* out_ms, BOOL* out_visible) {
+BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BOOL current_skip_confirm, UINT* out_ms, BOOL* out_visible, BOOL* out_skip_confirm) {
 	settings_dlg_data data;
 	data.refresh_ms = current_ms;
 	for (int i = 0; i < COL_COUNT; ++i) data.visible[i] = current_visible[i];
+	data.skip_kill_confirm = current_skip_confirm;
 	INT_PTR result = DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTINGS), parent, settings_dlg_proc, (LPARAM)&data);
 	if (!result) return FALSE;
 	*out_ms = data.refresh_ms;
 	for (int i = 0; i < COL_COUNT; ++i) out_visible[i] = data.visible[i];
+	*out_skip_confirm = data.skip_kill_confirm;
 	return TRUE;
 }
 
@@ -108,6 +116,9 @@ void settings_load(sort_prefs* prefs) {
 	wchar_t ms_buf[16];
 	GetPrivateProfileString(L"refresh", L"interval_ms", L"2000", ms_buf, 16, path);
 	prefs->refresh_ms = (UINT)StrToInt(ms_buf);
+	wchar_t skip_buf[4];
+	GetPrivateProfileString(L"confirm", L"skip_kill", L"0", skip_buf, 4, path);
+	prefs->skip_kill_confirm = (skip_buf[0] == L'1');
 	for (int i = 0; i < COL_COUNT; ++i) {
 		wchar_t key[64], val[4];
 		wnsprintf(key, 64, L"%s_visible", COLUMNS[i].label);
@@ -130,6 +141,7 @@ void settings_save(const sort_prefs* prefs) {
 	wchar_t ms_str[16];
 	wnsprintf(ms_str, 16, L"%u", prefs->refresh_ms);
 	WritePrivateProfileString(L"refresh", L"interval_ms", ms_str, path);
+	WritePrivateProfileString(L"confirm", L"skip_kill", prefs->skip_kill_confirm ? L"1" : L"0", path);
 	for (int i = 0; i < COL_COUNT; ++i) {
 		if (COLUMNS[i].always_visible) continue;
 		wchar_t key[64];
