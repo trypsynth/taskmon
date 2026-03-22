@@ -17,6 +17,7 @@
 #define WM_TRAYICON (WM_APP + 1)
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 #define ID_REFRESH_TIMER 1
+#define ID_HOTKEY_TOGGLE 1
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
 const wchar_t WINDOW_TITLE[] = L"Taskmon";
@@ -319,6 +320,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		return 0;
 	case WM_CREATE: {
 		g_hwnd = hwnd;
+		RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_OEM_3);
 		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES };
 		InitCommonControlsEx(&icc);
 		g_hwnd_sort_group = CreateWindowEx(WS_EX_CONTROLPARENT, L"BUTTON", L"Sort by",
@@ -500,7 +502,19 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			return 0;
 		}
 		break;
+	case WM_HOTKEY:
+		if (wp == ID_HOTKEY_TOGGLE) {
+			if (!IsWindowVisible(hwnd)) {
+				tray_restore();
+			} else if (GetForegroundWindow() != hwnd) {
+				SetForegroundWindow(hwnd);
+			} else {
+				PostMessage(hwnd, WM_HIDE_TO_TRAY, 0, 0);
+			}
+		}
+		return 0;
 	case WM_DESTROY:
+		UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 		KillTimer(hwnd, ID_REFRESH_TIMER);
 		tray_remove();
 		PostQuitMessage(0);
