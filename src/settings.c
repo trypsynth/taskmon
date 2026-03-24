@@ -9,9 +9,12 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"CPU", L"CPU %", 90, SORT_FIELD_CPU, FALSE, TRUE },
 	{ L"Memory", L"Memory", 120, SORT_FIELD_MEMORY, FALSE, TRUE },
 	{ L"Threads", L"Threads", 70, SORT_FIELD_THREADS, FALSE, FALSE },
-	{ L"Handles", L"Handles",  70, SORT_FIELD_HANDLES,   FALSE, FALSE },
-	{ L"Started",  L"Started",  100, SORT_FIELD_STARTTIME, FALSE, FALSE },
-	{ L"Priority", L"Priority", 100, SORT_FIELD_PRIORITY,  FALSE, FALSE },
+	{ L"Handles", L"Handles", 70, SORT_FIELD_HANDLES, FALSE, FALSE },
+	{ L"Started", L"Started", 100, SORT_FIELD_STARTTIME, FALSE, FALSE },
+	{ L"Priority", L"Priority", 100, SORT_FIELD_PRIORITY, FALSE, FALSE },
+	{ L"Disk I/O", L"Disk I/O", 100, SORT_FIELD_DISK_IO, FALSE, FALSE },
+	{ L"Private Bytes", L"Private Bytes", 120, SORT_FIELD_PRIVATE_BYTES, FALSE, FALSE },
+	{ L"Page Faults", L"Page Faults", 100, SORT_FIELD_PAGE_FAULTS, FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

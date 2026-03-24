@@ -10,6 +10,9 @@ typedef enum {
 	SORT_FIELD_HANDLES,
 	SORT_FIELD_STARTTIME,
 	SORT_FIELD_PRIORITY,
+	SORT_FIELD_DISK_IO,
+	SORT_FIELD_PRIVATE_BYTES,
+	SORT_FIELD_PAGE_FAULTS,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -23,11 +26,17 @@ typedef struct {
 	ULONGLONG start_time;
 	int base_priority;
 	BOOL suspended;
+	double disk_io_rate;
+	SIZE_T private_bytes;
+	double page_faults_per_sec;
 } process_entry;
 
 typedef struct {
 	ULONGLONG process_time;
 	ULONGLONG system_time;
+	ULONGLONG io_bytes;
+	ULONG page_fault_count;
+	ULONGLONG tick_ms;
 } cpu_snapshot;
 
 typedef struct {

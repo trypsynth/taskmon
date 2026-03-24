@@ -27,6 +27,19 @@ typedef struct SPI {
 	ULONG PageFaultCount;
 	SIZE_T PeakWorkingSetSize;
 	SIZE_T WorkingSetSize;
+	SIZE_T QuotaPeakPagedPoolUsage;
+	SIZE_T QuotaPagedPoolUsage;
+	SIZE_T QuotaPeakNonPagedPoolUsage;
+	SIZE_T QuotaNonPagedPoolUsage;
+	SIZE_T PagefileUsage;
+	SIZE_T PeakPagefileUsage;
+	SIZE_T PrivatePageCount;
+	LARGE_INTEGER ReadOperationCount;
+	LARGE_INTEGER WriteOperationCount;
+	LARGE_INTEGER OtherOperationCount;
+	LARGE_INTEGER ReadTransferCount;
+	LARGE_INTEGER WriteTransferCount;
+	LARGE_INTEGER OtherTransferCount;
 } SPI;
 
 typedef NTSTATUS (NTAPI *PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
@@ -128,6 +141,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_PRIORITY:
 		res = (a->base_priority < b->base_priority) ? -1 : (a->base_priority > b->base_priority);
 		break;
+	case SORT_FIELD_DISK_IO:
+		res = (a->disk_io_rate < b->disk_io_rate) ? -1 : (a->disk_io_rate > b->disk_io_rate);
+		break;
+	case SORT_FIELD_PRIVATE_BYTES:
+		res = (a->private_bytes < b->private_bytes) ? -1 : (a->private_bytes > b->private_bytes);
+		break;
+	case SORT_FIELD_PAGE_FAULTS:
+		res = (a->page_faults_per_sec < b->page_faults_per_sec) ? -1 : (a->page_faults_per_sec > b->page_faults_per_sec);
+		break;
 	default:
 		break;
 	}
@@ -158,6 +180,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	uli_k.LowPart = sys_kernel_ft.dwLowDateTime; uli_k.HighPart = sys_kernel_ft.dwHighDateTime;
 	uli_u.LowPart = sys_user_ft.dwLowDateTime; uli_u.HighPart = sys_user_ft.dwHighDateTime;
 	ULONGLONG sys_time = uli_k.QuadPart + uli_u.QuadPart;
+	ULONGLONG tick_ms = GetTickCount64();
 	ULONG buf_size = 0;
 	BYTE* buf = query_all_processes(&buf_size);
 	if (!buf) return NULL;
@@ -184,6 +207,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
 		e->base_priority = spi->BasePriority;
 		e->suspended = is_process_suspended(pid);
+		e->private_bytes = spi->PagefileUsage;
+		e->disk_io_rate = 0.0;
+		e->page_faults_per_sec = 0.0;
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {
@@ -195,7 +221,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			lstrcpy(e->name, L"(unknown)");
 		}
 		ULONGLONG proc_time = (ULONGLONG)spi->KernelTime.QuadPart + (ULONGLONG)spi->UserTime.QuadPart;
-		cpu_snapshot current_snap = { proc_time, sys_time };
+		ULONGLONG io_bytes = (ULONGLONG)spi->ReadTransferCount.QuadPart + (ULONGLONG)spi->WriteTransferCount.QuadPart;
+		cpu_snapshot current_snap = { proc_time, sys_time, io_bytes, spi->PageFaultCount, tick_ms };
 		update_snapshot(snapshots, pid, current_snap);
 		cpu_snapshot* prev = find_snapshot(old_snaps, pid);
 		if (prev) {
@@ -204,6 +231,14 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			if (delta_sys > 0) {
 				double pct = (double)delta_proc / (double)delta_sys * 100.0;
 				e->cpu_percent = pct < 0.0 ? 0.0 : pct > 100.0 ? 100.0 : pct;
+			}
+			ULONGLONG delta_ms = tick_ms - prev->tick_ms;
+			if (delta_ms > 0) {
+				ULONGLONG delta_io = io_bytes - prev->io_bytes;
+				e->disk_io_rate = (double)delta_io * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_pf = (spi->PageFaultCount >= prev->page_fault_count)
+					? spi->PageFaultCount - prev->page_fault_count : 0;
+				e->page_faults_per_sec = (double)delta_pf * 1000.0 / (double)delta_ms;
 			}
 		}
 		if (spi->NextEntryOffset == 0) break;

@@ -56,6 +56,32 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 			wnsprintf(buf, len, L"%02d/%02d %02d:%02d", st.wMonth, st.wDay, st.wHour, st.wMinute);
 		break;
 	}
+	case COL_DISK_IO: {
+		ULONGLONG rate = (ULONGLONG)e->disk_io_rate;
+		if (rate >= 1024ULL * 1024) {
+			int whole = (int)(rate / (1024 * 1024));
+			int frac  = (int)((rate % (1024 * 1024)) * 10 / (1024 * 1024));
+			wnsprintf(buf, len, L"%d.%d MB/s", whole, frac);
+		} else if (rate >= 1024) {
+			wnsprintf(buf, len, L"%u KB/s", (UINT)(rate / 1024));
+		} else if (rate > 0) {
+			wnsprintf(buf, len, L"%u B/s", (UINT)rate);
+		} else {
+			buf[0] = L'\0';
+		}
+		break;
+	}
+	case COL_PRIVATE_BYTES:
+		wnsprintf(buf, len, L"%u K", (UINT)(e->private_bytes / 1024));
+		break;
+	case COL_PAGE_FAULTS: {
+		UINT pf = (UINT)(e->page_faults_per_sec + 0.5);
+		if (pf > 0)
+			wnsprintf(buf, len, L"%u /s", pf);
+		else
+			buf[0] = L'\0';
+		break;
+	}
 	default:
 		buf[0] = L'\0';
 		break;
