@@ -13,6 +13,8 @@ typedef enum {
 	COL_DISK_IO,
 	COL_PRIVATE_BYTES,
 	COL_PAGE_FAULTS,
+	COL_USER,
+	COL_CMDLINE,
 	COL_COUNT,
 } column_id;
 

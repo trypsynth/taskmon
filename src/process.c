@@ -44,6 +44,7 @@ typedef struct SPI {
 
 typedef NTSTATUS (NTAPI *PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
 typedef NTSTATUS (NTAPI *PFN_NtProc)(HANDLE);
+typedef NTSTATUS (NTAPI *PFN_NtQIP)(HANDLE, DWORD, PVOID, ULONG, PULONG);
 
 static DWORD g_suspended_pids[SNAPSHOT_CAPACITY];
 static int   g_suspended_count = 0;
@@ -150,6 +151,12 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_PAGE_FAULTS:
 		res = (a->page_faults_per_sec < b->page_faults_per_sec) ? -1 : (a->page_faults_per_sec > b->page_faults_per_sec);
 		break;
+	case SORT_FIELD_USER:
+		res = StrCmpI(a->user, b->user);
+		break;
+	case SORT_FIELD_CMDLINE:
+		res = StrCmpI(a->cmdline, b->cmdline);
+		break;
 	default:
 		break;
 	}
@@ -171,6 +178,62 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 		quicksort(entries, low, p - 1, field, descending);
 		quicksort(entries, p + 1, high, field, descending);
 	}
+}
+
+static void get_process_user(DWORD pid, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	if (pid == 0) {
+		lstrcpyn(buf, L"SYSTEM", len);
+		return; 
+	}
+	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!hproc) return;
+	HANDLE htok = NULL;
+	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
+		CloseHandle(hproc);
+		return;
+	}
+	CloseHandle(hproc);
+	DWORD needed = 0;
+	GetTokenInformation(htok, TokenUser, NULL, 0, &needed);
+	BYTE* ubuf = (BYTE*)heap_alloc(needed);
+	if (ubuf && GetTokenInformation(htok, TokenUser, ubuf, needed, &needed)) {
+		TOKEN_USER* tu = (TOKEN_USER*)ubuf;
+		wchar_t name[64], domain[64];
+		DWORD nlen = 64, dlen = 64;
+		SID_NAME_USE use;
+		if (LookupAccountSidW(NULL, tu->User.Sid, name, &nlen, domain, &dlen, &use)) lstrcpyn(buf, name, len);
+	}
+	heap_free(ubuf);
+	CloseHandle(htok);
+}
+
+static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	if (pid == 0) return;
+	static PFN_NtQIP fn = NULL;
+	if (!fn) fn = (PFN_NtQIP)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtQueryInformationProcess");
+	if (!fn) return;
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return;
+	ULONG needed = 0;
+	fn(h, 60, NULL, 0, &needed);
+	if (needed == 0) needed = 1024;
+	BYTE* cbuf = (BYTE*)heap_alloc(needed);
+	if (cbuf) {
+		NTSTATUS st = fn(h, 60, cbuf, needed, NULL);
+		if (NT_SUCCESS(st)) {
+			UNICODE_STRING* us = (UNICODE_STRING*)cbuf;
+			if (us->Buffer && us->Length > 0) {
+				int wlen = us->Length / sizeof(wchar_t);
+				if (wlen >= len) wlen = len - 1;
+				memcpy(buf, us->Buffer, wlen * sizeof(wchar_t));
+				buf[wlen] = L'\0';
+			}
+		}
+		heap_free(cbuf);
+	}
+	CloseHandle(h);
 }
 
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
@@ -210,6 +273,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->private_bytes = spi->PagefileUsage;
 		e->disk_io_rate = 0.0;
 		e->page_faults_per_sec = 0.0;
+		get_process_user(pid, e->user, 64);
+		get_process_cmdline(pid, e->cmdline, 256);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {

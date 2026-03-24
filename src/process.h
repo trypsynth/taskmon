@@ -13,6 +13,8 @@ typedef enum {
 	SORT_FIELD_DISK_IO,
 	SORT_FIELD_PRIVATE_BYTES,
 	SORT_FIELD_PAGE_FAULTS,
+	SORT_FIELD_USER,
+	SORT_FIELD_CMDLINE,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -29,6 +31,8 @@ typedef struct {
 	double disk_io_rate;
 	SIZE_T private_bytes;
 	double page_faults_per_sec;
+	wchar_t user[64];
+	wchar_t cmdline[256];
 } process_entry;
 
 typedef struct {
