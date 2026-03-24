@@ -1,7 +1,9 @@
 #include "settings.h"
 #include "resource.h"
+#include "theme.h"
 #include <commctrl.h>
 #include <shlwapi.h>
+#include <uxtheme.h>
 
 const column_def COLUMNS[COL_COUNT] = {
 	{ L"Name", L"Name", 260, SORT_FIELD_NAME, TRUE, TRUE },
@@ -32,8 +34,10 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 	switch (msg) {
 	case WM_INITDIALOG: {
 		SetWindowLongPtr(hdlg, DWLP_USER, lp);
+		theme_apply_titlebar(hdlg);
 		settings_dlg_data* data = (settings_dlg_data*)lp;
 		HWND combo = GetDlgItem(hdlg, IDC_REFRESH_COMBO);
+		SetWindowTheme(combo, theme_is_dark() ? L"DarkMode_Explorer" : L"Explorer", NULL);
 		int sel = 0;
 		for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
 			SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)REFRESH_LABELS[i]);
@@ -60,6 +64,7 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 			ListView_SetCheckState(lv, lvi.iItem, data->visible[i]);
 		}
 		if (j > 0) ListView_SetItemState(lv, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+		theme_apply_listview(lv);
 		HWND skip_chk = CreateWindow(L"BUTTON", L"Disable end task confirmation (not recommended)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_SKIP_CONFIRM, GetModuleHandle(NULL), NULL);
 		SendMessage(skip_chk, WM_SETFONT, (WPARAM)font, FALSE);
 		SendMessage(skip_chk, BM_SETCHECK, data->skip_kill_confirm ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -93,6 +98,19 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 			return TRUE;
 		}
 		break;
+	case WM_CTLCOLORDLG: {
+		HBRUSH br = theme_bg_brush();
+		if (br) return (INT_PTR)br;
+		break;
+	}
+	case WM_CTLCOLORSTATIC:
+	case WM_CTLCOLORBTN:
+	case WM_CTLCOLORLISTBOX:
+	case WM_CTLCOLOREDIT: {
+		HBRUSH br = theme_ctl_color((HDC)wp);
+		if (br) return (INT_PTR)br;
+		break;
+	}
 	}
 	return FALSE;
 }

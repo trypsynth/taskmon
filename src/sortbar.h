@@ -5,3 +5,4 @@ HWND sortbar_create(HWND parent);
 void apply_columns(void);
 void update_sort_ui(void);
 void update_tab_stop(void);
+void sortbar_apply_theme(void);

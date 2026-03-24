@@ -3,12 +3,17 @@
 #include "settings.h"
 #include "resource.h"
 #include "listview.h"
+#include "theme.h"
 #include <commctrl.h>
 #include <shlwapi.h>
 
 static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
 	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
 	if (msg == WM_COMMAND) return SendMessage(g_hwnd, msg, wp, lp);
+	if (msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORSTATIC) {
+		LRESULT r = SendMessage(g_hwnd, msg, wp, lp);
+		if (r) return r;
+	}
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
@@ -123,6 +128,13 @@ void apply_columns(void) {
 	SetWindowPos(g_hwnd_sort_group, NULL, 0, 0, btn_x, 1, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	update_sort_ui();
 	update_tab_stop();
+	sortbar_apply_theme();
+}
+
+void sortbar_apply_theme(void) {
+	theme_apply_button(g_hwnd_sort_group);
+	for (int i = 0; i < g_sort_btn_count; ++i)
+		theme_apply_button(g_sort_btns[i]);
 }
 
 HWND sortbar_create(HWND parent) {

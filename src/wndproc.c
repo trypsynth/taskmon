@@ -5,6 +5,7 @@
 #include "resource.h"
 #include "listview.h"
 #include "sortbar.h"
+#include "theme.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -115,7 +116,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		SetWindowSubclass(g_hwnd_list, list_key_proc, 0, 0);
 		ListView_SetExtendedListViewStyle(g_hwnd_list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_HEADERDRAGDROP);
 		settings_load(&g_prefs);
+		theme_update();
 		apply_columns();
+		theme_apply_titlebar(hwnd);
+		theme_apply_listview(g_hwnd_list);
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
 		// Prime the snapshot table so the first real refresh has deltas to work from.
@@ -342,6 +346,31 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			}
 		}
 		return 0;
+	case WM_SETTINGCHANGE:
+		if (lp && lstrcmp((LPCWSTR)lp, L"ImmersiveColorSet") == 0) {
+			theme_update();
+			theme_apply_titlebar(hwnd);
+			theme_apply_listview(g_hwnd_list);
+			sortbar_apply_theme();
+			RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+		}
+		return 0;
+	case WM_ERASEBKGND: {
+		HBRUSH br = theme_bg_brush();
+		if (br) {
+			RECT rc;
+			GetClientRect(hwnd, &rc);
+			FillRect((HDC)wp, &rc, br);
+			return 1;
+		}
+		break;
+	}
+	case WM_CTLCOLORSTATIC:
+	case WM_CTLCOLORBTN: {
+		HBRUSH br = theme_ctl_color((HDC)wp);
+		if (br) return (LRESULT)br;
+		break;
+	}
 	case WM_DESTROY:
 		UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 		KillTimer(hwnd, ID_REFRESH_TIMER);
