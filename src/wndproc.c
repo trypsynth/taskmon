@@ -6,6 +6,7 @@
 #include "listview.h"
 #include "sortbar.h"
 #include "theme.h"
+#include "run.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -89,6 +90,11 @@ static BOOL open_item_location(const wchar_t* path) {
 
 static void create_menu_bar(HWND hwnd) {
 	HMENU bar = CreateMenu();
+	HMENU file = CreatePopupMenu();
+	AppendMenu(file, MF_STRING, ID_FILE_NEW_TASK, L"New task...\tCtrl+N");
+	AppendMenu(file, MF_SEPARATOR, 0, NULL);
+	AppendMenu(file, MF_STRING, ID_FILE_EXIT, L"Exit");
+	AppendMenu(bar, MF_POPUP, (UINT_PTR)file, L"&File");
 	HMENU view = CreatePopupMenu();
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
@@ -251,9 +257,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			}
 			return 0;
 		}
+		if (id == ID_FILE_NEW_TASK) {
+			open_run_dialog(hwnd);
+			return 0;
+		}
+		if (id == ID_FILE_EXIT) {
+			DestroyWindow(hwnd);
+			return 0;
+		}
 		if (id == ID_VIEW_ALWAYS_ON_TOP) {
 			g_prefs.always_on_top = !g_prefs.always_on_top;
-			HMENU view = GetSubMenu(GetMenu(hwnd), 0);
+			HMENU view = GetSubMenu(GetMenu(hwnd), 1);
 			CheckMenuItem(view, ID_VIEW_ALWAYS_ON_TOP, g_prefs.always_on_top ? MF_CHECKED : MF_UNCHECKED);
 			SetWindowPos(hwnd, g_prefs.always_on_top ? HWND_TOPMOST : HWND_NOTOPMOST,
 				0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
