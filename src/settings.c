@@ -37,6 +37,13 @@ typedef struct {
 	BOOL skip_kill_confirm;
 } settings_dlg_data;
 
+static LRESULT CALLBACK settings_lv_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
+	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	if (msg == WM_CHAR && wp == L' ')
+		return 0;
+	return DefSubclassProc(hwnd, msg, wp, lp);
+}
+
 static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
 	case WM_INITDIALOG: {
@@ -72,6 +79,7 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 		}
 		if (j > 0) ListView_SetItemState(lv, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
 		theme_apply_listview(lv);
+		SetWindowSubclass(lv, settings_lv_proc, 0, 0);
 		HWND skip_chk = CreateWindow(L"BUTTON", L"Disable end task confirmation (not recommended)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_SKIP_CONFIRM, GetModuleHandle(NULL), NULL);
 		SendMessage(skip_chk, WM_SETFONT, (WPARAM)font, FALSE);
 		SendMessage(skip_chk, BM_SETCHECK, data->skip_kill_confirm ? BST_CHECKED : BST_UNCHECKED, 0);
