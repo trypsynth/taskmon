@@ -30,13 +30,9 @@ static void run_command(HWND hdlg) {
 	sei.lpVerb = L"open";
 	sei.lpFile = cmd;
 	sei.nShow = SW_SHOWNORMAL;
-	if (ShellExecuteEx(&sei)) {
+	// ShellExecuteEx shows its own error dialog on failure, just keep ours open
+	if (ShellExecuteEx(&sei))
 		EndDialog(hdlg, 1);
-	} else {
-		wchar_t msg[512];
-		wnsprintf(msg, 512, L"Could not run \"%s\".", cmd);
-		MessageBox(hdlg, msg, L"Error", MB_ICONERROR | MB_OK);
-	}
 }
 
 static INT_PTR CALLBACK run_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) {
