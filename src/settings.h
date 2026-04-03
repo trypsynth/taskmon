@@ -15,6 +15,7 @@ typedef enum {
 	COL_PAGE_FAULTS,
 	COL_USER,
 	COL_CMDLINE,
+	COL_ARCH,
 	COL_COUNT,
 } column_id;
 

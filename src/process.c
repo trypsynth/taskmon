@@ -45,9 +45,10 @@ typedef struct SPI {
 typedef NTSTATUS (NTAPI *PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
 typedef NTSTATUS (NTAPI *PFN_NtProc)(HANDLE);
 typedef NTSTATUS (NTAPI *PFN_NtQIP)(HANDLE, DWORD, PVOID, ULONG, PULONG);
+typedef BOOL (WINAPI *PFN_IsWow64Process2)(HANDLE, USHORT*, USHORT*);
 
 static DWORD g_suspended_pids[SNAPSHOT_CAPACITY];
-static int   g_suspended_count = 0;
+static int g_suspended_count = 0;
 
 static void* heap_alloc(SIZE_T size) {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
@@ -157,6 +158,9 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_CMDLINE:
 		res = StrCmpI(a->cmdline, b->cmdline);
 		break;
+	case SORT_FIELD_ARCH:
+		res = (a->arch_machine < b->arch_machine) ? -1 : (a->arch_machine > b->arch_machine);
+		break;
 	default:
 		break;
 	}
@@ -178,6 +182,55 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 		quicksort(entries, low, p - 1, field, descending);
 		quicksort(entries, p + 1, high, field, descending);
 	}
+}
+
+static USHORT get_native_machine(void) {
+	static USHORT native = 0;
+	if (native) return native;
+	PFN_IsWow64Process2 fn = (PFN_IsWow64Process2)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "IsWow64Process2");
+	if (fn) {
+		USHORT proc_machine;
+		fn(GetCurrentProcess(), &proc_machine, &native);
+	} else {
+		SYSTEM_INFO si;
+		GetNativeSystemInfo(&si);
+		switch (si.wProcessorArchitecture) {
+		case PROCESSOR_ARCHITECTURE_AMD64:
+			native = 0x8664;
+			break;
+		case PROCESSOR_ARCHITECTURE_ARM64:
+			native = 0xAA64;
+			break;
+		default:
+			native = 0x014c;
+			break;
+		}
+	}
+	return native;
+}
+
+static USHORT get_process_arch(DWORD pid) {
+	static PFN_IsWow64Process2 fn = NULL;
+	static BOOL fn_checked = FALSE;
+	if (!fn_checked) {
+		fn_checked = TRUE;
+		fn = (PFN_IsWow64Process2)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "IsWow64Process2");
+	}
+	if (pid == 0) return get_native_machine();
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return 0;
+	USHORT arch = 0;
+	if (fn) {
+		USHORT proc_machine, native;
+		if (fn(h, &proc_machine, &native))
+			arch = (proc_machine == IMAGE_FILE_MACHINE_UNKNOWN) ? native : proc_machine;
+	} else {
+		BOOL is_wow64 = FALSE;
+		IsWow64Process(h, &is_wow64);
+		arch = is_wow64 ? 0x014c : get_native_machine();
+	}
+	CloseHandle(h);
+	return arch;
 }
 
 static void get_process_user(DWORD pid, wchar_t* buf, int len) {
@@ -275,6 +328,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->page_faults_per_sec = 0.0;
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
+		e->arch_machine = get_process_arch(pid);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {

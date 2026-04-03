@@ -30,13 +30,27 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_PRIORITY: {
 		const wchar_t* label;
 		switch (e->base_priority) {
-		case  4: label = L"Idle";         break;
-		case  6: label = L"Below Normal"; break;
-		case  8: label = L"Normal";       break;
-		case 10: label = L"Above Normal"; break;
-		case 13: label = L"High";         break;
-		case 24: label = L"Realtime";     break;
-		default: wnsprintf(buf, len, L"%d", e->base_priority); return;
+		case 4:
+			label = L"Idle";
+			break;
+		case 6:
+			label = L"Below Normal";
+			break;
+		case 8:
+			label = L"Normal";
+			break;
+		case 10:
+			label = L"Above Normal";
+			break;
+		case 13:
+			label = L"High";
+			break;
+		case 24:
+			label = L"Realtime";
+			break;
+		default:
+			wnsprintf(buf, len, L"%d", e->base_priority);
+			return;
 		}
 		lstrcpyn(buf, label, len);
 		break;
@@ -44,7 +58,7 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_STARTTIME: {
 		if (!e->start_time) { buf[0] = L'\0'; break; }
 		FILETIME ft, lft;
-		ft.dwLowDateTime  = (DWORD)(e->start_time & 0xFFFFFFFF);
+		ft.dwLowDateTime = (DWORD)(e->start_time & 0xFFFFFFFF);
 		ft.dwHighDateTime = (DWORD)(e->start_time >> 32);
 		FileTimeToLocalFileTime(&ft, &lft);
 		SYSTEMTIME st, now;
@@ -62,7 +76,7 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		ULONGLONG rate = (ULONGLONG)e->disk_io_rate;
 		if (rate >= 1024ULL * 1024) {
 			int whole = (int)(rate / (1024 * 1024));
-			int frac  = (int)((rate % (1024 * 1024)) * 10 / (1024 * 1024));
+			int frac = (int)((rate % (1024 * 1024)) * 10 / (1024 * 1024));
 			wnsprintf(buf, len, L"%d.%d MB/s", whole, frac);
 		} else if (rate >= 1024) {
 			wnsprintf(buf, len, L"%u KB/s", (UINT)(rate / 1024));
@@ -89,6 +103,22 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_CMDLINE:
 		lstrcpyn(buf, e->cmdline, len);
+		break;
+	case COL_ARCH:
+		switch (e->arch_machine) {
+		case 0x014c:
+			lstrcpyn(buf, L"x86", len);
+			break;
+		case 0x8664:
+			lstrcpyn(buf, L"x64", len);
+			break;
+		case 0xAA64:
+			lstrcpyn(buf, L"ARM64", len);
+			break;
+		default: 
+			buf[0] = L'\0';
+			break;
+		}
 		break;
 	default:
 		buf[0] = L'\0';
