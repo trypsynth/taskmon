@@ -45,8 +45,14 @@ static INT_PTR CALLBACK run_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) 
 	case WM_INITDIALOG:
 		theme_apply_titlebar(hdlg);
 		SendDlgItemMessage(hdlg, IDC_RUN_EDIT, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
+		EnableWindow(GetDlgItem(hdlg, IDOK), FALSE);
 		return TRUE;
 	case WM_COMMAND:
+		if (LOWORD(wp) == IDC_RUN_EDIT && HIWORD(wp) == EN_CHANGE) {
+			BOOL has_text = GetWindowTextLength(GetDlgItem(hdlg, IDC_RUN_EDIT)) > 0;
+			EnableWindow(GetDlgItem(hdlg, IDOK), has_text);
+			return TRUE;
+		}
 		if (LOWORD(wp) == IDC_RUN_BROWSE) {
 			browse_for_file(hdlg);
 			return TRUE;
