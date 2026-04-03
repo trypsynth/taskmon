@@ -161,6 +161,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_ARCH:
 		res = (a->arch_machine < b->arch_machine) ? -1 : (a->arch_machine > b->arch_machine);
 		break;
+	case SORT_FIELD_SESSION:
+		res = (a->session_id < b->session_id) ? -1 : (a->session_id > b->session_id);
+		break;
+	case SORT_FIELD_PEAK_WORKING_SET:
+		res = (a->peak_working_set < b->peak_working_set) ? -1 : (a->peak_working_set > b->peak_working_set);
+		break;
+	case SORT_FIELD_VIRTUAL_MEM:
+		res = (a->virtual_size < b->virtual_size) ? -1 : (a->virtual_size > b->virtual_size);
+		break;
 	default:
 		break;
 	}
@@ -326,6 +335,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->private_bytes = spi->PagefileUsage;
 		e->disk_io_rate = 0.0;
 		e->page_faults_per_sec = 0.0;
+		e->session_id = spi->SessionId;
+		e->peak_working_set = spi->PeakWorkingSetSize;
+		e->virtual_size = spi->VirtualSize;
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
 		e->arch_machine = get_process_arch(pid);

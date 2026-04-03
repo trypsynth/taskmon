@@ -16,6 +16,9 @@ typedef enum {
 	COL_USER,
 	COL_CMDLINE,
 	COL_ARCH,
+	COL_SESSION,
+	COL_PEAK_WORKING_SET,
+	COL_VIRTUAL_MEM,
 	COL_COUNT,
 } column_id;
 

@@ -16,6 +16,9 @@ typedef enum {
 	SORT_FIELD_USER,
 	SORT_FIELD_CMDLINE,
 	SORT_FIELD_ARCH,
+	SORT_FIELD_SESSION,
+	SORT_FIELD_PEAK_WORKING_SET,
+	SORT_FIELD_VIRTUAL_MEM,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -35,6 +38,9 @@ typedef struct {
 	wchar_t user[64];
 	wchar_t cmdline[256];
 	USHORT arch_machine;
+	DWORD session_id;
+	SIZE_T peak_working_set;
+	SIZE_T virtual_size;
 } process_entry;
 
 typedef struct {

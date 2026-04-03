@@ -106,19 +106,20 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_ARCH:
 		switch (e->arch_machine) {
-		case 0x014c:
-			lstrcpyn(buf, L"x86", len);
-			break;
-		case 0x8664:
-			lstrcpyn(buf, L"x64", len);
-			break;
-		case 0xAA64:
-			lstrcpyn(buf, L"ARM64", len);
-			break;
-		default: 
-			buf[0] = L'\0';
-			break;
+		case 0x014c: lstrcpyn(buf, L"x86",   len); break;
+		case 0x8664: lstrcpyn(buf, L"x64",   len); break;
+		case 0xAA64: lstrcpyn(buf, L"ARM64", len); break;
+		default:     buf[0] = L'\0';               break;
 		}
+		break;
+	case COL_SESSION:
+		wnsprintf(buf, len, L"%u", e->session_id);
+		break;
+	case COL_PEAK_WORKING_SET:
+		wnsprintf(buf, len, L"%u K", (UINT)(e->peak_working_set / 1024));
+		break;
+	case COL_VIRTUAL_MEM:
+		wnsprintf(buf, len, L"%u K", (UINT)(e->virtual_size / 1024));
 		break;
 	default:
 		buf[0] = L'\0';
