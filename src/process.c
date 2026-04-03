@@ -170,6 +170,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_VIRTUAL_MEM:
 		res = (a->virtual_size < b->virtual_size) ? -1 : (a->virtual_size > b->virtual_size);
 		break;
+	case SORT_FIELD_GDI_OBJECTS:
+		res = (a->gdi_objects < b->gdi_objects) ? -1 : (a->gdi_objects > b->gdi_objects);
+		break;
+	case SORT_FIELD_USER_OBJECTS:
+		res = (a->user_objects < b->user_objects) ? -1 : (a->user_objects > b->user_objects);
+		break;
+	case SORT_FIELD_INTEGRITY:
+		res = (a->integrity_level < b->integrity_level) ? -1 : (a->integrity_level > b->integrity_level);
+		break;
 	default:
 		break;
 	}
@@ -240,6 +249,39 @@ static USHORT get_process_arch(DWORD pid) {
 	}
 	CloseHandle(h);
 	return arch;
+}
+
+static DWORD get_process_gui_resources(DWORD pid, DWORD flags) {
+	if (pid == 0) return 0;
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return 0;
+	DWORD count = GetGuiResources(h, flags);
+	CloseHandle(h);
+	return count;
+}
+
+static DWORD get_process_integrity(DWORD pid) {
+	if (pid == 0) return 0x4000; /* SYSTEM */
+	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!hproc) return 0;
+	HANDLE htok = NULL;
+	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
+		CloseHandle(hproc);
+		return 0;
+	}
+	CloseHandle(hproc);
+	DWORD needed = 0;
+	GetTokenInformation(htok, TokenIntegrityLevel, NULL, 0, &needed);
+	BYTE* buf = (BYTE*)heap_alloc(needed);
+	DWORD rid = 0;
+	if (buf && GetTokenInformation(htok, TokenIntegrityLevel, buf, needed, &needed)) {
+		TOKEN_MANDATORY_LABEL* tml = (TOKEN_MANDATORY_LABEL*)buf;
+		DWORD sub_count = *GetSidSubAuthorityCount(tml->Label.Sid);
+		rid = *GetSidSubAuthority(tml->Label.Sid, sub_count - 1);
+	}
+	heap_free(buf);
+	CloseHandle(htok);
+	return rid;
 }
 
 static void get_process_user(DWORD pid, wchar_t* buf, int len) {
@@ -338,6 +380,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->session_id = spi->SessionId;
 		e->peak_working_set = spi->PeakWorkingSetSize;
 		e->virtual_size = spi->VirtualSize;
+		e->gdi_objects = get_process_gui_resources(pid, GR_GDIOBJECTS);
+		e->user_objects = get_process_gui_resources(pid, GR_USEROBJECTS);
+		e->integrity_level = get_process_integrity(pid);
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
 		e->arch_machine = get_process_arch(pid);

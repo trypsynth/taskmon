@@ -19,6 +19,9 @@ typedef enum {
 	SORT_FIELD_SESSION,
 	SORT_FIELD_PEAK_WORKING_SET,
 	SORT_FIELD_VIRTUAL_MEM,
+	SORT_FIELD_GDI_OBJECTS,
+	SORT_FIELD_USER_OBJECTS,
+	SORT_FIELD_INTEGRITY,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -41,6 +44,9 @@ typedef struct {
 	DWORD session_id;
 	SIZE_T peak_working_set;
 	SIZE_T virtual_size;
+	DWORD gdi_objects;
+	DWORD user_objects;
+	DWORD integrity_level;
 } process_entry;
 
 typedef struct {

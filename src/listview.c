@@ -118,9 +118,45 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_PEAK_WORKING_SET:
 		wnsprintf(buf, len, L"%u K", (UINT)(e->peak_working_set / 1024));
 		break;
-	case COL_VIRTUAL_MEM:
-		wnsprintf(buf, len, L"%u K", (UINT)(e->virtual_size / 1024));
+	case COL_VIRTUAL_MEM: {
+		ULONGLONG bytes = (ULONGLONG)e->virtual_size;
+		if (bytes >= 1024ULL * 1024 * 1024) {
+			int whole = (int)(bytes / (1024ULL * 1024 * 1024));
+			int frac  = (int)((bytes % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
+			wnsprintf(buf, len, L"%d.%d GB", whole, frac);
+		} else if (bytes >= 1024 * 1024) {
+			int whole = (int)(bytes / (1024 * 1024));
+			int frac  = (int)((bytes % (1024 * 1024)) * 10 / (1024 * 1024));
+			wnsprintf(buf, len, L"%d.%d MB", whole, frac);
+		} else {
+			wnsprintf(buf, len, L"%u K", (UINT)(bytes / 1024));
+		}
 		break;
+	}
+	case COL_GDI_OBJECTS:
+		if (e->gdi_objects) wnsprintf(buf, len, L"%u", e->gdi_objects);
+		else buf[0] = L'\0';
+		break;
+	case COL_USER_OBJECTS:
+		if (e->user_objects) wnsprintf(buf, len, L"%u", e->user_objects);
+		else buf[0] = L'\0';
+		break;
+	case COL_INTEGRITY: {
+		const wchar_t* label;
+		switch (e->integrity_level) {
+		case 0x0000: label = L"Untrusted"; break;
+		case 0x1000: label = L"Low";       break;
+		case 0x2000: label = L"Medium";    break;
+		case 0x2100: label = L"Medium+";   break;
+		case 0x3000: label = L"High";      break;
+		case 0x4000: label = L"System";    break;
+		case 0x5000: label = L"Protected"; break;
+		default:     label = NULL;         break;
+		}
+		if (label) lstrcpyn(buf, label, len);
+		else wnsprintf(buf, len, L"0x%04X", e->integrity_level);
+		break;
+	}
 	default:
 		buf[0] = L'\0';
 		break;

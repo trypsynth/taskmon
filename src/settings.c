@@ -20,9 +20,12 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"User",         L"User",         120, SORT_FIELD_USER,          FALSE, FALSE },
 	{ L"Command Line", L"Command Line", 300, SORT_FIELD_CMDLINE,       FALSE, FALSE },
 	{ L"Architecture",    L"Architecture",  70,  SORT_FIELD_ARCH,           FALSE, FALSE },
-	{ L"Session",         L"Session",       60,  SORT_FIELD_SESSION,        FALSE, FALSE },
-	{ L"Peak Memory",     L"Peak Memory",      120, SORT_FIELD_PEAK_WORKING_SET, FALSE, FALSE },
-	{ L"Virtual Memory",  L"Virtual Memory",   120, SORT_FIELD_VIRTUAL_MEM,    FALSE, FALSE },
+	{ L"Session",        L"Session",      60,  SORT_FIELD_SESSION,          FALSE, FALSE },
+	{ L"Peak Memory",    L"Peak Memory",  120, SORT_FIELD_PEAK_WORKING_SET,  FALSE, FALSE },
+	{ L"Virtual Memory", L"Virtual Mem",  120, SORT_FIELD_VIRTUAL_MEM,       FALSE, FALSE },
+	{ L"GDI Objects",    L"GDI Obj",      70,  SORT_FIELD_GDI_OBJECTS,       FALSE, FALSE },
+	{ L"USER Objects",   L"USER Obj",     70,  SORT_FIELD_USER_OBJECTS,      FALSE, FALSE },
+	{ L"Integrity",      L"Integrity",    80,  SORT_FIELD_INTEGRITY,         FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };
