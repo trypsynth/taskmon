@@ -42,6 +42,8 @@ typedef struct {
 	UINT refresh_ms;
 	BOOL visible[COL_COUNT];
 	BOOL skip_kill_confirm;
+	BOOL always_on_top;
+	int window_left, window_top, window_width, window_height;
 } sort_prefs;
 
 #define REFRESH_OPTION_COUNT 5

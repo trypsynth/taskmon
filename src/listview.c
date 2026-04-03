@@ -163,7 +163,7 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	}
 }
 
-static void populate_list(process_entry* entries, int count) {
+static double populate_list(process_entry* entries, int count) {
 	DWORD selected_pid = 0;
 	int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 	if (selected != -1) {
@@ -217,14 +217,32 @@ static void populate_list(process_entry* entries, int count) {
 	SendMessage(g_hwnd_list, WM_SETREDRAW, TRUE, 0);
 	InvalidateRect(g_hwnd_list, NULL, FALSE);
 	tray_update_tip(total_cpu);
+	return total_cpu;
 }
 
 void do_refresh(void) {
 	int count = 0;
 	process_entry* entries = snapshot_processes(g_snapshots, &count, g_prefs.field, g_prefs.desc[(int)g_prefs.field]);
 	if (entries) {
-		populate_list(entries, count);
+		double total_cpu = populate_list(entries, count);
 		free_process_entries(entries);
+		if (g_hwnd_status) {
+			int cpu_w = (int)total_cpu;
+			int cpu_f = (int)((total_cpu - cpu_w) * 100 + 0.5);
+			if (cpu_f >= 100) { cpu_w++; cpu_f = 0; }
+			MEMORYSTATUSEX ms = { sizeof(ms) };
+			GlobalMemoryStatusEx(&ms);
+			ULONGLONG in_use = ms.ullTotalPhys - ms.ullAvailPhys;
+			ULONGLONG total  = ms.ullTotalPhys;
+			int iu_w = (int)(in_use / (1024ULL * 1024 * 1024));
+			int iu_f = (int)((in_use % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
+			int t_w  = (int)(total  / (1024ULL * 1024 * 1024));
+			int t_f  = (int)((total  % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
+			wchar_t status[128];
+			wnsprintf(status, 128, L"  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB",
+				count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f);
+			SendMessage(g_hwnd_status, SB_SETTEXT, 0, (LPARAM)status);
+		}
 	}
 }
 

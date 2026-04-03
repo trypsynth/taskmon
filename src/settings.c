@@ -178,6 +178,20 @@ void settings_load(sort_prefs* prefs) {
 	wchar_t skip_buf[4];
 	GetPrivateProfileString(L"confirm", L"skip_kill", L"0", skip_buf, 4, path);
 	prefs->skip_kill_confirm = (skip_buf[0] == L'1');
+	wchar_t aot_buf[4];
+	GetPrivateProfileString(L"window", L"always_on_top", L"0", aot_buf, 4, path);
+	prefs->always_on_top = (aot_buf[0] == L'1');
+	wchar_t pos_buf[16];
+	GetPrivateProfileString(L"window", L"width", L"0", pos_buf, 16, path);
+	prefs->window_width = StrToInt(pos_buf);
+	if (prefs->window_width > 0) {
+		GetPrivateProfileString(L"window", L"height", L"0", pos_buf, 16, path);
+		prefs->window_height = StrToInt(pos_buf);
+		GetPrivateProfileString(L"window", L"left", L"0", pos_buf, 16, path);
+		prefs->window_left = StrToInt(pos_buf);
+		GetPrivateProfileString(L"window", L"top", L"0", pos_buf, 16, path);
+		prefs->window_top = StrToInt(pos_buf);
+	}
 	for (int i = 0; i < COL_COUNT; ++i) {
 		wchar_t key[64], val[4];
 		wnsprintf(key, 64, L"%s_visible", COLUMNS[i].label);
@@ -201,6 +215,18 @@ void settings_save(const sort_prefs* prefs) {
 	wnsprintf(ms_str, 16, L"%u", prefs->refresh_ms);
 	WritePrivateProfileString(L"refresh", L"interval_ms", ms_str, path);
 	WritePrivateProfileString(L"confirm", L"skip_kill", prefs->skip_kill_confirm ? L"1" : L"0", path);
+	WritePrivateProfileString(L"window", L"always_on_top", prefs->always_on_top ? L"1" : L"0", path);
+	if (prefs->window_width > 0) {
+		wchar_t pos_str[16];
+		wnsprintf(pos_str, 16, L"%d", prefs->window_left);
+		WritePrivateProfileString(L"window", L"left", pos_str, path);
+		wnsprintf(pos_str, 16, L"%d", prefs->window_top);
+		WritePrivateProfileString(L"window", L"top", pos_str, path);
+		wnsprintf(pos_str, 16, L"%d", prefs->window_width);
+		WritePrivateProfileString(L"window", L"width", pos_str, path);
+		wnsprintf(pos_str, 16, L"%d", prefs->window_height);
+		WritePrivateProfileString(L"window", L"height", pos_str, path);
+	}
 	for (int i = 0; i < COL_COUNT; ++i) {
 		if (COLUMNS[i].always_visible) continue;
 		wchar_t key[64];

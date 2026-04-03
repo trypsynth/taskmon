@@ -40,6 +40,7 @@ const wchar_t WINDOW_TITLE[] = L"Taskmon";
 HWND g_hwnd = NULL;
 HWND g_hwnd_list = NULL;
 HWND g_hwnd_sort_group = NULL;
+HWND g_hwnd_status = NULL;
 HWND g_sort_btns[COL_COUNT] = {0};
 column_id g_sort_btn_cols[COL_COUNT] = {0};
 int g_sort_btn_count = 0;
@@ -91,6 +92,8 @@ static void create_menu_bar(HWND hwnd) {
 	HMENU view = CreatePopupMenu();
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
+	AppendMenu(view, MF_STRING | (g_prefs.always_on_top ? MF_CHECKED : 0), ID_VIEW_ALWAYS_ON_TOP, L"Always on Top");
+	AppendMenu(view, MF_SEPARATOR, 0, NULL);
 	AppendMenu(view, MF_STRING, ID_VIEW_SETTINGS, L"Settings...\tCtrl+,");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)view, L"View");
 	SetMenu(hwnd, bar);
@@ -105,23 +108,33 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	case WM_CREATE: {
 		g_hwnd = hwnd;
 		RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_OEM_3);
-		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES };
+		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES };
 		InitCommonControlsEx(&icc);
 		g_hwnd_sort_group = sortbar_create(hwnd);
 		// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
 		// use "Processes" as the list's accessible name instead of the group box.
 		CreateWindow(L"STATIC", L"Processes", WS_CHILD | SS_LEFT,
 			0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
-		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, L"Processes", WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS, 0, 1, 760, 559, hwnd, (HMENU)(INT_PTR)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
+		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, L"Processes", WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, (HMENU)(INT_PTR)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
 		SetWindowSubclass(g_hwnd_list, list_key_proc, 0, 0);
 		ListView_SetExtendedListViewStyle(g_hwnd_list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_HEADERDRAGDROP);
+		g_hwnd_status = CreateWindowEx(0, STATUSCLASSNAME, NULL, WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
 		settings_load(&g_prefs);
 		theme_update();
 		apply_columns();
 		theme_apply_titlebar(hwnd);
 		theme_apply_listview(g_hwnd_list);
+		SetWindowTheme(g_hwnd_status, theme_is_dark() ? L"DarkMode_Explorer" : L"Explorer", NULL);
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
+		if (g_prefs.always_on_top)
+			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		if (g_prefs.window_width > 0) {
+			POINT pt = { g_prefs.window_left + 50, g_prefs.window_top + 50 };
+			if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL))
+				SetWindowPos(hwnd, NULL, g_prefs.window_left, g_prefs.window_top,
+					g_prefs.window_width, g_prefs.window_height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}
 		// Prime the snapshot table so the first real refresh has deltas to work from.
 		// Discard results — the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
 		{
@@ -132,6 +145,16 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		SetTimer(hwnd, ID_PRIME_TIMER, 250, NULL);
 		set_refresh_interval(hwnd, g_prefs.refresh_ms);
 		SetFocus(g_hwnd_list);
+		return 0;
+	}
+	case WM_SIZE: {
+		if (g_hwnd_list && g_hwnd_status) {
+			int w = LOWORD(lp), h = HIWORD(lp);
+			SendMessage(g_hwnd_status, WM_SIZE, wp, lp);
+			RECT sr;
+			GetClientRect(g_hwnd_status, &sr);
+			SetWindowPos(g_hwnd_list, NULL, 0, 1, w, h - 1 - (sr.bottom - sr.top), SWP_NOZORDER | SWP_NOACTIVATE);
+		}
 		return 0;
 	}
 	case WM_HIDE_TO_TRAY:
@@ -226,6 +249,15 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				set_process_priority((DWORD)lvi.lParam, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
 				do_refresh();
 			}
+			return 0;
+		}
+		if (id == ID_VIEW_ALWAYS_ON_TOP) {
+			g_prefs.always_on_top = !g_prefs.always_on_top;
+			HMENU view = GetSubMenu(GetMenu(hwnd), 0);
+			CheckMenuItem(view, ID_VIEW_ALWAYS_ON_TOP, g_prefs.always_on_top ? MF_CHECKED : MF_UNCHECKED);
+			SetWindowPos(hwnd, g_prefs.always_on_top ? HWND_TOPMOST : HWND_NOTOPMOST,
+				0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+			settings_save(&g_prefs);
 			return 0;
 		}
 		if (id == ID_VIEW_REFRESH) {
@@ -351,6 +383,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			theme_update();
 			theme_apply_titlebar(hwnd);
 			theme_apply_listview(g_hwnd_list);
+			SetWindowTheme(g_hwnd_status, theme_is_dark() ? L"DarkMode_Explorer" : L"Explorer", NULL);
 			sortbar_apply_theme();
 			RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 		}
@@ -371,12 +404,20 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (br) return (LRESULT)br;
 		break;
 	}
-	case WM_DESTROY:
+	case WM_DESTROY: {
+		WINDOWPLACEMENT wpl = { sizeof(wpl) };
+		GetWindowPlacement(hwnd, &wpl);
+		g_prefs.window_left   = wpl.rcNormalPosition.left;
+		g_prefs.window_top    = wpl.rcNormalPosition.top;
+		g_prefs.window_width  = wpl.rcNormalPosition.right  - wpl.rcNormalPosition.left;
+		g_prefs.window_height = wpl.rcNormalPosition.bottom - wpl.rcNormalPosition.top;
+		settings_save(&g_prefs);
 		UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 		KillTimer(hwnd, ID_REFRESH_TIMER);
 		tray_remove();
 		PostQuitMessage(0);
 		return 0;
+	}
 	}
 	return DefWindowProc(hwnd, msg, wp, lp);
 }

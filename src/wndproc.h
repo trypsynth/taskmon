@@ -11,6 +11,7 @@ extern const wchar_t WINDOW_TITLE[];
 extern HWND g_hwnd;
 extern HWND g_hwnd_list;
 extern HWND g_hwnd_sort_group;
+extern HWND g_hwnd_status;
 extern HWND g_sort_btns[COL_COUNT];
 extern column_id g_sort_btn_cols[COL_COUNT];
 extern int g_sort_btn_count;
