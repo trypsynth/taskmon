@@ -22,20 +22,34 @@ typedef enum {
 	SORT_FIELD_GDI_OBJECTS,
 	SORT_FIELD_USER_OBJECTS,
 	SORT_FIELD_INTEGRITY,
+	SORT_FIELD_PPID,
+	SORT_FIELD_PRIVATE_WS,
+	SORT_FIELD_PAGED_POOL,
+	SORT_FIELD_NONPAGED_POOL,
+	SORT_FIELD_IO_READ,
+	SORT_FIELD_IO_WRITE,
+	SORT_FIELD_IO_OTHER,
 	SORT_FIELD_COUNT,
 } sort_field;
 
 typedef struct {
 	DWORD pid;
+	DWORD parent_pid;
 	wchar_t name[64];
 	double cpu_percent;
 	SIZE_T working_set;
+	SIZE_T private_working_set;
+	SIZE_T paged_pool;
+	SIZE_T non_paged_pool;
 	DWORD threads;
 	DWORD handles;
 	ULONGLONG start_time;
 	int base_priority;
 	BOOL suspended;
 	double disk_io_rate;
+	double io_read_rate;
+	double io_write_rate;
+	double io_other_rate;
 	SIZE_T private_bytes;
 	double page_faults_per_sec;
 	wchar_t user[64];
@@ -53,6 +67,9 @@ typedef struct {
 	ULONGLONG process_time;
 	ULONGLONG system_time;
 	ULONGLONG io_bytes;
+	ULONGLONG io_read;
+	ULONGLONG io_write;
+	ULONGLONG io_other;
 	ULONG page_fault_count;
 	ULONGLONG tick_ms;
 } cpu_snapshot;

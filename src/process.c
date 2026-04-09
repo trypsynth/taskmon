@@ -179,6 +179,27 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_INTEGRITY:
 		res = (a->integrity_level < b->integrity_level) ? -1 : (a->integrity_level > b->integrity_level);
 		break;
+	case SORT_FIELD_PPID:
+		res = (a->parent_pid < b->parent_pid) ? -1 : (a->parent_pid > b->parent_pid);
+		break;
+	case SORT_FIELD_PRIVATE_WS:
+		res = (a->private_working_set < b->private_working_set) ? -1 : (a->private_working_set > b->private_working_set);
+		break;
+	case SORT_FIELD_PAGED_POOL:
+		res = (a->paged_pool < b->paged_pool) ? -1 : (a->paged_pool > b->paged_pool);
+		break;
+	case SORT_FIELD_NONPAGED_POOL:
+		res = (a->non_paged_pool < b->non_paged_pool) ? -1 : (a->non_paged_pool > b->non_paged_pool);
+		break;
+	case SORT_FIELD_IO_READ:
+		res = (a->io_read_rate < b->io_read_rate) ? -1 : (a->io_read_rate > b->io_read_rate);
+		break;
+	case SORT_FIELD_IO_WRITE:
+		res = (a->io_write_rate < b->io_write_rate) ? -1 : (a->io_write_rate > b->io_write_rate);
+		break;
+	case SORT_FIELD_IO_OTHER:
+		res = (a->io_other_rate < b->io_other_rate) ? -1 : (a->io_other_rate > b->io_other_rate);
+		break;
 	default:
 		break;
 	}
@@ -367,8 +388,12 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		}
 		process_entry* e = &entries[count++];
 		e->pid = pid;
+		e->parent_pid = (DWORD)(ULONG_PTR)spi->InheritedFromUniqueProcessId;
 		e->cpu_percent = 0.0;
 		e->working_set = spi->WorkingSetSize;
+		e->private_working_set = (SIZE_T)spi->WorkingSetPrivateSize.QuadPart;
+		e->paged_pool = spi->QuotaPagedPoolUsage;
+		e->non_paged_pool = spi->QuotaNonPagedPoolUsage;
 		e->threads = spi->NumberOfThreads;
 		e->handles = spi->HandleCount;
 		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
@@ -376,6 +401,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->suspended = is_process_suspended(pid);
 		e->private_bytes = spi->PagefileUsage;
 		e->disk_io_rate = 0.0;
+		e->io_read_rate = 0.0;
+		e->io_write_rate = 0.0;
+		e->io_other_rate = 0.0;
 		e->page_faults_per_sec = 0.0;
 		e->session_id = spi->SessionId;
 		e->peak_working_set = spi->PeakWorkingSetSize;
@@ -397,8 +425,11 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			lstrcpy(e->name, L"(unknown)");
 		}
 		ULONGLONG proc_time = (ULONGLONG)spi->KernelTime.QuadPart + (ULONGLONG)spi->UserTime.QuadPart;
-		ULONGLONG io_bytes = (ULONGLONG)spi->ReadTransferCount.QuadPart + (ULONGLONG)spi->WriteTransferCount.QuadPart;
-		cpu_snapshot current_snap = { proc_time, sys_time, io_bytes, spi->PageFaultCount, tick_ms };
+		ULONGLONG io_read = (ULONGLONG)spi->ReadTransferCount.QuadPart;
+		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
+		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;
+		ULONGLONG io_bytes = io_read + io_write + io_other;
+		cpu_snapshot current_snap = { proc_time, sys_time, io_bytes, io_read, io_write, io_other, spi->PageFaultCount, tick_ms };
 		update_snapshot(snapshots, pid, current_snap);
 		cpu_snapshot* prev = find_snapshot(old_snaps, pid);
 		if (prev) {
@@ -412,6 +443,13 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			if (delta_ms > 0) {
 				ULONGLONG delta_io = io_bytes - prev->io_bytes;
 				e->disk_io_rate = (double)delta_io * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_read = (io_read >= prev->io_read) ? io_read - prev->io_read : 0;
+				e->io_read_rate = (double)delta_read * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_write = (io_write >= prev->io_write) ? io_write - prev->io_write : 0;
+				e->io_write_rate = (double)delta_write * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_other = (io_other >= prev->io_other) ? io_other - prev->io_other : 0;
+				e->io_other_rate = (double)delta_other * 1000.0 / (double)delta_ms;
+
 				ULONGLONG delta_pf = (spi->PageFaultCount >= prev->page_fault_count)
 					? spi->PageFaultCount - prev->page_fault_count : 0;
 				e->page_faults_per_sec = (double)delta_pf * 1000.0 / (double)delta_ms;

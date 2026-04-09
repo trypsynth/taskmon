@@ -26,6 +26,13 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"GDI Objects",    L"GDI Obj",      70,  SORT_FIELD_GDI_OBJECTS,       FALSE, FALSE },
 	{ L"USER Objects",   L"USER Obj",     70,  SORT_FIELD_USER_OBJECTS,      FALSE, FALSE },
 	{ L"Integrity",      L"Integrity",    80,  SORT_FIELD_INTEGRITY,         FALSE, FALSE },
+	{ L"Parent PID",     L"PPID",         80,  SORT_FIELD_PPID,              FALSE, FALSE },
+	{ L"Private WS",     L"Private WS",   100, SORT_FIELD_PRIVATE_WS,        FALSE, FALSE },
+	{ L"Paged Pool",     L"Paged Pool",   100, SORT_FIELD_PAGED_POOL,        FALSE, FALSE },
+	{ L"Non-paged Pool", L"NP Pool",      100, SORT_FIELD_NONPAGED_POOL,     FALSE, FALSE },
+	{ L"I/O Read",       L"I/O Read",     100, SORT_FIELD_IO_READ,           FALSE, FALSE },
+	{ L"I/O Write",      L"I/O Write",    100, SORT_FIELD_IO_WRITE,          FALSE, FALSE },
+	{ L"I/O Other",      L"I/O Other",    100, SORT_FIELD_IO_OTHER,          FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

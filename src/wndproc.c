@@ -12,6 +12,7 @@
 #include <shlobj.h>
 #include <commctrl.h>
 #include <shlwapi.h>
+#include <uxtheme.h>
 
 #define ID_LISTVIEW 105
 #define ID_TRAY_RESTORE 201

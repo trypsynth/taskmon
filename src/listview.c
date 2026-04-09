@@ -19,7 +19,7 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	}
 	case COL_MEMORY:
-		wnsprintf(buf, len, L"%u K", (UINT)(e->working_set / 1024));
+		StrFormatByteSizeW(e->working_set, buf, len);
 		break;
 	case COL_THREADS:
 		wnsprintf(buf, len, L"%u", e->threads);
@@ -30,24 +30,12 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_PRIORITY: {
 		const wchar_t* label;
 		switch (e->base_priority) {
-		case 4:
-			label = L"Idle";
-			break;
-		case 6:
-			label = L"Below Normal";
-			break;
-		case 8:
-			label = L"Normal";
-			break;
-		case 10:
-			label = L"Above Normal";
-			break;
-		case 13:
-			label = L"High";
-			break;
-		case 24:
-			label = L"Realtime";
-			break;
+		case 4:  label = L"Idle"; break;
+		case 6:  label = L"Below Normal"; break;
+		case 8:  label = L"Normal"; break;
+		case 10: label = L"Above Normal"; break;
+		case 13: label = L"High"; break;
+		case 24: label = L"Realtime"; break;
 		default:
 			wnsprintf(buf, len, L"%d", e->base_priority);
 			return;
@@ -72,30 +60,19 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 			wnsprintf(buf, len, L"%02d/%02d/%04d %02d:%02d", st.wMonth, st.wDay, st.wYear, st.wHour, st.wMinute);
 		break;
 	}
-	case COL_DISK_IO: {
-		ULONGLONG rate = (ULONGLONG)e->disk_io_rate;
-		if (rate >= 1024ULL * 1024) {
-			int whole = (int)(rate / (1024 * 1024));
-			int frac = (int)((rate % (1024 * 1024)) * 10 / (1024 * 1024));
-			wnsprintf(buf, len, L"%d.%d MB/s", whole, frac);
-		} else if (rate >= 1024) {
-			wnsprintf(buf, len, L"%u KB/s", (UINT)(rate / 1024));
-		} else if (rate > 0) {
-			wnsprintf(buf, len, L"%u B/s", (UINT)rate);
-		} else {
-			buf[0] = L'\0';
-		}
+	case COL_DISK_IO:
+		if (e->disk_io_rate > 0) {
+			StrFormatByteSizeW((LONGLONG)e->disk_io_rate, buf, len);
+			lstrcat(buf, L"/s");
+		} else buf[0] = L'\0';
 		break;
-	}
 	case COL_PRIVATE_BYTES:
-		wnsprintf(buf, len, L"%u K", (UINT)(e->private_bytes / 1024));
+		StrFormatByteSizeW(e->private_bytes, buf, len);
 		break;
 	case COL_PAGE_FAULTS: {
 		UINT pf = (UINT)(e->page_faults_per_sec + 0.5);
-		if (pf > 0)
-			wnsprintf(buf, len, L"%u /s", pf);
-		else
-			buf[0] = L'\0';
+		if (pf > 0) wnsprintf(buf, len, L"%u /s", pf);
+		else buf[0] = L'\0';
 		break;
 	}
 	case COL_USER:
@@ -116,23 +93,11 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		wnsprintf(buf, len, L"%u", e->session_id);
 		break;
 	case COL_PEAK_WORKING_SET:
-		wnsprintf(buf, len, L"%u K", (UINT)(e->peak_working_set / 1024));
+		StrFormatByteSizeW(e->peak_working_set, buf, len);
 		break;
-	case COL_VIRTUAL_MEM: {
-		ULONGLONG bytes = (ULONGLONG)e->virtual_size;
-		if (bytes >= 1024ULL * 1024 * 1024) {
-			int whole = (int)(bytes / (1024ULL * 1024 * 1024));
-			int frac  = (int)((bytes % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
-			wnsprintf(buf, len, L"%d.%d GB", whole, frac);
-		} else if (bytes >= 1024 * 1024) {
-			int whole = (int)(bytes / (1024 * 1024));
-			int frac  = (int)((bytes % (1024 * 1024)) * 10 / (1024 * 1024));
-			wnsprintf(buf, len, L"%d.%d MB", whole, frac);
-		} else {
-			wnsprintf(buf, len, L"%u K", (UINT)(bytes / 1024));
-		}
+	case COL_VIRTUAL_MEM:
+		StrFormatByteSizeW(e->virtual_size, buf, len);
 		break;
-	}
 	case COL_GDI_OBJECTS:
 		if (e->gdi_objects) wnsprintf(buf, len, L"%u", e->gdi_objects);
 		else buf[0] = L'\0';
@@ -157,6 +122,37 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		else wnsprintf(buf, len, L"0x%04X", e->integrity_level);
 		break;
 	}
+	case COL_PPID:
+		if (e->parent_pid) wnsprintf(buf, len, L"%u", e->parent_pid);
+		else buf[0] = L'\0';
+		break;
+	case COL_PRIVATE_WS:
+		StrFormatByteSizeW(e->private_working_set, buf, len);
+		break;
+	case COL_PAGED_POOL:
+		StrFormatByteSizeW(e->paged_pool, buf, len);
+		break;
+	case COL_NONPAGED_POOL:
+		StrFormatByteSizeW(e->non_paged_pool, buf, len);
+		break;
+	case COL_IO_READ:
+		if (e->io_read_rate > 0) {
+			StrFormatByteSizeW((LONGLONG)e->io_read_rate, buf, len);
+			lstrcat(buf, L"/s");
+		} else buf[0] = L'\0';
+		break;
+	case COL_IO_WRITE:
+		if (e->io_write_rate > 0) {
+			StrFormatByteSizeW((LONGLONG)e->io_write_rate, buf, len);
+			lstrcat(buf, L"/s");
+		} else buf[0] = L'\0';
+		break;
+	case COL_IO_OTHER:
+		if (e->io_other_rate > 0) {
+			StrFormatByteSizeW((LONGLONG)e->io_other_rate, buf, len);
+			lstrcat(buf, L"/s");
+		} else buf[0] = L'\0';
+		break;
 	default:
 		buf[0] = L'\0';
 		break;
