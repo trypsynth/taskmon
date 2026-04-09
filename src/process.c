@@ -200,6 +200,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_IO_OTHER:
 		res = (a->io_other_rate < b->io_other_rate) ? -1 : (a->io_other_rate > b->io_other_rate);
 		break;
+	case SORT_FIELD_DESCRIPTION:
+		res = StrCmpI(a->description, b->description);
+		break;
+	case SORT_FIELD_COMPANY:
+		res = StrCmpI(a->company, b->company);
+		break;
+	case SORT_FIELD_DPI:
+		res = (int)a->dpi_awareness - (int)b->dpi_awareness;
+		break;
 	default:
 		break;
 	}
@@ -361,6 +370,53 @@ static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
 	CloseHandle(h);
 }
 
+static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wchar_t* company, int comp_len) {
+	desc[0] = L'\0';
+	company[0] = L'\0';
+	wchar_t path[MAX_PATH];
+	get_process_path(pid, path, MAX_PATH);
+	if (!path[0]) return;
+	DWORD dummy;
+	DWORD size = GetFileVersionInfoSizeW(path, &dummy);
+	if (size == 0) return;
+	void* data = heap_alloc(size);
+	if (data) {
+		if (GetFileVersionInfoW(path, 0, size, data)) {
+			struct { USHORT lang; USHORT codepage; } *translate;
+			UINT tlen;
+			if (VerQueryValueW(data, L"\\VarFileInfo\\Translation", (LPVOID*)&translate, &tlen) && tlen >= sizeof(*translate)) {
+				wchar_t subblock[64];
+				wchar_t* value;
+				UINT vlen;
+				wnsprintf(subblock, 64, L"\\StringFileInfo\\%04x%04x\\FileDescription", translate[0].lang, translate[0].codepage);
+				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(desc, value, desc_len);
+				wnsprintf(subblock, 64, L"\\StringFileInfo\\%04x%04x\\CompanyName", translate[0].lang, translate[0].codepage);
+				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(company, value, comp_len);
+			}
+		}
+		heap_free(data);
+	}
+}
+
+static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
+	typedef HRESULT (WINAPI *PFN_GPDA)(HANDLE, int*);
+	static PFN_GPDA fn = NULL;
+	static BOOL checked = FALSE;
+	if (!checked) {
+		HMODULE h = GetModuleHandle(L"shcore.dll");
+		if (!h) h = LoadLibrary(L"shcore.dll");
+		if (h) fn = (PFN_GPDA)GetProcAddress(h, "GetProcessDpiAwareness");
+		checked = TRUE;
+	}
+	if (!fn) return TM_DPI_UNAWARE;
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return TM_DPI_UNAWARE;
+	int awareness = 0;
+	fn(h, &awareness);
+	CloseHandle(h);
+	return (tm_dpi_awareness)awareness;
+}
+
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
 	FILETIME sys_idle_ft, sys_kernel_ft, sys_user_ft;
 	GetSystemTimes(&sys_idle_ft, &sys_kernel_ft, &sys_user_ft);
@@ -413,6 +469,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->integrity_level = get_process_integrity(pid);
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
+		get_process_version_info(pid, e->description, 128, e->company, 128);
+		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");

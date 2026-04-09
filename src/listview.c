@@ -153,6 +153,23 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 			lstrcat(buf, L"/s");
 		} else buf[0] = L'\0';
 		break;
+	case COL_DESCRIPTION:
+		lstrcpyn(buf, e->description, len);
+		break;
+	case COL_COMPANY:
+		lstrcpyn(buf, e->company, len);
+		break;
+	case COL_DPI: {
+		const wchar_t* label;
+		switch (e->dpi_awareness) {
+		case TM_DPI_UNAWARE:            label = L"Unaware"; break;
+		case TM_DPI_SYSTEM_AWARE:       label = L"System"; break;
+		case TM_DPI_PER_MONITOR_AWARE:  label = L"Per-Monitor"; break;
+		default:                        label = L"Unknown"; break;
+		}
+		lstrcpyn(buf, label, len);
+		break;
+	}
 	default:
 		buf[0] = L'\0';
 		break;

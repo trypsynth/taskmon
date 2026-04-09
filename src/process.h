@@ -29,13 +29,25 @@ typedef enum {
 	SORT_FIELD_IO_READ,
 	SORT_FIELD_IO_WRITE,
 	SORT_FIELD_IO_OTHER,
+	SORT_FIELD_DESCRIPTION,
+	SORT_FIELD_COMPANY,
+	SORT_FIELD_DPI,
 	SORT_FIELD_COUNT,
 } sort_field;
+
+typedef enum {
+	TM_DPI_UNAWARE = 0,
+	TM_DPI_SYSTEM_AWARE = 1,
+	TM_DPI_PER_MONITOR_AWARE = 2
+} tm_dpi_awareness;
 
 typedef struct {
 	DWORD pid;
 	DWORD parent_pid;
 	wchar_t name[64];
+	wchar_t description[128];
+	wchar_t company[128];
+	tm_dpi_awareness dpi_awareness;
 	double cpu_percent;
 	SIZE_T working_set;
 	SIZE_T private_working_set;

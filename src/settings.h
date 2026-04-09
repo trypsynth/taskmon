@@ -29,6 +29,9 @@ typedef enum {
 	COL_IO_READ,
 	COL_IO_WRITE,
 	COL_IO_OTHER,
+	COL_DESCRIPTION,
+	COL_COMPANY,
+	COL_DPI,
 	COL_COUNT,
 } column_id;
 
