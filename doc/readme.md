@@ -41,3 +41,29 @@ Bringing up the context menu on a process in the list provides access to several
 * Suspend or Resume: Pauses or resumes the execution of the process.
 * End task: Forcefully terminates the process.
 * Priority: Allows changing the CPU priority class (Idle, Below Normal, Normal, Above Normal, High, Realtime).
+
+## Changelog
+
+### Version 0.2.0
+* Added a basic status bar.
+* Added a run dialog for launching new tasks.
+* Added Always on Top and Remember Window Position options.
+* Added 14 new columns: GDI objects, User objects, Integrity, Peak working set, Virtual memory size, Session, Architecture, User, Command line, Disk I/O, Private bytes, Page faults, Priority, and Process start time.
+* Added the ability to suspend and resume processes.
+* Added an option to change process priority.
+* Fixed an issue where CPU usage showed 0% on first run.
+* Fixed beep when pressing space after letter navigation in the settings column list.
+* Removed duplicate error message when launching a program fails.
+* Taskmon will now respect your system dark mode setting.
+
+### Version 0.1.1
+* Added an option to turn off the end task confirmation dialog.
+* Added Ctrl+Shift+` as a global hotkey to toggle Taskmon's window from anywhere on your system.
+* Column customization in the options dialog is now a proper list of checkboxes.
+* Fixed the system tray icon showing incorrect memory usage statistics.
+* Switched the end task key to Delete.
+* The CPU percentage column now has a more human-friendly label.
+* Various other small improvements, such as smartly selecting a process after one is killed and improved wording.
+
+### Version 0.1.0
+* Initial release.
