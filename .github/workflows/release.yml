@@ -1,0 +1,51 @@
+name: Release Taskmon
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, ARM64]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Configure CMake
+        run: cmake -B build -A ${{ matrix.arch }}
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Rename Binary
+        shell: pwsh
+        run: |
+          $arch = "${{ matrix.arch }}".ToLower()
+          Move-Item build/Release/taskmon.exe build/Release/taskmon-$arch.exe
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskmon-${{ matrix.arch }}
+          path: build/Release/taskmon-*.exe
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      - name: List artifacts
+        run: ls -R ./artifacts
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Taskmon Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            ./artifacts/taskmon-x64/taskmon-x64.exe
+            ./artifacts/taskmon-ARM64/taskmon-arm64.exe
