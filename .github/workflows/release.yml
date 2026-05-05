@@ -4,8 +4,10 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -15,20 +17,42 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: choco install pandoc
+
       - name: Configure CMake
         run: cmake -B build -A ${{ matrix.arch }}
+
       - name: Build
         run: cmake --build build --config Release
-      - name: Rename Binary
+
+      - name: Prepare Package
         shell: pwsh
         run: |
           $arch = "${{ matrix.arch }}".ToLower()
-          Move-Item build/Release/taskmon.exe build/Release/taskmon-$arch.exe
+          $dist = "dist-$arch"
+          New-Item -ItemType Directory -Path $dist
+
+          # Copy executable
+          Copy-Item build/Release/taskmon.exe -Destination "$dist/taskmon.exe"
+
+          # Copy documentation (HTML if generated, otherwise fallback to MD)
+          if (Test-Path "build/readme.html") {
+            Copy-Item build/readme.html -Destination "$dist/readme.html"
+          } else {
+            Copy-Item doc/readme.md -Destination "$dist/readme.md"
+          }
+
+          # Create ZIP
+          Compress-Archive -Path "$dist/*" -DestinationPath "taskmon-$arch.zip"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: taskmon-${{ matrix.arch }}
-          path: build/Release/taskmon-*.exe
+          path: taskmon-*.zip
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -37,8 +61,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
+
       - name: List artifacts
         run: ls -R ./artifacts
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -47,5 +73,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            ./artifacts/taskmon-x64/taskmon-x64.exe
-            ./artifacts/taskmon-ARM64/taskmon-arm64.exe
+            ./artifacts/taskmon-x64/taskmon-x64.zip
+            ./artifacts/taskmon-ARM64/taskmon-arm64.zip
+

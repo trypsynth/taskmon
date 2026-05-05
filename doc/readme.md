@@ -44,6 +44,12 @@ Bringing up the context menu on a process in the list provides access to several
 
 ## Changelog
 
+### Version 0.2.1
+* Added support for ARM64 architecture.
+* Releases are now packaged as ZIP files containing a standalone HTML user manual.
+* Added 10 new columns: DPI Awareness, Company, Description, Parent PID, Private Working Set, Paged Pool, Nonpaged Pool, I/O Read, I/O Write, and I/O Other.
+* Improved memory and I/O column formatting using standard Windows byte size strings.
+
 ### Version 0.2.0
 * Added a basic status bar.
 * Added a run dialog for launching new tasks.
