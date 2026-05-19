@@ -62,6 +62,55 @@ static void heap_free(void* ptr) {
 	HeapFree(GetProcessHeap(), 0, ptr);
 }
 
+typedef struct { DWORD pid; wchar_t name[64]; } svc_entry;
+static svc_entry* g_svc_map = NULL;
+static int g_svc_count = 0;
+
+static void build_service_map(void) {
+	heap_free(g_svc_map);
+	g_svc_map = NULL;
+	g_svc_count = 0;
+	SC_HANDLE hscm = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE);
+	if (!hscm) return;
+	DWORD needed = 0, count = 0, resume = 0;
+	EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+	                      NULL, 0, &needed, &count, &resume, NULL);
+	if (!needed) { CloseServiceHandle(hscm); return; }
+	BYTE* buf = (BYTE*)heap_alloc(needed);
+	if (!buf) { CloseServiceHandle(hscm); return; }
+	resume = 0;
+	if (EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+	                          buf, needed, &needed, &count, &resume, NULL)) {
+		g_svc_map = (svc_entry*)heap_alloc(count * sizeof(svc_entry));
+		if (g_svc_map) {
+			ENUM_SERVICE_STATUS_PROCESSW* sv = (ENUM_SERVICE_STATUS_PROCESSW*)buf;
+			for (DWORD i = 0; i < count; i++) {
+				DWORD pid = sv[i].ServiceStatusProcess.dwProcessId;
+				if (!pid) continue;
+				g_svc_map[g_svc_count].pid = pid;
+				lstrcpyn(g_svc_map[g_svc_count].name, sv[i].lpServiceName, 64);
+				g_svc_count++;
+			}
+		}
+	}
+	heap_free(buf);
+	CloseServiceHandle(hscm);
+}
+
+static void get_services_for_pid(DWORD pid, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	if (!pid || !g_svc_map) return;
+	int pos = 0;
+	for (int i = 0; i < g_svc_count && pos < len - 1; i++) {
+		if (g_svc_map[i].pid != pid) continue;
+		if (pos > 0 && pos + 2 < len) { buf[pos++] = L';'; buf[pos++] = L' '; }
+		int nlen = lstrlen(g_svc_map[i].name);
+		if (pos + nlen >= len) nlen = len - pos - 1;
+		if (nlen > 0) { memcpy(buf + pos, g_svc_map[i].name, nlen * sizeof(wchar_t)); pos += nlen; }
+		buf[pos] = L'\0';
+	}
+}
+
 static BYTE* query_all_processes(ULONG* total_size) {
 	static PFN_NtQSI fn = NULL;
 	if (!fn) fn = (PFN_NtQSI)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtQuerySystemInformation");
@@ -208,6 +257,9 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 		break;
 	case SORT_FIELD_DPI:
 		res = (int)a->dpi_awareness - (int)b->dpi_awareness;
+		break;
+	case SORT_FIELD_SERVICE:
+		res = StrCmpI(a->services, b->services);
 		break;
 	default:
 		break;
@@ -418,6 +470,7 @@ static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
 }
 
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
+	build_service_map();
 	FILETIME sys_idle_ft, sys_kernel_ft, sys_user_ft;
 	GetSystemTimes(&sys_idle_ft, &sys_kernel_ft, &sys_user_ft);
 	ULARGE_INTEGER uli_k, uli_u;
@@ -470,6 +523,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
 		get_process_version_info(pid, e->description, 128, e->company, 128);
+		get_services_for_pid(pid, e->services, 256);
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
 		if (pid == 0) {

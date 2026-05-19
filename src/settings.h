@@ -32,6 +32,7 @@ typedef enum {
 	COL_DESCRIPTION,
 	COL_COMPANY,
 	COL_DPI,
+	COL_SERVICE,
 	COL_COUNT,
 } column_id;
 
@@ -53,6 +54,7 @@ typedef struct {
 	BOOL visible[COL_COUNT];
 	BOOL skip_kill_confirm;
 	BOOL always_on_top;
+	BOOL tree_mode;
 	int window_left, window_top, window_width, window_height;
 } sort_prefs;
 

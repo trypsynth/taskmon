@@ -170,6 +170,9 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		lstrcpyn(buf, label, len);
 		break;
 	}
+	case COL_SERVICE:
+		lstrcpyn(buf, e->services, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

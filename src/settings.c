@@ -36,6 +36,7 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"Description",    L"Description",  200, SORT_FIELD_DESCRIPTION,       FALSE, FALSE },
 	{ L"Company",        L"Company",      150, SORT_FIELD_COMPANY,           FALSE, FALSE },
 	{ L"DPI Awareness",  L"DPI Awareness",           90, SORT_FIELD_DPI,               FALSE, FALSE },
+	{ L"Service",        L"Service",                200, SORT_FIELD_SERVICE,           FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };
@@ -191,6 +192,9 @@ void settings_load(sort_prefs* prefs) {
 	wchar_t aot_buf[4];
 	GetPrivateProfileString(L"window", L"always_on_top", L"0", aot_buf, 4, path);
 	prefs->always_on_top = (aot_buf[0] == L'1');
+	wchar_t tree_buf[4];
+	GetPrivateProfileString(L"view", L"tree_mode", L"0", tree_buf, 4, path);
+	prefs->tree_mode = (tree_buf[0] == L'1');
 	wchar_t pos_buf[16];
 	GetPrivateProfileString(L"window", L"width", L"0", pos_buf, 16, path);
 	prefs->window_width = StrToInt(pos_buf);
@@ -226,6 +230,7 @@ void settings_save(const sort_prefs* prefs) {
 	WritePrivateProfileString(L"refresh", L"interval_ms", ms_str, path);
 	WritePrivateProfileString(L"confirm", L"skip_kill", prefs->skip_kill_confirm ? L"1" : L"0", path);
 	WritePrivateProfileString(L"window", L"always_on_top", prefs->always_on_top ? L"1" : L"0", path);
+	WritePrivateProfileString(L"view", L"tree_mode", prefs->tree_mode ? L"1" : L"0", path);
 	if (prefs->window_width > 0) {
 		wchar_t pos_str[16];
 		wnsprintf(pos_str, 16, L"%d", prefs->window_left);

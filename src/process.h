@@ -32,6 +32,7 @@ typedef enum {
 	SORT_FIELD_DESCRIPTION,
 	SORT_FIELD_COMPANY,
 	SORT_FIELD_DPI,
+	SORT_FIELD_SERVICE,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -66,6 +67,7 @@ typedef struct {
 	double page_faults_per_sec;
 	wchar_t user[64];
 	wchar_t cmdline[256];
+	wchar_t services[256];
 	USHORT arch_machine;
 	DWORD session_id;
 	SIZE_T peak_working_set;
