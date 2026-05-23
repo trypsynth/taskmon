@@ -5,11 +5,14 @@
 
 static const wchar_t MUTEX_NAME[] = L"Local\\TaskmonSingleInstance";
 
+HANDLE g_mutex = NULL;
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show) {
 	UNREFERENCED_PARAMETER(prev);
 	UNREFERENCED_PARAMETER(cmd_line);
 	HRESULT com_init = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-	HANDLE mutex = CreateMutex(NULL, TRUE, MUTEX_NAME);
+	g_mutex = CreateMutex(NULL, TRUE, MUTEX_NAME);
+	HANDLE mutex = g_mutex;
 	if (GetLastError() == ERROR_ALREADY_EXISTS) {
 		HWND existing = FindWindow(CLASS_NAME, NULL);
 		if (existing) {

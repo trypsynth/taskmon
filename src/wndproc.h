@@ -17,5 +17,6 @@ extern column_id g_sort_btn_cols[COL_COUNT];
 extern int g_sort_btn_count;
 extern sort_prefs g_prefs;
 extern snapshot_entry g_snapshots[SNAPSHOT_CAPACITY];
+extern HANDLE g_mutex;
 
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);

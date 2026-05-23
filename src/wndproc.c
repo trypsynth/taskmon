@@ -62,6 +62,16 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 	settings_save(&g_prefs);
 }
 
+static BOOL is_elevated(void) {
+	HANDLE token = NULL;
+	TOKEN_ELEVATION elev = {0};
+	DWORD size = sizeof(elev);
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return FALSE;
+	GetTokenInformation(token, TokenElevation, &elev, sizeof(elev), &size);
+	CloseHandle(token);
+	return elev.TokenIsElevated;
+}
+
 static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
 	if (g_prefs.skip_kill_confirm) return TRUE;
 	wchar_t message[512];
@@ -93,6 +103,8 @@ static void create_menu_bar(HWND hwnd) {
 	HMENU bar = CreateMenu();
 	HMENU file = CreatePopupMenu();
 	AppendMenu(file, MF_STRING, ID_FILE_NEW_TASK, L"New task...\tCtrl+N");
+	AppendMenu(file, MF_SEPARATOR, 0, NULL);
+	AppendMenu(file, MF_STRING | (is_elevated() ? MF_GRAYED : 0), ID_FILE_RESTART_AS_ADMIN, L"Restart as administrator");
 	AppendMenu(file, MF_SEPARATOR, 0, NULL);
 	AppendMenu(file, MF_STRING, ID_FILE_EXIT, L"Exit");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)file, L"&File");
@@ -260,6 +272,16 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		if (id == ID_FILE_NEW_TASK) {
 			open_run_dialog(hwnd);
+			return 0;
+		}
+		if (id == ID_FILE_RESTART_AS_ADMIN) {
+			wchar_t path[MAX_PATH];
+			GetModuleFileName(NULL, path, MAX_PATH);
+			if (g_mutex) { CloseHandle(g_mutex); g_mutex = NULL; }
+			if ((INT_PTR)ShellExecute(NULL, L"runas", path, NULL, NULL, SW_SHOW) > 32)
+				DestroyWindow(hwnd);
+			else if (!g_mutex)
+				g_mutex = CreateMutex(NULL, TRUE, L"Local\\TaskmonSingleInstance");
 			return 0;
 		}
 		if (id == ID_FILE_EXIT) {
