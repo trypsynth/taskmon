@@ -66,7 +66,7 @@ typedef struct { DWORD pid; wchar_t name[64]; } svc_entry;
 static svc_entry* g_svc_map = NULL;
 static int g_svc_count = 0;
 
-static void build_service_map(void) {
+static void build_service_map() {
 	heap_free(g_svc_map);
 	g_svc_map = NULL;
 	g_svc_count = 0;
@@ -76,12 +76,12 @@ static void build_service_map(void) {
 	EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
 	                      NULL, 0, &needed, &count, &resume, NULL);
 	if (!needed) { CloseServiceHandle(hscm); return; }
-	BYTE* buf = (BYTE*)heap_alloc(needed);
+	BYTE* buf = heap_alloc(needed);
 	if (!buf) { CloseServiceHandle(hscm); return; }
 	resume = 0;
 	if (EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
 	                          buf, needed, &needed, &count, &resume, NULL)) {
-		g_svc_map = (svc_entry*)heap_alloc(count * sizeof(svc_entry));
+		g_svc_map = heap_alloc(count * sizeof(svc_entry));
 		if (g_svc_map) {
 			ENUM_SERVICE_STATUS_PROCESSW* sv = (ENUM_SERVICE_STATUS_PROCESSW*)buf;
 			for (DWORD i = 0; i < count; i++) {
@@ -117,7 +117,7 @@ static BYTE* query_all_processes(ULONG* total_size) {
 	if (!fn) return NULL;
 	ULONG size = 512 * 1024;
 	for (;;) {
-		BYTE* buf = (BYTE*)heap_alloc(size);
+		BYTE* buf = heap_alloc(size);
 		if (!buf) return NULL;
 		ULONG returned = 0;
 		NTSTATUS st = fn(SystemProcessInformation, buf, size, &returned);
@@ -284,7 +284,7 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 	}
 }
 
-static USHORT get_native_machine(void) {
+static USHORT get_native_machine() {
 	static USHORT native = 0;
 	if (native) return native;
 	PFN_IsWow64Process2 fn = (PFN_IsWow64Process2)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "IsWow64Process2");
@@ -354,7 +354,7 @@ static DWORD get_process_integrity(DWORD pid) {
 	CloseHandle(hproc);
 	DWORD needed = 0;
 	GetTokenInformation(htok, TokenIntegrityLevel, NULL, 0, &needed);
-	BYTE* buf = (BYTE*)heap_alloc(needed);
+	BYTE* buf = heap_alloc(needed);
 	DWORD rid = 0;
 	if (buf && GetTokenInformation(htok, TokenIntegrityLevel, buf, needed, &needed)) {
 		TOKEN_MANDATORY_LABEL* tml = (TOKEN_MANDATORY_LABEL*)buf;
@@ -382,7 +382,7 @@ static void get_process_user(DWORD pid, wchar_t* buf, int len) {
 	CloseHandle(hproc);
 	DWORD needed = 0;
 	GetTokenInformation(htok, TokenUser, NULL, 0, &needed);
-	BYTE* ubuf = (BYTE*)heap_alloc(needed);
+	BYTE* ubuf = heap_alloc(needed);
 	if (ubuf && GetTokenInformation(htok, TokenUser, ubuf, needed, &needed)) {
 		TOKEN_USER* tu = (TOKEN_USER*)ubuf;
 		wchar_t name[64], domain[64];
@@ -405,7 +405,7 @@ static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
 	ULONG needed = 0;
 	fn(h, 60, NULL, 0, &needed);
 	if (needed == 0) needed = 1024;
-	BYTE* cbuf = (BYTE*)heap_alloc(needed);
+	BYTE* cbuf = heap_alloc(needed);
 	if (cbuf) {
 		NTSTATUS st = fn(h, 60, cbuf, needed, NULL);
 		if (NT_SUCCESS(st)) {
@@ -483,8 +483,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	if (!buf) return NULL;
 	int capacity = 256;
 	int count = 0;
-	process_entry* entries = (process_entry*)heap_alloc(capacity * sizeof(process_entry));
-	snapshot_entry* old_snaps = (snapshot_entry*)heap_alloc(SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
+	process_entry* entries = heap_alloc(capacity * sizeof(process_entry));
+	snapshot_entry* old_snaps = heap_alloc(SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
 	memcpy(old_snaps, snapshots, SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
 	memset(snapshots, 0, SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
 	BYTE* p = buf;

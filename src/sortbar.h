@@ -2,7 +2,7 @@
 #include <windows.h>
 
 HWND sortbar_create(HWND parent);
-void apply_columns(void);
-void update_sort_ui(void);
-void update_tab_stop(void);
-void sortbar_apply_theme(void);
+void apply_columns();
+void update_sort_ui();
+void update_tab_stop();
+void sortbar_apply_theme();

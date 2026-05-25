@@ -1,4 +1,4 @@
 #pragma once
 #include <windows.h>
-void do_refresh(void);
+void do_refresh();
 LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data);

@@ -236,7 +236,7 @@ static double populate_list(process_entry* entries, int count) {
 	return total_cpu;
 }
 
-void do_refresh(void) {
+void do_refresh() {
 	int count = 0;
 	process_entry* entries = snapshot_processes(g_snapshots, &count, g_prefs.field, g_prefs.desc[(int)g_prefs.field]);
 	if (entries) {

@@ -62,7 +62,7 @@ static void set_refresh_interval(HWND hwnd, UINT ms) {
 	settings_save(&g_prefs);
 }
 
-static BOOL is_elevated(void) {
+static BOOL is_elevated() {
 	HANDLE token = NULL;
 	TOKEN_ELEVATION elev = {0};
 	DWORD size = sizeof(elev);

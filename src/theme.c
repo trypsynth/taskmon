@@ -13,13 +13,13 @@
 static BOOL   g_dark = FALSE;
 static HBRUSH g_dark_brush = NULL;
 
-void theme_update(void) {
+void theme_update() {
 	DWORD value = 1, size = sizeof(value);
 	RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme", RRF_RT_REG_DWORD, NULL, &value, &size);
 	g_dark = (value == 0);
 }
 
-BOOL theme_is_dark(void) {
+BOOL theme_is_dark() {
 	return g_dark;
 }
 
@@ -55,7 +55,7 @@ HBRUSH theme_ctl_color(HDC hdc) {
 	return g_dark_brush;
 }
 
-HBRUSH theme_bg_brush(void) {
+HBRUSH theme_bg_brush() {
 	if (!g_dark) return NULL;
 	if (!g_dark_brush) g_dark_brush = CreateSolidBrush(DARK_BG);
 	return g_dark_brush;

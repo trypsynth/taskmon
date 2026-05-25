@@ -62,7 +62,7 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	return DefSubclassProc(hwnd, msg, wp, lp);
 }
 
-void update_tab_stop(void) {
+void update_tab_stop() {
 	for (int i = 0; i < g_sort_btn_count; ++i) {
 		LONG_PTR style = GetWindowLongPtr(g_sort_btns[i], GWL_STYLE);
 		style = (COLUMNS[g_sort_btn_cols[i]].field == g_prefs.field) ? (style | WS_TABSTOP) : (style & ~WS_TABSTOP);
@@ -70,7 +70,7 @@ void update_tab_stop(void) {
 	}
 }
 
-void update_sort_ui(void) {
+void update_sort_ui() {
 	for (int i = 0; i < g_sort_btn_count; ++i) {
 		column_id cid = g_sort_btn_cols[i];
 		BOOL active = (COLUMNS[cid].field == g_prefs.field);
@@ -92,7 +92,7 @@ void update_sort_ui(void) {
 	}
 }
 
-void apply_columns(void) {
+void apply_columns() {
 	for (int i = 0; i < g_sort_btn_count; ++i) {
 		DestroyWindow(g_sort_btns[i]);
 		g_sort_btns[i] = NULL;
@@ -131,7 +131,7 @@ void apply_columns(void) {
 	sortbar_apply_theme();
 }
 
-void sortbar_apply_theme(void) {
+void sortbar_apply_theme() {
 	theme_apply_button(g_hwnd_sort_group);
 	for (int i = 0; i < g_sort_btn_count; ++i)
 		theme_apply_button(g_sort_btns[i]);
