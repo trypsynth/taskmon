@@ -268,20 +268,31 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 }
 
 static void quicksort(process_entry* entries, int low, int high, sort_field field, BOOL descending) {
-	if (low < high) {
-		process_entry pivot = entries[high];
-		int i = low - 1;
-		for (int j = low; j < high; j++) {
-			if (compare_entries(&entries[j], &pivot, field, descending) <= 0) {
-				i++;
+	if (low >= high) return;
+	typedef struct { int low, high; } stack_entry;
+	stack_entry* stack = heap_alloc((high - low + 1) * sizeof(stack_entry));
+	if (!stack) return;
+	int top = -1;
+	stack[++top] = (stack_entry){ low, high };
+	while (top >= 0) {
+		stack_entry range = stack[top--];
+		int l = range.low;
+		int h = range.high;
+		process_entry pivot = entries[l + (h - l) / 2];
+		int i = l, j = h;
+		while (i <= j) {
+			while (compare_entries(&entries[i], &pivot, field, descending) < 0) i++;
+			while (compare_entries(&entries[j], &pivot, field, descending) > 0) j--;
+			if (i <= j) {
 				swap(&entries[i], &entries[j]);
+				i++;
+				j--;
 			}
 		}
-		swap(&entries[i + 1], &entries[high]);
-		int p = i + 1;
-		quicksort(entries, low, p - 1, field, descending);
-		quicksort(entries, p + 1, high, field, descending);
+		if (l < j) stack[++top] = (stack_entry){ l, j };
+		if (i < h) stack[++top] = (stack_entry){ i, h };
 	}
+	heap_free(stack);
 }
 
 static USHORT get_native_machine() {
