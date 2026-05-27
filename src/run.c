@@ -2,8 +2,19 @@
 #include "resource.h"
 #include "theme.h"
 #include <commdlg.h>
+#include <commctrl.h>
 #include <shellapi.h>
 #include <shlwapi.h>
+
+static LRESULT CALLBACK edit_subclass_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
+	UNREFERENCED_PARAMETER(id);
+	UNREFERENCED_PARAMETER(data);
+	if (msg == WM_CHAR && wp == 1) { // Ctrl+A: select all
+		SendMessage(hwnd, EM_SETSEL, 0, -1);
+		return 0;
+	}
+	return DefSubclassProc(hwnd, msg, wp, lp);
+}
 
 static void browse_for_file(HWND hdlg) {
 	wchar_t path[MAX_PATH] = {0};
@@ -42,6 +53,7 @@ static INT_PTR CALLBACK run_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM lp) 
 		theme_apply_titlebar(hdlg);
 		SendDlgItemMessage(hdlg, IDC_RUN_EDIT, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
 		EnableWindow(GetDlgItem(hdlg, IDOK), FALSE);
+		SetWindowSubclass(GetDlgItem(hdlg, IDC_RUN_EDIT), edit_subclass_proc, 0, 0);
 		return TRUE;
 	case WM_COMMAND:
 		if (LOWORD(wp) == IDC_RUN_EDIT && HIWORD(wp) == EN_CHANGE) {
