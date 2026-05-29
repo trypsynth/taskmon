@@ -3,6 +3,7 @@
 #include "settings.h"
 #include "process.h"
 #include "tray.h"
+#include "treeview.h"
 #include <commctrl.h>
 #include <shlwapi.h>
 
@@ -238,9 +239,13 @@ static double populate_list(process_entry* entries, int count) {
 
 void do_refresh() {
 	int count = 0;
-	process_entry* entries = snapshot_processes(g_snapshots, &count, g_prefs.field, g_prefs.desc[(int)g_prefs.field]);
+	sort_field field = g_prefs.tree_mode ? SORT_FIELD_NAME : g_prefs.field;
+	BOOL desc  = g_prefs.tree_mode ? FALSE : g_prefs.desc[(int)g_prefs.field];
+	process_entry* entries = snapshot_processes(g_snapshots, &count, field, desc);
 	if (entries) {
-		double total_cpu = populate_list(entries, count);
+		double total_cpu = g_prefs.tree_mode
+			? populate_tree_view(entries, count)
+			: populate_list(entries, count);
 		free_process_entries(entries);
 		if (g_hwnd_status) {
 			int cpu_w = (int)total_cpu;

@@ -7,6 +7,7 @@
 #include "sortbar.h"
 #include "theme.h"
 #include "run.h"
+#include "treeview.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -15,6 +16,7 @@
 #include <uxtheme.h>
 
 #define ID_LISTVIEW 105
+#define ID_TREEVIEW 106
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
 #define ID_CTX_OPEN_LOCATION   301
@@ -41,6 +43,7 @@ const wchar_t WINDOW_TITLE[] = L"Taskmon";
 
 HWND g_hwnd = NULL;
 HWND g_hwnd_list = NULL;
+HWND g_hwnd_tree = NULL;
 HWND g_hwnd_sort_group = NULL;
 HWND g_hwnd_status = NULL;
 HWND g_sort_btns[COL_COUNT] = {0};
@@ -79,6 +82,13 @@ static BOOL confirm_end_task(HWND hwnd, const wchar_t* name, DWORD pid) {
 	return MessageBox(hwnd, message, L"Confirm End Task", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2) == IDYES;
 }
 
+static BOOL confirm_end_tree(HWND hwnd, const wchar_t* name, DWORD pid) {
+	if (g_prefs.skip_kill_confirm) return TRUE;
+	wchar_t message[512];
+	wnsprintf(message, 512, L"End \"%s\" (PID %u) and all its descendant processes?\n\nUnsaved data may be lost.", name[0] ? name : L"this process", pid);
+	return MessageBox(hwnd, message, L"Confirm End Process Tree", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2) == IDYES;
+}
+
 static BOOL open_item_location(const wchar_t* path) {
 	wchar_t folder[MAX_PATH];
 	lstrcpy(folder, path);
@@ -112,6 +122,7 @@ static void create_menu_bar(HWND hwnd) {
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
 	AppendMenu(view, MF_STRING | (g_prefs.always_on_top ? MF_CHECKED : 0), ID_VIEW_ALWAYS_ON_TOP, L"Always on Top");
+	AppendMenu(view, MF_STRING | (g_prefs.tree_mode    ? MF_CHECKED : 0), ID_VIEW_TREE_MODE,    L"Process Tree\tCtrl+T");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
 	AppendMenu(view, MF_STRING, ID_VIEW_SETTINGS, L"Settings...\tCtrl+,");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)view, L"View");
@@ -122,12 +133,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
 	case WM_ACTIVATE:
 		if (LOWORD(wp) == WA_INACTIVE) g_last_focus = GetFocus();
-		else SetFocus(g_last_focus ? g_last_focus : g_hwnd_list);
+		else SetFocus(g_last_focus ? g_last_focus : (g_prefs.tree_mode ? g_hwnd_tree : g_hwnd_list));
 		return 0;
 	case WM_CREATE: {
 		g_hwnd = hwnd;
 		RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_OEM_3);
-		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES };
+		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TREEVIEW_CLASSES };
 		InitCommonControlsEx(&icc);
 		g_hwnd_sort_group = sortbar_create(hwnd);
 		// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
@@ -137,13 +148,21 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		g_hwnd_list = CreateWindowEx(0, WC_LISTVIEWW, L"Processes", WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, (HMENU)(INT_PTR)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
 		SetWindowSubclass(g_hwnd_list, list_key_proc, 0, 0);
 		ListView_SetExtendedListViewStyle(g_hwnd_list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_HEADERDRAGDROP);
+		g_hwnd_tree = CreateWindowEx(0, WC_TREEVIEWW, NULL, WS_CHILD | WS_TABSTOP | TVS_HASLINES | TVS_HASBUTTONS | TVS_LINESATROOT | TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, (HMENU)(INT_PTR)ID_TREEVIEW, GetModuleHandle(NULL), NULL);
+		SetWindowSubclass(g_hwnd_tree, tree_key_proc, 0, 0);
+		SendMessage(g_hwnd_tree, TVM_SETEXTENDEDSTYLE, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
 		g_hwnd_status = CreateWindowEx(0, STATUSCLASSNAME, NULL, WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
 		settings_load(&g_prefs);
 		theme_update();
 		apply_columns();
 		theme_apply_titlebar(hwnd);
 		theme_apply_listview(g_hwnd_list);
+		theme_apply_treeview(g_hwnd_tree);
 		SetWindowTheme(g_hwnd_status, theme_is_dark() ? L"DarkMode_Explorer" : L"Explorer", NULL);
+		if (g_prefs.tree_mode) {
+			ShowWindow(g_hwnd_list, SW_HIDE);
+			ShowWindow(g_hwnd_tree, SW_SHOW);
+		}
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
 		if (g_prefs.always_on_top)
@@ -172,7 +191,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			SendMessage(g_hwnd_status, WM_SIZE, wp, lp);
 			RECT sr;
 			GetClientRect(g_hwnd_status, &sr);
-			SetWindowPos(g_hwnd_list, NULL, 0, 1, w, h - 1 - (sr.bottom - sr.top), SWP_NOZORDER | SWP_NOACTIVATE);
+			int view_h = h - 1 - (sr.bottom - sr.top);
+			SetWindowPos(g_hwnd_list, NULL, 0, 1, w, view_h, SWP_NOZORDER | SWP_NOACTIVATE);
+			if (g_hwnd_tree)
+				SetWindowPos(g_hwnd_tree, NULL, 0, 1, w, view_h, SWP_NOZORDER | SWP_NOACTIVATE);
 		}
 		return 0;
 	}
@@ -209,19 +231,44 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			return 0;
 		}
 		if (id == ID_CTX_SUSPEND || id == ID_CTX_RESUME) {
-			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
-			if (selected != -1) {
-				LVITEM lvi = {0};
-				lvi.iItem = selected;
-				lvi.mask = LVIF_PARAM;
-				ListView_GetItem(g_hwnd_list, &lvi);
-				if (id == ID_CTX_SUSPEND) suspend_process((DWORD)lvi.lParam);
-				else                       resume_process((DWORD)lvi.lParam);
+			DWORD pid = 0;
+			if (g_prefs.tree_mode) {
+				pid = tree_get_selected_pid();
+			} else {
+				int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+				if (selected != -1) {
+					LVITEM lvi = {0};
+					lvi.iItem = selected; lvi.mask = LVIF_PARAM;
+					ListView_GetItem(g_hwnd_list, &lvi);
+					pid = (DWORD)lvi.lParam;
+				}
+			}
+			if (pid) {
+				if (id == ID_CTX_SUSPEND) suspend_process(pid);
+				else                       resume_process(pid);
 				do_refresh();
 			}
 			return 0;
 		}
 		if (id == ID_CTX_OPEN_LOCATION || id == ID_CTX_END_TASK) {
+			if (g_prefs.tree_mode) {
+				wchar_t name[260] = {0};
+				tree_get_selected_name(name, 260);
+				DWORD pid = tree_get_selected_pid();
+				if (pid) {
+					if (id == ID_CTX_OPEN_LOCATION) {
+						wchar_t path[MAX_PATH];
+						get_process_path(pid, path, MAX_PATH);
+						if (path[0]) open_item_location(path);
+					} else {
+						if (confirm_end_task(hwnd, name, pid)) {
+							terminate_process(pid);
+							do_refresh();
+						}
+					}
+				}
+				return 0;
+			}
 			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 			if (selected != -1) {
 				LVITEM lvi = {0};
@@ -258,14 +305,51 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			}
 			return 0;
 		}
+		if (id == ID_CTX_END_PROCESS_TREE) {
+			HTREEITEM sel = tree_get_selection();
+			if (sel) {
+				wchar_t name[260] = {0};
+				tree_get_selected_name(name, 260);
+				DWORD pid = tree_get_selected_pid();
+				if (confirm_end_tree(hwnd, name, pid)) {
+					terminate_tree_from_item(sel);
+					do_refresh();
+				}
+			}
+			return 0;
+		}
+		if (id == ID_VIEW_TREE_MODE) {
+			g_prefs.tree_mode = !g_prefs.tree_mode;
+			HMENU view = GetSubMenu(GetMenu(hwnd), 1);
+			CheckMenuItem(view, ID_VIEW_TREE_MODE, g_prefs.tree_mode ? MF_CHECKED : MF_UNCHECKED);
+			if (g_prefs.tree_mode) {
+				ShowWindow(g_hwnd_list, SW_HIDE);
+				ShowWindow(g_hwnd_tree, SW_SHOW);
+				SetFocus(g_hwnd_tree);
+			} else {
+				ShowWindow(g_hwnd_tree, SW_HIDE);
+				ShowWindow(g_hwnd_list, SW_SHOW);
+				SetFocus(g_hwnd_list);
+			}
+			do_refresh();
+			settings_save(&g_prefs);
+			return 0;
+		}
 		if (id >= ID_CTX_PRIORITY_BASE && id < ID_CTX_PRIORITY_BASE + PRIORITY_CLASS_COUNT) {
-			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
-			if (selected != -1) {
-				LVITEM lvi = {0};
-				lvi.iItem = selected;
-				lvi.mask = LVIF_PARAM;
-				ListView_GetItem(g_hwnd_list, &lvi);
-				set_process_priority((DWORD)lvi.lParam, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
+			DWORD pid = 0;
+			if (g_prefs.tree_mode) {
+				pid = tree_get_selected_pid();
+			} else {
+				int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
+				if (selected != -1) {
+					LVITEM lvi = {0};
+					lvi.iItem = selected; lvi.mask = LVIF_PARAM;
+					ListView_GetItem(g_hwnd_list, &lvi);
+					pid = (DWORD)lvi.lParam;
+				}
+			}
+			if (pid) {
+				set_process_priority(pid, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
 				do_refresh();
 			}
 			return 0;
@@ -334,6 +418,60 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		return 0;
 	}
 	case WM_CONTEXTMENU: {
+		if ((HWND)wp == g_hwnd_tree) {
+			POINT pt;
+			pt.x = GET_X_LPARAM(lp);
+			pt.y = GET_Y_LPARAM(lp);
+			HTREEITEM sel;
+			if (pt.x == -1 && pt.y == -1) {
+				// Keyboard-triggered: use current selection
+				sel = tree_get_selection();
+				if (sel) {
+					RECT rc;
+					*(HTREEITEM*)&rc = sel;
+					if ((BOOL)SendMessage(g_hwnd_tree, TVM_GETITEMRECT, TRUE, (LPARAM)&rc)) {
+						MapWindowPoints(g_hwnd_tree, HWND_DESKTOP, (LPPOINT)&rc, 2);
+						pt.x = rc.left;
+						pt.y = rc.bottom;
+					}
+				}
+			} else {
+				// Mouse-triggered: select item under cursor first
+				POINT local = pt;
+				ScreenToClient(g_hwnd_tree, &local);
+				TVHITTESTINFO tvht = {0};
+				tvht.pt = local;
+				HTREEITEM hit = (HTREEITEM)SendMessage(g_hwnd_tree, TVM_HITTEST, 0, (LPARAM)&tvht);
+				if (hit && (tvht.flags & TVHT_ONITEM))
+					SendMessage(g_hwnd_tree, TVM_SELECTITEM, TVGN_CARET, (LPARAM)hit);
+				sel = tree_get_selection();
+			}
+			if (sel) {
+				DWORD pid = tree_get_selected_pid();
+				HMENU menu = CreatePopupMenu();
+				wchar_t path[MAX_PATH];
+				get_process_path(pid, path, MAX_PATH);
+				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
+				if (is_process_suspended(pid))
+					AppendMenu(menu, MF_STRING, ID_CTX_RESUME,  L"Resume");
+				else
+					AppendMenu(menu, MF_STRING, ID_CTX_SUSPEND, L"Suspend");
+				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK,         L"End task\tDelete");
+				AppendMenu(menu, MF_STRING, ID_CTX_END_PROCESS_TREE, L"End process tree");
+				HMENU pri_menu = CreatePopupMenu();
+				DWORD cur_cls = 0;
+				HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+				if (ph) { cur_cls = GetPriorityClass(ph); CloseHandle(ph); }
+				for (int i = 0; i < PRIORITY_CLASS_COUNT; ++i) {
+					UINT flags = MF_STRING | (PRIORITY_CLASSES[i].cls == cur_cls ? MF_CHECKED : 0);
+					AppendMenu(pri_menu, flags, ID_CTX_PRIORITY_BASE + i, PRIORITY_CLASSES[i].label);
+				}
+				AppendMenu(menu, MF_POPUP, (UINT_PTR)pri_menu, L"Priority");
+				TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+				DestroyMenu(menu);
+			}
+			return 0;
+		}
 		if ((HWND)wp == g_hwnd_list) {
 			int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 			if (selected != -1) {
@@ -420,6 +558,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			theme_update();
 			theme_apply_titlebar(hwnd);
 			theme_apply_listview(g_hwnd_list);
+			theme_apply_treeview(g_hwnd_tree);
 			SetWindowTheme(g_hwnd_status, theme_is_dark() ? L"DarkMode_Explorer" : L"Explorer", NULL);
 			sortbar_apply_theme();
 			RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);

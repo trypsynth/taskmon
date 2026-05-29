@@ -47,6 +47,19 @@ void theme_apply_button(HWND hwnd) {
 	SetWindowTheme(hwnd, g_dark ? L"DarkMode_Explorer" : L"Explorer", NULL);
 }
 
+void theme_apply_treeview(HWND hwnd_tree) {
+	if (g_dark) {
+		SetWindowTheme(hwnd_tree, L"DarkMode_Explorer", NULL);
+		TreeView_SetBkColor(hwnd_tree, DARK_BG);
+		TreeView_SetTextColor(hwnd_tree, DARK_TEXT);
+	} else {
+		SetWindowTheme(hwnd_tree, L"Explorer", NULL);
+		TreeView_SetBkColor(hwnd_tree, (COLORREF)-1);
+		TreeView_SetTextColor(hwnd_tree, (COLORREF)-1);
+	}
+	InvalidateRect(hwnd_tree, NULL, TRUE);
+}
+
 HBRUSH theme_ctl_color(HDC hdc) {
 	if (!g_dark) return NULL;
 	if (!g_dark_brush) g_dark_brush = CreateSolidBrush(DARK_BG);
