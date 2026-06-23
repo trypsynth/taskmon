@@ -116,7 +116,7 @@ static void create_menu_bar(HWND hwnd) {
 	AppendMenu(file, MF_SEPARATOR, 0, NULL);
 	AppendMenu(file, MF_STRING | (is_elevated() ? MF_GRAYED : 0), ID_FILE_RESTART_AS_ADMIN, L"Restart as administrator");
 	AppendMenu(file, MF_SEPARATOR, 0, NULL);
-	AppendMenu(file, MF_STRING, ID_FILE_EXIT, L"Exit");
+	AppendMenu(file, MF_STRING, ID_FILE_EXIT, L"Exit\tCtrl+Q");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)file, L"&File");
 	HMENU view = CreatePopupMenu();
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
