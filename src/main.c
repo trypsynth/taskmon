@@ -44,8 +44,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show)
 		MessageBox(NULL, L"Failed to create window.", L"Error", MB_ICONERROR);
 		return 1;
 	}
-	ShowWindow(hwnd, show);
-	UpdateWindow(hwnd);
+	// WM_CREATE (fired synchronously above) loads g_prefs, so it already reflects
+	// the user's "start minimized to tray" choice by the time we get here.
+	if (!g_prefs.start_minimized_to_tray) {
+		ShowWindow(hwnd, show);
+		UpdateWindow(hwnd);
+	}
 	HACCEL haccel = LoadAccelerators(instance, MAKEINTRESOURCE(IDR_ACCEL));
 	MSG msg = {0};
 	while (GetMessage(&msg, NULL, 0, 0)) {

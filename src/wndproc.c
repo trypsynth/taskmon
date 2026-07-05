@@ -166,7 +166,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		create_menu_bar(hwnd);
 		tray_add(hwnd, WM_TRAYICON, WINDOW_TITLE);
 		if (g_prefs.always_on_top)
-			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		if (g_prefs.window_width > 0) {
 			POINT pt = { g_prefs.window_left + 50, g_prefs.window_top + 50 };
 			if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL))
@@ -182,7 +182,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		}
 		SetTimer(hwnd, ID_PRIME_TIMER, 250, NULL);
 		set_refresh_interval(hwnd, g_prefs.refresh_ms);
-		SetFocus(g_hwnd_list);
+		// Skip when starting minimized: SetFocus on a hidden window can still activate
+		// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
+		// assigns focus (falling back to g_hwnd_list/g_hwnd_tree) once the window is
+		// actually shown via tray_restore().
+		if (!g_prefs.start_minimized_to_tray)
+			SetFocus(g_hwnd_list);
 		return 0;
 	}
 	case WM_SIZE: {
@@ -389,12 +394,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			UINT new_ms;
 			BOOL new_visible[COL_COUNT];
 			BOOL new_skip_confirm;
-			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, g_prefs.skip_kill_confirm, &new_ms, new_visible, &new_skip_confirm)) {
+			BOOL new_start_minimized;
+			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, g_prefs.skip_kill_confirm, g_prefs.start_minimized_to_tray, &new_ms, new_visible, &new_skip_confirm, &new_start_minimized)) {
 				BOOL cols_changed = FALSE;
 				for (int i = 0; i < COL_COUNT; ++i)
 					if (new_visible[i] != g_prefs.visible[i]) { cols_changed = TRUE; break; }
 				for (int i = 0; i < COL_COUNT; ++i) g_prefs.visible[i] = new_visible[i];
 				g_prefs.skip_kill_confirm = new_skip_confirm;
+				g_prefs.start_minimized_to_tray = new_start_minimized;
 				if (new_ms != g_prefs.refresh_ms) set_refresh_interval(hwnd, new_ms);
 				if (cols_changed) { apply_columns(); do_refresh(); }
 				settings_save(&g_prefs);

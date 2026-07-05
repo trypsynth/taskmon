@@ -55,6 +55,7 @@ typedef struct {
 	BOOL skip_kill_confirm;
 	BOOL always_on_top;
 	BOOL tree_mode;
+	BOOL start_minimized_to_tray;
 	int window_left, window_top, window_width, window_height;
 } sort_prefs;
 
@@ -64,4 +65,4 @@ extern const wchar_t* const REFRESH_LABELS[REFRESH_OPTION_COUNT];
 
 void settings_load(sort_prefs* prefs);
 void settings_save(const sort_prefs* prefs);
-BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BOOL current_skip_confirm, UINT* out_ms, BOOL* out_visible, BOOL* out_skip_confirm);
+BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BOOL current_skip_confirm, BOOL current_start_minimized, UINT* out_ms, BOOL* out_visible, BOOL* out_skip_confirm, BOOL* out_start_minimized);

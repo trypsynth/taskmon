@@ -46,6 +46,7 @@ typedef struct {
 	UINT refresh_ms;
 	BOOL visible[COL_COUNT];
 	BOOL skip_kill_confirm;
+	BOOL start_minimized_to_tray;
 } settings_dlg_data;
 
 static LRESULT CALLBACK settings_lv_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
@@ -94,9 +95,13 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 		HWND skip_chk = CreateWindow(L"BUTTON", L"Disable end task confirmation (not recommended)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_SKIP_CONFIRM, GetModuleHandle(NULL), NULL);
 		SendMessage(skip_chk, WM_SETFONT, (WPARAM)font, FALSE);
 		SendMessage(skip_chk, BM_SETCHECK, data->skip_kill_confirm ? BST_CHECKED : BST_UNCHECKED, 0);
-		// Tab order: combo -> listview -> skip_chk -> OK -> Cancel
+		HWND min_chk = CreateWindow(L"BUTTON", L"Start minimized to tray", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 7, 131, 176, 10, hdlg, (HMENU)(INT_PTR)IDC_START_MINIMIZED, GetModuleHandle(NULL), NULL);
+		SendMessage(min_chk, WM_SETFONT, (WPARAM)font, FALSE);
+		SendMessage(min_chk, BM_SETCHECK, data->start_minimized_to_tray ? BST_CHECKED : BST_UNCHECKED, 0);
+		// Tab order: combo -> listview -> skip_chk -> min_chk -> OK -> Cancel
 		SetWindowPos(skip_chk, lv, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		SetWindowPos(GetDlgItem(hdlg, IDOK), skip_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		SetWindowPos(min_chk, skip_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		SetWindowPos(GetDlgItem(hdlg, IDOK), min_chk, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SetWindowPos(GetDlgItem(hdlg, IDCANCEL), GetDlgItem(hdlg, IDOK), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		return TRUE;
 	}
@@ -116,6 +121,7 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 				data->visible[(int)lvi2.lParam] = ListView_GetCheckState(lv, j) ? TRUE : FALSE;
 			}
 			data->skip_kill_confirm = SendMessage(GetDlgItem(hdlg, IDC_SKIP_CONFIRM), BM_GETCHECK, 0, 0) == BST_CHECKED;
+			data->start_minimized_to_tray = SendMessage(GetDlgItem(hdlg, IDC_START_MINIMIZED), BM_GETCHECK, 0, 0) == BST_CHECKED;
 			EndDialog(hdlg, 1);
 			return TRUE;
 		}
@@ -141,16 +147,18 @@ static INT_PTR CALLBACK settings_dlg_proc(HWND hdlg, UINT msg, WPARAM wp, LPARAM
 	return FALSE;
 }
 
-BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BOOL current_skip_confirm, UINT* out_ms, BOOL* out_visible, BOOL* out_skip_confirm) {
+BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BOOL current_skip_confirm, BOOL current_start_minimized, UINT* out_ms, BOOL* out_visible, BOOL* out_skip_confirm, BOOL* out_start_minimized) {
 	settings_dlg_data data;
 	data.refresh_ms = current_ms;
 	for (int i = 0; i < COL_COUNT; ++i) data.visible[i] = current_visible[i];
 	data.skip_kill_confirm = current_skip_confirm;
+	data.start_minimized_to_tray = current_start_minimized;
 	INT_PTR result = DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTINGS), parent, settings_dlg_proc, (LPARAM)&data);
 	if (!result) return FALSE;
 	*out_ms = data.refresh_ms;
 	for (int i = 0; i < COL_COUNT; ++i) out_visible[i] = data.visible[i];
 	*out_skip_confirm = data.skip_kill_confirm;
+	*out_start_minimized = data.start_minimized_to_tray;
 	return TRUE;
 }
 
@@ -195,6 +203,9 @@ void settings_load(sort_prefs* prefs) {
 	wchar_t tree_buf[4];
 	GetPrivateProfileString(L"view", L"tree_mode", L"0", tree_buf, 4, path);
 	prefs->tree_mode = (tree_buf[0] == L'1');
+	wchar_t startmin_buf[4];
+	GetPrivateProfileString(L"window", L"start_minimized_to_tray", L"0", startmin_buf, 4, path);
+	prefs->start_minimized_to_tray = (startmin_buf[0] == L'1');
 	wchar_t pos_buf[16];
 	GetPrivateProfileString(L"window", L"width", L"0", pos_buf, 16, path);
 	prefs->window_width = StrToInt(pos_buf);
@@ -231,6 +242,7 @@ void settings_save(const sort_prefs* prefs) {
 	WritePrivateProfileString(L"confirm", L"skip_kill", prefs->skip_kill_confirm ? L"1" : L"0", path);
 	WritePrivateProfileString(L"window", L"always_on_top", prefs->always_on_top ? L"1" : L"0", path);
 	WritePrivateProfileString(L"view", L"tree_mode", prefs->tree_mode ? L"1" : L"0", path);
+	WritePrivateProfileString(L"window", L"start_minimized_to_tray", prefs->start_minimized_to_tray ? L"1" : L"0", path);
 	if (prefs->window_width > 0) {
 		wchar_t pos_str[16];
 		wnsprintf(pos_str, 16, L"%d", prefs->window_left);
