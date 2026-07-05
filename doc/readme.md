@@ -7,6 +7,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 * View all running processes and sort them by various resource usage metrics.
 * Choose from a large variety of customizable columns to display, including PID, CPU, Memory, Threads, Handles, Command Line, Disk I/O, and many more.
 * Minimize to the system tray to keep your taskbar clean.
+* Optionally launch Taskmon already minimized to the tray, with no window shown on startup.
 * Hover over the system tray icon to quickly view CPU and memory usage.
 * Suspend, resume, or terminate processes directly from the list.
 * Change the priority class of any running process.
