@@ -21,6 +21,15 @@ jobs:
       - name: Install Pandoc
         run: choco install pandoc
 
+      - name: Install Inno Setup
+        run: choco install innosetup
+
+      - name: Set version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          echo "TASKMON_VERSION=$version" >> $env:GITHUB_ENV
+
       - name: Configure CMake
         run: cmake -B build -A ${{ matrix.arch }}
 
@@ -53,6 +62,12 @@ jobs:
           name: taskmon-${{ matrix.arch }}
           path: taskmon-*.zip
 
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskmon-installer-${{ matrix.arch }}
+          path: build/taskmon-setup-*.exe
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -75,4 +90,6 @@ jobs:
           files: |
             ./artifacts/taskmon-x64/taskmon-x64.zip
             ./artifacts/taskmon-ARM64/taskmon-arm64.zip
+            ./artifacts/taskmon-installer-x64/taskmon-setup-x64.exe
+            ./artifacts/taskmon-installer-ARM64/taskmon-setup-arm64.exe
 

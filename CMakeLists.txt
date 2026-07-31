@@ -20,3 +20,28 @@ if(PANDOC_EXECUTABLE)
     )
     add_custom_target(doc ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/readme.html")
 endif()
+
+find_program(ISCC_EXECUTABLE ISCC)
+if(ISCC_EXECUTABLE)
+    if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
+        set(TASKMON_INSTALLER_ARCH "arm64")
+    else()
+        set(TASKMON_INSTALLER_ARCH "x64")
+    endif()
+    if(DEFINED ENV{TASKMON_VERSION})
+        set(TASKMON_VERSION "$ENV{TASKMON_VERSION}")
+    else()
+        set(TASKMON_VERSION "0.0.0")
+    endif()
+    add_custom_target(installer ALL
+        COMMAND ${ISCC_EXECUTABLE}
+                "/DMyAppArch=${TASKMON_INSTALLER_ARCH}"
+                "/DMyAppVersion=${TASKMON_VERSION}"
+                "/DSourceExeDir=$<TARGET_FILE_DIR:taskmon>"
+                "/DMyOutputDir=${CMAKE_BINARY_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/installer/taskmon.iss"
+        DEPENDS taskmon
+        COMMENT "Building Inno Setup installer (${TASKMON_INSTALLER_ARCH})"
+        VERBATIM
+    )
+endif()
