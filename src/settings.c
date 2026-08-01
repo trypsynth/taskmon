@@ -3,6 +3,7 @@
 #include "theme.h"
 #include <commctrl.h>
 #include <shlwapi.h>
+#include <shlobj.h>
 #include <uxtheme.h>
 
 const column_def COLUMNS[COL_COUNT] = {
@@ -164,10 +165,27 @@ BOOL open_settings(HWND parent, UINT current_ms, const BOOL* current_visible, BO
 	return TRUE;
 }
 
+/* Installed copies (under Program Files) can't write next to the exe, so they
+ * use per-user AppData instead; portable copies keep everything self-contained
+ * next to the exe. Checking install location rather than probing writability
+ * keeps this consistent even if the installed copy is ever run elevated. */
 static void get_ini_path(wchar_t* buf) {
-	GetModuleFileName(NULL, buf, MAX_PATH);
-	PathRemoveFileSpec(buf);
-	PathAppend(buf, L"taskmon.ini");
+	wchar_t exe_dir[MAX_PATH];
+	GetModuleFileName(NULL, exe_dir, MAX_PATH);
+	PathRemoveFileSpec(exe_dir);
+
+	wchar_t program_files[MAX_PATH];
+	BOOL installed = SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROGRAM_FILES, NULL, 0, program_files))
+		&& PathIsPrefix(program_files, exe_dir);
+
+	if (installed && SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, buf))) {
+		PathAppend(buf, L"Taskmon");
+		CreateDirectory(buf, NULL);
+		PathAppend(buf, L"taskmon.ini");
+	} else {
+		lstrcpyn(buf, exe_dir, MAX_PATH);
+		PathAppend(buf, L"taskmon.ini");
+	}
 }
 
 void settings_load(sort_prefs* prefs) {
