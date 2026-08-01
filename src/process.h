@@ -33,6 +33,8 @@ typedef enum {
 	SORT_FIELD_COMPANY,
 	SORT_FIELD_DPI,
 	SORT_FIELD_SERVICE,
+	SORT_FIELD_GPU,
+	SORT_FIELD_GPU_MEMORY,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -75,6 +77,8 @@ typedef struct {
 	DWORD gdi_objects;
 	DWORD user_objects;
 	DWORD integrity_level;
+	double gpu_percent;
+	ULONGLONG gpu_memory;
 } process_entry;
 
 typedef struct {
@@ -104,3 +108,4 @@ BOOL set_process_priority(DWORD pid, DWORD priority_class);
 BOOL is_process_suspended(DWORD pid);
 BOOL suspend_process(DWORD pid);
 BOOL resume_process(DWORD pid);
+void gpu_cleanup(void);

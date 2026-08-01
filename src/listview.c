@@ -174,6 +174,16 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_SERVICE:
 		lstrcpyn(buf, e->services, len);
 		break;
+	case COL_GPU: {
+		int whole = (int)e->gpu_percent;
+		int frac = (int)((e->gpu_percent - whole) * 100 + 0.5);
+		if (frac >= 100) { whole++; frac = 0; }
+		wnsprintf(buf, len, L"%d.%02d", whole, frac);
+		break;
+	}
+	case COL_GPU_MEMORY:
+		StrFormatByteSizeW((LONGLONG)e->gpu_memory, buf, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

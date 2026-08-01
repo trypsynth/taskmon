@@ -37,6 +37,8 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"Company",        L"Company",      150, SORT_FIELD_COMPANY,           FALSE, FALSE },
 	{ L"DPI Awareness",  L"DPI Awareness",           90, SORT_FIELD_DPI,               FALSE, FALSE },
 	{ L"Service",        L"Service",                200, SORT_FIELD_SERVICE,           FALSE, FALSE },
+	{ L"GPU",            L"GPU",                     70, SORT_FIELD_GPU,               FALSE, FALSE },
+	{ L"GPU Memory",     L"GPU Memory",             100, SORT_FIELD_GPU_MEMORY,        FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

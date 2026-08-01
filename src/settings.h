@@ -33,6 +33,8 @@ typedef enum {
 	COL_COMPANY,
 	COL_DPI,
 	COL_SERVICE,
+	COL_GPU,
+	COL_GPU_MEMORY,
 	COL_COUNT,
 } column_id;
 

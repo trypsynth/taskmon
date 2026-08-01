@@ -1,6 +1,8 @@
 #include "process.h"
 #include <winternl.h>
 #include <shlwapi.h>
+#include <pdh.h>
+#include <pdhmsg.h>
 
 #define SystemProcessInformation 5
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004L
@@ -60,6 +62,116 @@ static void* heap_realloc(void* ptr, SIZE_T size) {
 
 static void heap_free(void* ptr) {
 	HeapFree(GetProcessHeap(), 0, ptr);
+}
+
+static PDH_HQUERY g_pdh_query = NULL;
+static PDH_HCOUNTER g_pdh_util = NULL;
+static PDH_HCOUNTER g_pdh_mem_dedicated = NULL;
+static PDH_HCOUNTER g_pdh_mem_shared = NULL;
+static BOOL g_pdh_ready = FALSE;
+static BOOL g_pdh_init_attempted = FALSE;
+
+typedef struct { DWORD pid; double gpu_percent; ULONGLONG gpu_memory; BOOL active; } gpu_stat_entry;
+static gpu_stat_entry g_gpu_stats[SNAPSHOT_CAPACITY];
+
+static void init_gpu_counters(void) {
+	g_pdh_init_attempted = TRUE;
+	if (PdhOpenQueryW(NULL, 0, &g_pdh_query) != ERROR_SUCCESS) return;
+	BOOL ok = TRUE;
+	ok &= PdhAddEnglishCounterW(g_pdh_query, L"\\GPU Engine(*)\\Utilization Percentage", 0, &g_pdh_util) == ERROR_SUCCESS;
+	ok &= PdhAddEnglishCounterW(g_pdh_query, L"\\GPU Process Memory(*)\\Dedicated Usage", 0, &g_pdh_mem_dedicated) == ERROR_SUCCESS;
+	ok &= PdhAddEnglishCounterW(g_pdh_query, L"\\GPU Process Memory(*)\\Shared Usage", 0, &g_pdh_mem_shared) == ERROR_SUCCESS;
+	if (!ok) {
+		PdhCloseQuery(g_pdh_query);
+		g_pdh_query = NULL;
+		return;
+	}
+	g_pdh_ready = TRUE;
+}
+
+void gpu_cleanup(void) {
+	if (g_pdh_query) {
+		PdhCloseQuery(g_pdh_query);
+		g_pdh_query = NULL;
+	}
+	g_pdh_ready = FALSE;
+}
+
+static void add_gpu_stat(DWORD pid, double percent, ULONGLONG memory) {
+	int h = pid % SNAPSHOT_CAPACITY;
+	int i = h;
+	do {
+		if (!g_gpu_stats[i].active || g_gpu_stats[i].pid == pid) {
+			g_gpu_stats[i].active = TRUE;
+			g_gpu_stats[i].pid = pid;
+			g_gpu_stats[i].gpu_percent += percent;
+			g_gpu_stats[i].gpu_memory += memory;
+			return;
+		}
+		i = (i + 1) % SNAPSHOT_CAPACITY;
+	} while (i != h);
+}
+
+static void get_gpu_stat(DWORD pid, double* out_percent, ULONGLONG* out_memory) {
+	*out_percent = 0.0;
+	*out_memory = 0;
+	int h = pid % SNAPSHOT_CAPACITY;
+	int i = h;
+	do {
+		if (!g_gpu_stats[i].active) return;
+		if (g_gpu_stats[i].pid == pid) {
+			*out_percent = g_gpu_stats[i].gpu_percent;
+			*out_memory = g_gpu_stats[i].gpu_memory;
+			return;
+		}
+		i = (i + 1) % SNAPSHOT_CAPACITY;
+	} while (i != h);
+}
+
+/* Instance names look like "pid_1234_luid_0x00000000_0x0000abcd_phys_0_eng_0_engtype_3D". */
+static DWORD parse_pid_from_instance(const wchar_t* name) {
+	const wchar_t prefix[] = L"pid_";
+	int i = 0;
+	for (; prefix[i]; i++) {
+		if (name[i] != prefix[i]) return 0;
+	}
+	if (name[i] < L'0' || name[i] > L'9') return 0;
+	DWORD pid = 0;
+	while (name[i] >= L'0' && name[i] <= L'9') {
+		pid = pid * 10 + (name[i] - L'0');
+		i++;
+	}
+	return pid;
+}
+
+static void accumulate_counter_array(PDH_HCOUNTER counter, DWORD format, BOOL is_percent) {
+	DWORD buf_size = 0, item_count = 0;
+	PDH_STATUS st = PdhGetFormattedCounterArrayW(counter, format, &buf_size, &item_count, NULL);
+	if (st != PDH_MORE_DATA || buf_size == 0) return;
+	PDH_FMT_COUNTERVALUE_ITEM_W* items = heap_alloc(buf_size);
+	if (!items) return;
+	st = PdhGetFormattedCounterArrayW(counter, format, &buf_size, &item_count, items);
+	if (st == ERROR_SUCCESS) {
+		for (DWORD i = 0; i < item_count; i++) {
+			DWORD pid = parse_pid_from_instance(items[i].szName);
+			if (!pid) continue;
+			if (is_percent)
+				add_gpu_stat(pid, items[i].FmtValue.doubleValue, 0);
+			else
+				add_gpu_stat(pid, 0.0, (ULONGLONG)items[i].FmtValue.largeValue);
+		}
+	}
+	heap_free(items);
+}
+
+static void refresh_gpu_stats(void) {
+	if (!g_pdh_init_attempted) init_gpu_counters();
+	memset(g_gpu_stats, 0, sizeof(g_gpu_stats));
+	if (!g_pdh_ready) return;
+	if (PdhCollectQueryData(g_pdh_query) != ERROR_SUCCESS) return;
+	accumulate_counter_array(g_pdh_util, PDH_FMT_DOUBLE, TRUE);
+	accumulate_counter_array(g_pdh_mem_dedicated, PDH_FMT_LARGE, FALSE);
+	accumulate_counter_array(g_pdh_mem_shared, PDH_FMT_LARGE, FALSE);
 }
 
 typedef struct { DWORD pid; wchar_t name[64]; } svc_entry;
@@ -260,6 +372,12 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 		break;
 	case SORT_FIELD_SERVICE:
 		res = StrCmpI(a->services, b->services);
+		break;
+	case SORT_FIELD_GPU:
+		res = (a->gpu_percent < b->gpu_percent) ? -1 : (a->gpu_percent > b->gpu_percent);
+		break;
+	case SORT_FIELD_GPU_MEMORY:
+		res = (a->gpu_memory < b->gpu_memory) ? -1 : (a->gpu_memory > b->gpu_memory);
 		break;
 	default:
 		break;
@@ -482,6 +600,7 @@ static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
 
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
 	build_service_map();
+	refresh_gpu_stats();
 	FILETIME sys_idle_ft, sys_kernel_ft, sys_user_ft;
 	GetSystemTimes(&sys_idle_ft, &sys_kernel_ft, &sys_user_ft);
 	ULARGE_INTEGER uli_k, uli_u;
@@ -537,6 +656,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		get_services_for_pid(pid, e->services, 256);
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
+		get_gpu_stat(pid, &e->gpu_percent, &e->gpu_memory);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {

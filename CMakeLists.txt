@@ -8,7 +8,7 @@ if(MSVC)
 	target_compile_options(taskmon PRIVATE /GS- /W4 /Os /Oy /std:c17 /Zc:preprocessor)
 	target_link_options(taskmon PRIVATE /NODEFAULTLIB /ENTRY:WinMainCRTStartup /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MERGE:.rdata=.text /MERGE:.pdata=.text)
 endif()
-target_link_libraries(taskmon PRIVATE kernel32 user32 gdi32 shell32 comctl32 ole32 shlwapi ntdll advapi32 dwmapi uxtheme comdlg32 version)
+target_link_libraries(taskmon PRIVATE kernel32 user32 gdi32 shell32 comctl32 ole32 shlwapi ntdll advapi32 dwmapi uxtheme comdlg32 version pdh)
 
 find_program(PANDOC_EXECUTABLE pandoc)
 if(PANDOC_EXECUTABLE)

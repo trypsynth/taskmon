@@ -598,6 +598,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 		KillTimer(hwnd, ID_REFRESH_TIMER);
 		tray_remove();
+		gpu_cleanup();
 		PostQuitMessage(0);
 		return 0;
 	}
