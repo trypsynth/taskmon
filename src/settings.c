@@ -40,6 +40,10 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"Service",        L"Service",                200, SORT_FIELD_SERVICE,           FALSE, FALSE },
 	{ L"GPU",            L"GPU",                     70, SORT_FIELD_GPU,               FALSE, FALSE },
 	{ L"GPU Memory",     L"GPU Memory",             100, SORT_FIELD_GPU_MEMORY,        FALSE, FALSE },
+	{ L"CPU Time",       L"CPU Time",                90, SORT_FIELD_CPU_TIME,          FALSE, FALSE },
+	{ L"Elevated",       L"Elevated",                70, SORT_FIELD_ELEVATED,          FALSE, FALSE },
+	{ L"Path",           L"Path",                   300, SORT_FIELD_PATH,              FALSE, FALSE },
+	{ L"Window Title",   L"Window Title",           200, SORT_FIELD_WINDOW_TITLE,      FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

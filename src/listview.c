@@ -184,6 +184,24 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_GPU_MEMORY:
 		StrFormatByteSizeW((LONGLONG)e->gpu_memory, buf, len);
 		break;
+	case COL_CPU_TIME: {
+		ULONGLONG total_secs = e->cpu_time / 10000000ULL;
+		ULONGLONG hours = total_secs / 3600;
+		UINT mins = (UINT)((total_secs % 3600) / 60);
+		UINT secs = (UINT)(total_secs % 60);
+		wnsprintf(buf, len, L"%llu:%02u:%02u", hours, mins, secs);
+		break;
+	}
+	case COL_ELEVATED:
+		if (e->elevated < 0) buf[0] = L'\0';
+		else lstrcpyn(buf, e->elevated ? L"Yes" : L"No", len);
+		break;
+	case COL_PATH:
+		lstrcpyn(buf, e->path, len);
+		break;
+	case COL_WINDOW_TITLE:
+		lstrcpyn(buf, e->window_title, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;
@@ -223,9 +241,9 @@ static double populate_list(process_entry* entries, int count) {
 		ListView_InsertItem(g_hwnd_list, &lvi);
 		if (e->pid == selected_pid) new_selected_idx = i;
 		if (e->pid == top_pid) new_top_idx = i;
-		wchar_t buf[64];
+		wchar_t buf[300];
 		for (int col = 1; col < g_sort_btn_count; ++col) {
-			format_column(e, g_sort_btn_cols[col], buf, 64);
+			format_column(e, g_sort_btn_cols[col], buf, 300);
 			ListView_SetItemText(g_hwnd_list, i, col, buf);
 		}
 	}

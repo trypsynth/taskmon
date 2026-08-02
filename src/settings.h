@@ -35,6 +35,10 @@ typedef enum {
 	COL_SERVICE,
 	COL_GPU,
 	COL_GPU_MEMORY,
+	COL_CPU_TIME,
+	COL_ELEVATED,
+	COL_PATH,
+	COL_WINDOW_TITLE,
 	COL_COUNT,
 } column_id;
 

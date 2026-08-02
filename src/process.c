@@ -223,6 +223,57 @@ static void get_services_for_pid(DWORD pid, wchar_t* buf, int len) {
 	}
 }
 
+typedef struct { DWORD pid; wchar_t title[128]; } win_entry;
+static win_entry* g_win_map = NULL;
+static int g_win_count = 0;
+static int g_win_capacity = 0;
+
+static BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM lparam) {
+	UNREFERENCED_PARAMETER(lparam);
+	if (!IsWindowVisible(hwnd)) return TRUE;
+	if (GetWindow(hwnd, GW_OWNER) != NULL) return TRUE; /* only true top-level windows */
+	wchar_t title[128];
+	int len = GetWindowText(hwnd, title, 128);
+	if (len == 0) return TRUE;
+	DWORD pid = 0;
+	GetWindowThreadProcessId(hwnd, &pid);
+	if (!pid) return TRUE;
+	for (int i = 0; i < g_win_count; i++)
+		if (g_win_map[i].pid == pid) return TRUE; /* keep the first (topmost z-order) window per pid */
+	if (g_win_count >= g_win_capacity) {
+		g_win_capacity = g_win_capacity ? g_win_capacity * 2 : 64;
+		g_win_map = heap_realloc(g_win_map, g_win_capacity * sizeof(win_entry));
+		if (!g_win_map) { g_win_capacity = 0; g_win_count = 0; return FALSE; }
+	}
+	g_win_map[g_win_count].pid = pid;
+	lstrcpyn(g_win_map[g_win_count].title, title, 128);
+	g_win_count++;
+	return TRUE;
+}
+
+static void build_window_map() {
+	g_win_count = 0;
+	if (!g_win_map) {
+		/* heap_realloc is HeapReAlloc, which (unlike CRT realloc) requires a
+		 * real existing block — seed one so growth in the callback never
+		 * calls it with NULL. */
+		g_win_capacity = 64;
+		g_win_map = heap_alloc(g_win_capacity * sizeof(win_entry));
+	}
+	EnumWindows(enum_windows_proc, 0);
+}
+
+static void get_window_title_for_pid(DWORD pid, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	if (!pid) return;
+	for (int i = 0; i < g_win_count; i++) {
+		if (g_win_map[i].pid == pid) {
+			lstrcpyn(buf, g_win_map[i].title, len);
+			return;
+		}
+	}
+}
+
 static BYTE* query_all_processes(ULONG* total_size) {
 	static PFN_NtQSI fn = NULL;
 	if (!fn) fn = (PFN_NtQSI)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtQuerySystemInformation");
@@ -271,10 +322,13 @@ static cpu_snapshot* find_snapshot(snapshot_entry* snapshots, DWORD pid) {
 	return NULL;
 }
 
-static void swap(process_entry* a, process_entry* b) {
-	process_entry temp = *a;
-	*a = *b;
-	*b = temp;
+/* process_entry is large enough now that copying it by value risks overflowing
+ * the no-CRT stack-probe-free frame budget (__chkstk isn't linkable here), so
+ * swaps and the pivot copy go through a heap scratch buffer instead. */
+static void swap(process_entry* a, process_entry* b, process_entry* scratch) {
+	memcpy(scratch, a, sizeof(process_entry));
+	memcpy(a, b, sizeof(process_entry));
+	memcpy(b, scratch, sizeof(process_entry));
 }
 
 static int compare_entries(const process_entry* a, const process_entry* b, sort_field field, BOOL descending) {
@@ -379,6 +433,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_GPU_MEMORY:
 		res = (a->gpu_memory < b->gpu_memory) ? -1 : (a->gpu_memory > b->gpu_memory);
 		break;
+	case SORT_FIELD_CPU_TIME:
+		res = (a->cpu_time < b->cpu_time) ? -1 : (a->cpu_time > b->cpu_time);
+		break;
+	case SORT_FIELD_ELEVATED:
+		res = (a->elevated < b->elevated) ? -1 : (a->elevated > b->elevated);
+		break;
+	case SORT_FIELD_PATH:
+		res = StrCmpI(a->path, b->path);
+		break;
+	case SORT_FIELD_WINDOW_TITLE:
+		res = StrCmpI(a->window_title, b->window_title);
+		break;
 	default:
 		break;
 	}
@@ -389,20 +455,27 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 	if (low >= high) return;
 	typedef struct { int low, high; } stack_entry;
 	stack_entry* stack = heap_alloc((high - low + 1) * sizeof(stack_entry));
-	if (!stack) return;
+	process_entry* pivot = heap_alloc(sizeof(process_entry));
+	process_entry* swap_tmp = heap_alloc(sizeof(process_entry));
+	if (!stack || !pivot || !swap_tmp) {
+		heap_free(stack);
+		heap_free(pivot);
+		heap_free(swap_tmp);
+		return;
+	}
 	int top = -1;
 	stack[++top] = (stack_entry){ low, high };
 	while (top >= 0) {
 		stack_entry range = stack[top--];
 		int l = range.low;
 		int h = range.high;
-		process_entry pivot = entries[l + (h - l) / 2];
+		memcpy(pivot, &entries[l + (h - l) / 2], sizeof(process_entry));
 		int i = l, j = h;
 		while (i <= j) {
-			while (compare_entries(&entries[i], &pivot, field, descending) < 0) i++;
-			while (compare_entries(&entries[j], &pivot, field, descending) > 0) j--;
+			while (compare_entries(&entries[i], pivot, field, descending) < 0) i++;
+			while (compare_entries(&entries[j], pivot, field, descending) > 0) j--;
 			if (i <= j) {
-				swap(&entries[i], &entries[j]);
+				swap(&entries[i], &entries[j], swap_tmp);
 				i++;
 				j--;
 			}
@@ -410,6 +483,8 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 		if (l < j) stack[++top] = (stack_entry){ l, j };
 		if (i < h) stack[++top] = (stack_entry){ i, h };
 	}
+	heap_free(pivot);
+	heap_free(swap_tmp);
 	heap_free(stack);
 }
 
@@ -493,6 +568,26 @@ static DWORD get_process_integrity(DWORD pid) {
 	heap_free(buf);
 	CloseHandle(htok);
 	return rid;
+}
+
+/* -1 = couldn't determine (e.g. protected process, other user without rights), 0 = no, 1 = yes */
+static int get_process_elevation(DWORD pid) {
+	if (pid == 0) return 0;
+	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!hproc) return -1;
+	HANDLE htok = NULL;
+	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
+		CloseHandle(hproc);
+		return -1;
+	}
+	CloseHandle(hproc);
+	TOKEN_ELEVATION elev = {0};
+	DWORD needed = 0;
+	int result = -1;
+	if (GetTokenInformation(htok, TokenElevation, &elev, sizeof(elev), &needed))
+		result = elev.TokenIsElevated ? 1 : 0;
+	CloseHandle(htok);
+	return result;
 }
 
 static void get_process_user(DWORD pid, wchar_t* buf, int len) {
@@ -600,6 +695,7 @@ static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
 
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
 	build_service_map();
+	build_window_map();
 	refresh_gpu_stats();
 	FILETIME sys_idle_ft, sys_kernel_ft, sys_user_ft;
 	GetSystemTimes(&sys_idle_ft, &sys_kernel_ft, &sys_user_ft);
@@ -657,6 +753,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
 		get_gpu_stat(pid, &e->gpu_percent, &e->gpu_memory);
+		e->elevated = get_process_elevation(pid);
+		get_process_path(pid, e->path, MAX_PATH);
+		get_window_title_for_pid(pid, e->window_title, 128);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
 		} else if (spi->ImageName.Buffer && spi->ImageName.Length > 0) {
@@ -668,6 +767,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			lstrcpy(e->name, L"(unknown)");
 		}
 		ULONGLONG proc_time = (ULONGLONG)spi->KernelTime.QuadPart + (ULONGLONG)spi->UserTime.QuadPart;
+		e->cpu_time = proc_time;
 		ULONGLONG io_read = (ULONGLONG)spi->ReadTransferCount.QuadPart;
 		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
 		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;

@@ -35,6 +35,10 @@ typedef enum {
 	SORT_FIELD_SERVICE,
 	SORT_FIELD_GPU,
 	SORT_FIELD_GPU_MEMORY,
+	SORT_FIELD_CPU_TIME,
+	SORT_FIELD_ELEVATED,
+	SORT_FIELD_PATH,
+	SORT_FIELD_WINDOW_TITLE,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -79,6 +83,10 @@ typedef struct {
 	DWORD integrity_level;
 	double gpu_percent;
 	ULONGLONG gpu_memory;
+	ULONGLONG cpu_time;
+	int elevated; /* -1 = unknown, 0 = no, 1 = yes */
+	wchar_t path[MAX_PATH];
+	wchar_t window_title[128];
 } process_entry;
 
 typedef struct {
