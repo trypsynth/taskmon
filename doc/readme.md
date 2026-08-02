@@ -5,17 +5,70 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 ## Core Features
 
 * View all running processes and sort them by various resource usage metrics.
-* Choose from a large variety of customizable columns to display, including PID, CPU, Memory, Threads, Handles, Command Line, Disk I/O, and many more.
+* Choose from over 35 customizable columns to display; see Available Columns below for the full list.
+* Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
+* Available as a portable executable or via a Windows installer. Portable copies keep their settings alongside the executable so you can carry them on a USB drive; installed copies store settings per-user automatically, since Program Files isn't writable without administrator rights.
 * Minimize to the system tray to keep your taskbar clean.
 * Optionally launch Taskmon already minimized to the tray, with no window shown on startup.
 * Hover over the system tray icon to quickly view CPU and memory usage.
 * Suspend, resume, or terminate processes directly from the list.
 * Change the priority class of any running process.
 * Launch new tasks directly from the application.
+* Restart Taskmon as administrator from the File menu to manage processes you don't otherwise have access to.
 * Keep Taskmon Always on Top via the View menu.
 * Configurable auto-refresh interval (Off, 5 seconds, 10 seconds, 30 seconds, 1 minute).
 * Remembers your window size, position, and column preferences across sessions.
 * Option to disable the end task confirmation prompt for faster workflow.
+
+## Process Tree View
+
+Taskmon can display processes as a hierarchical tree instead of a flat list, grouping each process under the parent that launched it.
+
+* Press Ctrl+T, or choose View > Process Tree, to toggle between the list and tree views.
+* Expand or collapse a process's children using the tree's disclosure triangles or the keyboard.
+* Right-click a process in tree view for an additional End process tree action, which terminates that process and all of its descendants, ending the children before their parents.
+
+## Available Columns
+
+All columns are optional except Name, which is always shown. Enable the ones you want from Settings (Ctrl+,); Name, PID, CPU %, and Memory are shown by default.
+
+* Name: The process's executable name.
+* PID: The unique numeric process ID assigned by Windows.
+* CPU %: The percentage of total system CPU capacity the process is currently using.
+* Memory: The process's current physical working set (RAM) usage.
+* Threads: The number of threads currently running within the process.
+* Handles: The number of open kernel object handles, such as files and registry keys, held by the process.
+* Started: The date and time the process was launched.
+* Priority: The process's CPU scheduling priority class.
+* Disk I/O: The combined rate of disk read, write, and other I/O activity.
+* Private Bytes: The amount of memory committed exclusively to the process.
+* Page Faults: The rate of page faults per second, showing how often the process accesses memory outside its working set.
+* User: The account under which the process is running.
+* Command Line: The full command line, including arguments, the process was launched with.
+* Architecture: Whether the process is running as x86, x64, or ARM64 code.
+* Session: The Windows session ID the process belongs to.
+* Peak Memory: The highest physical memory (working set) usage the process has reached.
+* Virtual Memory: The total virtual address space reserved by the process.
+* GDI Objects: The number of GDI graphics objects, such as brushes and pens, currently allocated by the process.
+* USER Objects: The number of USER objects, such as windows and menus, currently allocated by the process.
+* Integrity: The process's Windows integrity level, such as Low, Medium, High, or System.
+* Parent PID: The process ID of the parent process that launched it.
+* Private Working Set: The portion of physical memory used exclusively by this process, excluding memory shared with other processes.
+* Paged Pool: The amount of pageable kernel memory allocated on the process's behalf.
+* Non-paged Pool: The amount of non-pageable kernel memory allocated on the process's behalf.
+* I/O Read: The rate of bytes read from disk or other I/O devices.
+* I/O Write: The rate of bytes written to disk or other I/O devices.
+* I/O Other: The rate of bytes transferred by I/O operations that are neither reads nor writes.
+* Description: The file description recorded in the executable's version information.
+* Company: The company name recorded in the executable's version information.
+* DPI Awareness: How the process handles high-DPI displays: Unaware, System, or Per-Monitor.
+* Service: The name of any Windows service or services hosted inside the process.
+* GPU: The percentage of total GPU capacity the process is currently using, summed across all GPU engines.
+* GPU Memory: The combined dedicated and shared GPU memory currently committed to the process.
+* CPU Time: The total accumulated CPU time the process has consumed since it started.
+* Elevated: Whether the process is running with administrator privileges.
+* Path: The full file system path to the process's executable.
+* Window Title: The title of the process's main visible window, if it has one.
 
 ## Column Reordering and Accessible Sorting
 
@@ -31,16 +84,20 @@ Taskmon supports the following keyboard shortcuts for quick navigation and contr
 * Ctrl+Shift+~: Global hotkey to toggle Taskmon visibility from anywhere.
 * F5: Refresh the process list manually.
 * Ctrl+N: Open the Run dialog to start a new task.
+* Ctrl+T: Toggle between the list and process tree views.
 * Ctrl+,: Open the Settings dialog to customize columns and refresh rates.
 * Delete: End the currently selected task.
+* Escape: Hide Taskmon to the system tray.
+* Ctrl+Q: Exit Taskmon completely.
 
 ## Context Menu Actions
 
-Bringing up the context menu on a process in the list provides access to several actions:
+Bringing up the context menu on a process in the list or tree view provides access to several actions:
 
 * Open file location: Opens Windows Explorer to the directory containing the executable.
 * Suspend or Resume: Pauses or resumes the execution of the process.
 * End task: Forcefully terminates the process.
+* End process tree: In the tree view only, terminates the selected process and all of its descendants, ending the children before their parents.
 * Priority: Allows changing the CPU priority class (Idle, Below Normal, Normal, Above Normal, High, Realtime).
 
 ## Changelog

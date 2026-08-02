@@ -255,8 +255,8 @@ static void build_window_map() {
 	g_win_count = 0;
 	if (!g_win_map) {
 		/* heap_realloc is HeapReAlloc, which (unlike CRT realloc) requires a
-		 * real existing block — seed one so growth in the callback never
-		 * calls it with NULL. */
+		 * real existing block, so seed one here; otherwise growth in the
+		 * callback would call it with NULL. */
 		g_win_capacity = 64;
 		g_win_map = heap_alloc(g_win_capacity * sizeof(win_entry));
 	}
