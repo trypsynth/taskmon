@@ -26,7 +26,6 @@ OutputBaseFilename=taskmon-setup-{#MyAppArch}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-LicenseFile=..\LICENSE
 WizardStyle=modern
 #if MyAppArch == "arm64"
 ArchitecturesAllowed=arm64
@@ -45,6 +44,7 @@ Name: "replacetaskmgr"; Description: "Replace Windows Task Manager (Ctrl+Shift+E
 
 [Files]
 Source: "{#SourceExeDir}\taskmon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\taskmon.exe"
