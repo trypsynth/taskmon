@@ -44,6 +44,10 @@ const column_def COLUMNS[COL_COUNT] = {
 	{ L"Elevated",       L"Elevated",                70, SORT_FIELD_ELEVATED,          FALSE, FALSE },
 	{ L"Path",           L"Path",                   300, SORT_FIELD_PATH,              FALSE, FALSE },
 	{ L"Window Title",   L"Window Title",           200, SORT_FIELD_WINDOW_TITLE,      FALSE, FALSE },
+	{ L"File Version",   L"File Version",           100, SORT_FIELD_FILE_VERSION,      FALSE, FALSE },
+	{ L"Product Version", L"Product Version",       100, SORT_FIELD_PRODUCT_VERSION,   FALSE, FALSE },
+	{ L"Session Name",   L"Session Name",           120, SORT_FIELD_SESSION_NAME,      FALSE, FALSE },
+	{ L"Package Name",   L"Package Name",           300, SORT_FIELD_PACKAGE_NAME,      FALSE, FALSE },
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };

@@ -202,6 +202,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_WINDOW_TITLE:
 		lstrcpyn(buf, e->window_title, len);
 		break;
+	case COL_FILE_VERSION:
+		lstrcpyn(buf, e->file_version, len);
+		break;
+	case COL_PRODUCT_VERSION:
+		lstrcpyn(buf, e->product_version, len);
+		break;
+	case COL_SESSION_NAME:
+		lstrcpyn(buf, e->session_name, len);
+		break;
+	case COL_PACKAGE_NAME:
+		lstrcpyn(buf, e->package_name, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

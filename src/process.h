@@ -39,6 +39,10 @@ typedef enum {
 	SORT_FIELD_ELEVATED,
 	SORT_FIELD_PATH,
 	SORT_FIELD_WINDOW_TITLE,
+	SORT_FIELD_FILE_VERSION,
+	SORT_FIELD_PRODUCT_VERSION,
+	SORT_FIELD_SESSION_NAME,
+	SORT_FIELD_PACKAGE_NAME,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -87,6 +91,10 @@ typedef struct {
 	int elevated; /* -1 = unknown, 0 = no, 1 = yes */
 	wchar_t path[MAX_PATH];
 	wchar_t window_title[128];
+	wchar_t file_version[64];
+	wchar_t product_version[64];
+	wchar_t session_name[64];
+	wchar_t package_name[256];
 } process_entry;
 
 typedef struct {

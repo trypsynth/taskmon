@@ -3,6 +3,8 @@
 #include <shlwapi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <wtsapi32.h>
+#include <appmodel.h>
 
 #define SystemProcessInformation 5
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004L
@@ -445,6 +447,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_WINDOW_TITLE:
 		res = StrCmpI(a->window_title, b->window_title);
 		break;
+	case SORT_FIELD_FILE_VERSION:
+		res = StrCmpI(a->file_version, b->file_version);
+		break;
+	case SORT_FIELD_PRODUCT_VERSION:
+		res = StrCmpI(a->product_version, b->product_version);
+		break;
+	case SORT_FIELD_SESSION_NAME:
+		res = StrCmpI(a->session_name, b->session_name);
+		break;
+	case SORT_FIELD_PACKAGE_NAME:
+		res = StrCmpI(a->package_name, b->package_name);
+		break;
 	default:
 		break;
 	}
@@ -646,9 +660,12 @@ static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
 	CloseHandle(h);
 }
 
-static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wchar_t* company, int comp_len) {
+static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wchar_t* company, int comp_len,
+                                      wchar_t* file_ver, int file_ver_len, wchar_t* product_ver, int product_ver_len) {
 	desc[0] = L'\0';
 	company[0] = L'\0';
+	file_ver[0] = L'\0';
+	product_ver[0] = L'\0';
 	wchar_t path[MAX_PATH];
 	get_process_path(pid, path, MAX_PATH);
 	if (!path[0]) return;
@@ -668,10 +685,42 @@ static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wch
 				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(desc, value, desc_len);
 				wnsprintf(subblock, 64, L"\\StringFileInfo\\%04x%04x\\CompanyName", translate[0].lang, translate[0].codepage);
 				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(company, value, comp_len);
+				wnsprintf(subblock, 64, L"\\StringFileInfo\\%04x%04x\\FileVersion", translate[0].lang, translate[0].codepage);
+				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(file_ver, value, file_ver_len);
+				wnsprintf(subblock, 64, L"\\StringFileInfo\\%04x%04x\\ProductVersion", translate[0].lang, translate[0].codepage);
+				if (VerQueryValueW(data, subblock, (LPVOID*)&value, &vlen)) lstrcpyn(product_ver, value, product_ver_len);
 			}
 		}
 		heap_free(data);
 	}
+}
+
+static void get_session_name(DWORD session_id, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	LPWSTR info = NULL;
+	DWORD bytes = 0;
+	if (WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSWinStationName, &info, &bytes)) {
+		if (info && info[0]) lstrcpyn(buf, info, len);
+		WTSFreeMemory(info);
+	}
+}
+
+static void get_package_name(DWORD pid, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	if (pid == 0) return;
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return;
+	UINT32 length = 0;
+	GetPackageFullName(h, &length, NULL);
+	if (length > 0) {
+		wchar_t* name = heap_alloc(length * sizeof(wchar_t));
+		if (name) {
+			if (GetPackageFullName(h, &length, name) == ERROR_SUCCESS)
+				lstrcpyn(buf, name, len);
+			heap_free(name);
+		}
+	}
+	CloseHandle(h);
 }
 
 static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
@@ -748,13 +797,16 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->integrity_level = get_process_integrity(pid);
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
-		get_process_version_info(pid, e->description, 128, e->company, 128);
+		get_process_version_info(pid, e->description, 128, e->company, 128,
+		                          e->file_version, 64, e->product_version, 64);
 		get_services_for_pid(pid, e->services, 256);
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
 		get_gpu_stat(pid, &e->gpu_percent, &e->gpu_memory);
 		e->elevated = get_process_elevation(pid);
 		get_process_path(pid, e->path, MAX_PATH);
+		get_session_name(e->session_id, e->session_name, 64);
+		get_package_name(pid, e->package_name, 256);
 		get_window_title_for_pid(pid, e->window_title, 128);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
