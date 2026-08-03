@@ -69,6 +69,10 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Elevated: Whether the process is running with administrator privileges.
 * Path: The full file system path to the process's executable.
 * Window Title: The title of the process's main visible window, if it has one.
+* File Version: The file version recorded in the executable's version information.
+* Product Version: The product version recorded in the executable's version information.
+* Session Name: The friendly name of the Windows session the process belongs to, such as Console or Services.
+* Package Name: The full package name for processes installed as a UWP or Store app, blank for regular Win32 processes.
 
 ## Column Reordering and Accessible Sorting
 
