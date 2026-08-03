@@ -1,15 +1,15 @@
 #define MyAppName "Taskmon"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.0.0"
+	#define MyAppVersion "0.2.1"
 #endif
 #ifndef MyAppArch
-  #define MyAppArch "x64"
+	#define MyAppArch "x64"
 #endif
 #ifndef SourceExeDir
-  #define SourceExeDir "..\build\Release"
+	#define SourceExeDir "..\build\Release"
 #endif
 #ifndef MyOutputDir
-  #define MyOutputDir "..\build"
+	#define MyOutputDir "..\build"
 #endif
 
 [Setup]

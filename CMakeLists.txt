@@ -31,7 +31,7 @@ if(ISCC_EXECUTABLE)
 	if(DEFINED ENV{TASKMON_VERSION})
 		set(TASKMON_VERSION "$ENV{TASKMON_VERSION}")
 	else()
-		set(TASKMON_VERSION "0.0.0")
+		set(TASKMON_VERSION "0.2.1")
 	endif()
 	add_custom_target(installer ALL
 		COMMAND ${ISCC_EXECUTABLE}
