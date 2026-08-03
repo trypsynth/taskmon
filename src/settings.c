@@ -2,56 +2,56 @@
 #include "resource.h"
 #include "theme.h"
 #include <commctrl.h>
-#include <shlwapi.h>
 #include <shlobj.h>
+#include <shlwapi.h>
 #include <uxtheme.h>
 
 const column_def COLUMNS[COL_COUNT] = {
-	{ L"Name", L"Name", 260, SORT_FIELD_NAME, TRUE, TRUE },
-	{ L"PID", L"PID", 80, SORT_FIELD_PID, FALSE, TRUE },
-	{ L"CPU", L"CPU %", 90, SORT_FIELD_CPU, FALSE, TRUE },
-	{ L"Memory", L"Memory", 120, SORT_FIELD_MEMORY, FALSE, TRUE },
-	{ L"Threads", L"Threads", 70, SORT_FIELD_THREADS, FALSE, FALSE },
-	{ L"Handles", L"Handles", 70, SORT_FIELD_HANDLES, FALSE, FALSE },
-	{ L"Started", L"Started", 100, SORT_FIELD_STARTTIME, FALSE, FALSE },
-	{ L"Priority", L"Priority", 100, SORT_FIELD_PRIORITY, FALSE, FALSE },
-	{ L"Disk I/O",     L"Disk I/O",     100, SORT_FIELD_DISK_IO,       FALSE, FALSE },
-	{ L"Private Bytes", L"Private Bytes", 120, SORT_FIELD_PRIVATE_BYTES, FALSE, FALSE },
-	{ L"Page Faults",  L"Page Faults",  100, SORT_FIELD_PAGE_FAULTS,   FALSE, FALSE },
-	{ L"User",         L"User",         120, SORT_FIELD_USER,          FALSE, FALSE },
-	{ L"Command Line", L"Command Line", 500, SORT_FIELD_CMDLINE,       FALSE, FALSE },
-	{ L"Architecture",    L"Architecture",  70,  SORT_FIELD_ARCH,           FALSE, FALSE },
-	{ L"Session",        L"Session",      60,  SORT_FIELD_SESSION,          FALSE, FALSE },
-	{ L"Peak Memory",    L"Peak Memory",  120, SORT_FIELD_PEAK_WORKING_SET,  FALSE, FALSE },
-	{ L"Virtual Memory", L"Virtual Memory",  120, SORT_FIELD_VIRTUAL_MEM,       FALSE, FALSE },
-	{ L"GDI Objects",    L"GDI Objects",      70,  SORT_FIELD_GDI_OBJECTS,       FALSE, FALSE },
-	{ L"USER Objects",   L"USER Objects",     70,  SORT_FIELD_USER_OBJECTS,      FALSE, FALSE },
-	{ L"Integrity",      L"Integrity",    80,  SORT_FIELD_INTEGRITY,         FALSE, FALSE },
-	{ L"Parent PID",     L"Parent PID",         80,  SORT_FIELD_PPID,              FALSE, FALSE },
-	{ L"Private Working Set",     L"Private Working Set",   100, SORT_FIELD_PRIVATE_WS,        FALSE, FALSE },
-	{ L"Paged Pool",     L"Paged Pool",   100, SORT_FIELD_PAGED_POOL,        FALSE, FALSE },
-	{ L"Non-paged Pool", L"Non-paged Pool",      100, SORT_FIELD_NONPAGED_POOL,     FALSE, FALSE },
-	{ L"I/O Read",       L"I/O Read",     100, SORT_FIELD_IO_READ,           FALSE, FALSE },
-	{ L"I/O Write",      L"I/O Write",    100, SORT_FIELD_IO_WRITE,          FALSE, FALSE },
-	{ L"I/O Other",      L"I/O Other",    100, SORT_FIELD_IO_OTHER,          FALSE, FALSE },
-	{ L"Description",    L"Description",  200, SORT_FIELD_DESCRIPTION,       FALSE, FALSE },
-	{ L"Company",        L"Company",      150, SORT_FIELD_COMPANY,           FALSE, FALSE },
-	{ L"DPI Awareness",  L"DPI Awareness",           90, SORT_FIELD_DPI,               FALSE, FALSE },
-	{ L"Service",        L"Service",                200, SORT_FIELD_SERVICE,           FALSE, FALSE },
-	{ L"GPU",            L"GPU",                     70, SORT_FIELD_GPU,               FALSE, FALSE },
-	{ L"GPU Memory",     L"GPU Memory",             100, SORT_FIELD_GPU_MEMORY,        FALSE, FALSE },
-	{ L"CPU Time",       L"CPU Time",                90, SORT_FIELD_CPU_TIME,          FALSE, FALSE },
-	{ L"Elevated",       L"Elevated",                70, SORT_FIELD_ELEVATED,          FALSE, FALSE },
-	{ L"Path",           L"Path",                   300, SORT_FIELD_PATH,              FALSE, FALSE },
-	{ L"Window Title",   L"Window Title",           200, SORT_FIELD_WINDOW_TITLE,      FALSE, FALSE },
-	{ L"File Version",   L"File Version",           100, SORT_FIELD_FILE_VERSION,      FALSE, FALSE },
-	{ L"Product Version", L"Product Version",       100, SORT_FIELD_PRODUCT_VERSION,   FALSE, FALSE },
-	{ L"Session Name",   L"Session Name",           120, SORT_FIELD_SESSION_NAME,      FALSE, FALSE },
-	{ L"Package Name",   L"Package Name",           300, SORT_FIELD_PACKAGE_NAME,      FALSE, FALSE },
+	{L"Name", L"Name", 260, SORT_FIELD_NAME, TRUE, TRUE},
+	{L"PID", L"PID", 80, SORT_FIELD_PID, FALSE, TRUE},
+	{L"CPU", L"CPU %", 90, SORT_FIELD_CPU, FALSE, TRUE},
+	{L"Memory", L"Memory", 120, SORT_FIELD_MEMORY, FALSE, TRUE},
+	{L"Threads", L"Threads", 70, SORT_FIELD_THREADS, FALSE, FALSE},
+	{L"Handles", L"Handles", 70, SORT_FIELD_HANDLES, FALSE, FALSE},
+	{L"Started", L"Started", 100, SORT_FIELD_STARTTIME, FALSE, FALSE},
+	{L"Priority", L"Priority", 100, SORT_FIELD_PRIORITY, FALSE, FALSE},
+	{L"Disk I/O", L"Disk I/O", 100, SORT_FIELD_DISK_IO, FALSE, FALSE},
+	{L"Private Bytes", L"Private Bytes", 120, SORT_FIELD_PRIVATE_BYTES, FALSE, FALSE},
+	{L"Page Faults", L"Page Faults", 100, SORT_FIELD_PAGE_FAULTS, FALSE, FALSE},
+	{L"User", L"User", 120, SORT_FIELD_USER, FALSE, FALSE},
+	{L"Command Line", L"Command Line", 500, SORT_FIELD_CMDLINE, FALSE, FALSE},
+	{L"Architecture", L"Architecture", 70, SORT_FIELD_ARCH, FALSE, FALSE},
+	{L"Session", L"Session", 60, SORT_FIELD_SESSION, FALSE, FALSE},
+	{L"Peak Memory", L"Peak Memory", 120, SORT_FIELD_PEAK_WORKING_SET, FALSE, FALSE},
+	{L"Virtual Memory", L"Virtual Memory", 120, SORT_FIELD_VIRTUAL_MEM, FALSE, FALSE},
+	{L"GDI Objects", L"GDI Objects", 70, SORT_FIELD_GDI_OBJECTS, FALSE, FALSE},
+	{L"USER Objects", L"USER Objects", 70, SORT_FIELD_USER_OBJECTS, FALSE, FALSE},
+	{L"Integrity", L"Integrity", 80, SORT_FIELD_INTEGRITY, FALSE, FALSE},
+	{L"Parent PID", L"Parent PID", 80, SORT_FIELD_PPID, FALSE, FALSE},
+	{L"Private Working Set", L"Private Working Set", 100, SORT_FIELD_PRIVATE_WS, FALSE, FALSE},
+	{L"Paged Pool", L"Paged Pool", 100, SORT_FIELD_PAGED_POOL, FALSE, FALSE},
+	{L"Non-paged Pool", L"Non-paged Pool", 100, SORT_FIELD_NONPAGED_POOL, FALSE, FALSE},
+	{L"I/O Read", L"I/O Read", 100, SORT_FIELD_IO_READ, FALSE, FALSE},
+	{L"I/O Write", L"I/O Write", 100, SORT_FIELD_IO_WRITE, FALSE, FALSE},
+	{L"I/O Other", L"I/O Other", 100, SORT_FIELD_IO_OTHER, FALSE, FALSE},
+	{L"Description", L"Description", 200, SORT_FIELD_DESCRIPTION, FALSE, FALSE},
+	{L"Company", L"Company", 150, SORT_FIELD_COMPANY, FALSE, FALSE},
+	{L"DPI Awareness", L"DPI Awareness", 90, SORT_FIELD_DPI, FALSE, FALSE},
+	{L"Service", L"Service", 200, SORT_FIELD_SERVICE, FALSE, FALSE},
+	{L"GPU", L"GPU", 70, SORT_FIELD_GPU, FALSE, FALSE},
+	{L"GPU Memory", L"GPU Memory", 100, SORT_FIELD_GPU_MEMORY, FALSE, FALSE},
+	{L"CPU Time", L"CPU Time", 90, SORT_FIELD_CPU_TIME, FALSE, FALSE},
+	{L"Elevated", L"Elevated", 70, SORT_FIELD_ELEVATED, FALSE, FALSE},
+	{L"Path", L"Path", 300, SORT_FIELD_PATH, FALSE, FALSE},
+	{L"Window Title", L"Window Title", 200, SORT_FIELD_WINDOW_TITLE, FALSE, FALSE},
+	{L"File Version", L"File Version", 100, SORT_FIELD_FILE_VERSION, FALSE, FALSE},
+	{L"Product Version", L"Product Version", 100, SORT_FIELD_PRODUCT_VERSION, FALSE, FALSE},
+	{L"Session Name", L"Session Name", 120, SORT_FIELD_SESSION_NAME, FALSE, FALSE},
+	{L"Package Name", L"Package Name", 300, SORT_FIELD_PACKAGE_NAME, FALSE, FALSE},
 };
 
-const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = { 0, 5000, 10000, 30000, 60000 };
-const wchar_t* const REFRESH_LABELS[REFRESH_OPTION_COUNT] = { L"Off", L"5 seconds", L"10 seconds", L"30 seconds", L"1 minute" };
+const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};
+const wchar_t* const REFRESH_LABELS[REFRESH_OPTION_COUNT] = {L"Off", L"5 seconds", L"10 seconds", L"30 seconds", L"1 minute"};
 
 typedef struct {
 	UINT refresh_ms;
@@ -61,7 +61,8 @@ typedef struct {
 } settings_dlg_data;
 
 static LRESULT CALLBACK settings_lv_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
-	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(id);
+	UNREFERENCED_PARAMETER(data);
 	if (msg == WM_CHAR && wp == L' ')
 		return 0;
 	return DefSubclassProc(hwnd, msg, wp, lp);
@@ -183,8 +184,7 @@ static void get_ini_path(wchar_t* buf) {
 	PathRemoveFileSpec(exe_dir);
 
 	wchar_t program_files[MAX_PATH];
-	BOOL installed = SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROGRAM_FILES, NULL, 0, program_files))
-		&& PathIsPrefix(program_files, exe_dir);
+	BOOL installed = SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROGRAM_FILES, NULL, 0, program_files)) && PathIsPrefix(program_files, exe_dir);
 
 	if (installed && SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, buf))) {
 		PathAppend(buf, L"Taskmon");
@@ -248,7 +248,7 @@ void settings_load(sort_prefs* prefs) {
 	for (int i = 0; i < COL_COUNT; ++i) {
 		wchar_t key[64], val[4];
 		wnsprintf(key, 64, L"%s_visible", COLUMNS[i].label);
-		wchar_t def[2] = { COLUMNS[i].default_visible ? L'1' : L'0', L'\0' };
+		wchar_t def[2] = {COLUMNS[i].default_visible ? L'1' : L'0', L'\0'};
 		GetPrivateProfileString(L"columns", key, def, val, 4, path);
 		prefs->visible[i] = COLUMNS[i].always_visible || (val[0] == L'1');
 	}

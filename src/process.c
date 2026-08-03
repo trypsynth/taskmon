@@ -1,10 +1,10 @@
 #include "process.h"
-#include <winternl.h>
-#include <shlwapi.h>
+#include <appmodel.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <shlwapi.h>
+#include <winternl.h>
 #include <wtsapi32.h>
-#include <appmodel.h>
 
 #define SystemProcessInformation 5
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004L
@@ -46,10 +46,10 @@ typedef struct SPI {
 	LARGE_INTEGER OtherTransferCount;
 } SPI;
 
-typedef NTSTATUS (NTAPI *PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
-typedef NTSTATUS (NTAPI *PFN_NtProc)(HANDLE);
-typedef NTSTATUS (NTAPI *PFN_NtQIP)(HANDLE, DWORD, PVOID, ULONG, PULONG);
-typedef BOOL (WINAPI *PFN_IsWow64Process2)(HANDLE, USHORT*, USHORT*);
+typedef NTSTATUS(NTAPI* PFN_NtQSI)(ULONG, PVOID, ULONG, PULONG);
+typedef NTSTATUS(NTAPI* PFN_NtProc)(HANDLE);
+typedef NTSTATUS(NTAPI* PFN_NtQIP)(HANDLE, DWORD, PVOID, ULONG, PULONG);
+typedef BOOL(WINAPI* PFN_IsWow64Process2)(HANDLE, USHORT*, USHORT*);
 
 static DWORD g_suspended_pids[SNAPSHOT_CAPACITY];
 static int g_suspended_count = 0;
@@ -73,7 +73,12 @@ static PDH_HCOUNTER g_pdh_mem_shared = NULL;
 static BOOL g_pdh_ready = FALSE;
 static BOOL g_pdh_init_attempted = FALSE;
 
-typedef struct { DWORD pid; double gpu_percent; ULONGLONG gpu_memory; BOOL active; } gpu_stat_entry;
+typedef struct {
+	DWORD pid;
+	double gpu_percent;
+	ULONGLONG gpu_memory;
+	BOOL active;
+} gpu_stat_entry;
 static gpu_stat_entry g_gpu_stats[SNAPSHOT_CAPACITY];
 
 static void init_gpu_counters(void) {
@@ -176,7 +181,10 @@ static void refresh_gpu_stats(void) {
 	accumulate_counter_array(g_pdh_mem_shared, PDH_FMT_LARGE, FALSE);
 }
 
-typedef struct { DWORD pid; wchar_t name[64]; } svc_entry;
+typedef struct {
+	DWORD pid;
+	wchar_t name[64];
+} svc_entry;
 static svc_entry* g_svc_map = NULL;
 static int g_svc_count = 0;
 
@@ -188,13 +196,19 @@ static void build_service_map() {
 	if (!hscm) return;
 	DWORD needed = 0, count = 0, resume = 0;
 	EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
-	                      NULL, 0, &needed, &count, &resume, NULL);
-	if (!needed) { CloseServiceHandle(hscm); return; }
+		NULL, 0, &needed, &count, &resume, NULL);
+	if (!needed) {
+		CloseServiceHandle(hscm);
+		return;
+	}
 	BYTE* buf = heap_alloc(needed);
-	if (!buf) { CloseServiceHandle(hscm); return; }
+	if (!buf) {
+		CloseServiceHandle(hscm);
+		return;
+	}
 	resume = 0;
 	if (EnumServicesStatusExW(hscm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
-	                          buf, needed, &needed, &count, &resume, NULL)) {
+			buf, needed, &needed, &count, &resume, NULL)) {
 		g_svc_map = heap_alloc(count * sizeof(svc_entry));
 		if (g_svc_map) {
 			ENUM_SERVICE_STATUS_PROCESSW* sv = (ENUM_SERVICE_STATUS_PROCESSW*)buf;
@@ -217,15 +231,24 @@ static void get_services_for_pid(DWORD pid, wchar_t* buf, int len) {
 	int pos = 0;
 	for (int i = 0; i < g_svc_count && pos < len - 1; i++) {
 		if (g_svc_map[i].pid != pid) continue;
-		if (pos > 0 && pos + 2 < len) { buf[pos++] = L';'; buf[pos++] = L' '; }
+		if (pos > 0 && pos + 2 < len) {
+			buf[pos++] = L';';
+			buf[pos++] = L' ';
+		}
 		int nlen = lstrlen(g_svc_map[i].name);
 		if (pos + nlen >= len) nlen = len - pos - 1;
-		if (nlen > 0) { memcpy(buf + pos, g_svc_map[i].name, nlen * sizeof(wchar_t)); pos += nlen; }
+		if (nlen > 0) {
+			memcpy(buf + pos, g_svc_map[i].name, nlen * sizeof(wchar_t));
+			pos += nlen;
+		}
 		buf[pos] = L'\0';
 	}
 }
 
-typedef struct { DWORD pid; wchar_t title[128]; } win_entry;
+typedef struct {
+	DWORD pid;
+	wchar_t title[128];
+} win_entry;
 static win_entry* g_win_map = NULL;
 static int g_win_count = 0;
 static int g_win_capacity = 0;
@@ -245,7 +268,11 @@ static BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM lparam) {
 	if (g_win_count >= g_win_capacity) {
 		g_win_capacity = g_win_capacity ? g_win_capacity * 2 : 64;
 		g_win_map = heap_realloc(g_win_map, g_win_capacity * sizeof(win_entry));
-		if (!g_win_map) { g_win_capacity = 0; g_win_count = 0; return FALSE; }
+		if (!g_win_map) {
+			g_win_capacity = 0;
+			g_win_count = 0;
+			return FALSE;
+		}
 	}
 	g_win_map[g_win_count].pid = pid;
 	lstrcpyn(g_win_map[g_win_count].title, title, 128);
@@ -467,7 +494,9 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 
 static void quicksort(process_entry* entries, int low, int high, sort_field field, BOOL descending) {
 	if (low >= high) return;
-	typedef struct { int low, high; } stack_entry;
+	typedef struct {
+		int low, high;
+	} stack_entry;
 	stack_entry* stack = heap_alloc((high - low + 1) * sizeof(stack_entry));
 	process_entry* pivot = heap_alloc(sizeof(process_entry));
 	process_entry* swap_tmp = heap_alloc(sizeof(process_entry));
@@ -478,7 +507,7 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 		return;
 	}
 	int top = -1;
-	stack[++top] = (stack_entry){ low, high };
+	stack[++top] = (stack_entry){low, high};
 	while (top >= 0) {
 		stack_entry range = stack[top--];
 		int l = range.low;
@@ -494,8 +523,8 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 				j--;
 			}
 		}
-		if (l < j) stack[++top] = (stack_entry){ l, j };
-		if (i < h) stack[++top] = (stack_entry){ i, h };
+		if (l < j) stack[++top] = (stack_entry){l, j};
+		if (i < h) stack[++top] = (stack_entry){i, h};
 	}
 	heap_free(pivot);
 	heap_free(swap_tmp);
@@ -608,7 +637,7 @@ static void get_process_user(DWORD pid, wchar_t* buf, int len) {
 	buf[0] = L'\0';
 	if (pid == 0) {
 		lstrcpyn(buf, L"SYSTEM", len);
-		return; 
+		return;
 	}
 	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
 	if (!hproc) return;
@@ -661,7 +690,7 @@ static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
 }
 
 static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wchar_t* company, int comp_len,
-                                      wchar_t* file_ver, int file_ver_len, wchar_t* product_ver, int product_ver_len) {
+	wchar_t* file_ver, int file_ver_len, wchar_t* product_ver, int product_ver_len) {
 	desc[0] = L'\0';
 	company[0] = L'\0';
 	file_ver[0] = L'\0';
@@ -675,7 +704,10 @@ static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wch
 	void* data = heap_alloc(size);
 	if (data) {
 		if (GetFileVersionInfoW(path, 0, size, data)) {
-			struct { USHORT lang; USHORT codepage; } *translate;
+			struct {
+				USHORT lang;
+				USHORT codepage;
+			}* translate;
 			UINT tlen;
 			if (VerQueryValueW(data, L"\\VarFileInfo\\Translation", (LPVOID*)&translate, &tlen) && tlen >= sizeof(*translate)) {
 				wchar_t subblock[64];
@@ -724,7 +756,7 @@ static void get_package_name(DWORD pid, wchar_t* buf, int len) {
 }
 
 static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
-	typedef HRESULT (WINAPI *PFN_GPDA)(HANDLE, int*);
+	typedef HRESULT(WINAPI * PFN_GPDA)(HANDLE, int*);
 	static PFN_GPDA fn = NULL;
 	static BOOL checked = FALSE;
 	if (!checked) {
@@ -749,8 +781,10 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	FILETIME sys_idle_ft, sys_kernel_ft, sys_user_ft;
 	GetSystemTimes(&sys_idle_ft, &sys_kernel_ft, &sys_user_ft);
 	ULARGE_INTEGER uli_k, uli_u;
-	uli_k.LowPart = sys_kernel_ft.dwLowDateTime; uli_k.HighPart = sys_kernel_ft.dwHighDateTime;
-	uli_u.LowPart = sys_user_ft.dwLowDateTime; uli_u.HighPart = sys_user_ft.dwHighDateTime;
+	uli_k.LowPart = sys_kernel_ft.dwLowDateTime;
+	uli_k.HighPart = sys_kernel_ft.dwHighDateTime;
+	uli_u.LowPart = sys_user_ft.dwLowDateTime;
+	uli_u.HighPart = sys_user_ft.dwHighDateTime;
 	ULONGLONG sys_time = uli_k.QuadPart + uli_u.QuadPart;
 	ULONGLONG tick_ms = GetTickCount64();
 	ULONG buf_size = 0;
@@ -798,7 +832,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		get_process_user(pid, e->user, 64);
 		get_process_cmdline(pid, e->cmdline, 256);
 		get_process_version_info(pid, e->description, 128, e->company, 128,
-		                          e->file_version, 64, e->product_version, 64);
+			e->file_version, 64, e->product_version, 64);
 		get_services_for_pid(pid, e->services, 256);
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
@@ -824,7 +858,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
 		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;
 		ULONGLONG io_bytes = io_read + io_write + io_other;
-		cpu_snapshot current_snap = { proc_time, sys_time, io_bytes, io_read, io_write, io_other, spi->PageFaultCount, tick_ms };
+		cpu_snapshot current_snap = {proc_time, sys_time, io_bytes, io_read, io_write, io_other, spi->PageFaultCount, tick_ms};
 		update_snapshot(snapshots, pid, current_snap);
 		cpu_snapshot* prev = find_snapshot(old_snaps, pid);
 		if (prev) {
@@ -832,7 +866,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 			ULONGLONG delta_sys = sys_time - prev->system_time;
 			if (delta_sys > 0) {
 				double pct = (double)delta_proc / (double)delta_sys * 100.0;
-				e->cpu_percent = pct < 0.0 ? 0.0 : pct > 100.0 ? 100.0 : pct;
+				e->cpu_percent = pct < 0.0 ? 0.0 : pct > 100.0 ? 100.0
+															   : pct;
 			}
 			ULONGLONG delta_ms = tick_ms - prev->tick_ms;
 			if (delta_ms > 0) {
@@ -846,7 +881,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 				e->io_other_rate = (double)delta_other * 1000.0 / (double)delta_ms;
 
 				ULONGLONG delta_pf = (spi->PageFaultCount >= prev->page_fault_count)
-					? spi->PageFaultCount - prev->page_fault_count : 0;
+										 ? spi->PageFaultCount - prev->page_fault_count
+										 : 0;
 				e->page_faults_per_sec = (double)delta_pf * 1000.0 / (double)delta_ms;
 			}
 		}

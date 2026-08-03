@@ -1,14 +1,15 @@
 #include "sortbar.h"
-#include "wndproc.h"
-#include "settings.h"
-#include "resource.h"
 #include "listview.h"
+#include "resource.h"
+#include "settings.h"
 #include "theme.h"
+#include "wndproc.h"
 #include <commctrl.h>
 #include <shlwapi.h>
 
 static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
-	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(id);
+	UNREFERENCED_PARAMETER(data);
 	if (msg == WM_COMMAND) return SendMessage(g_hwnd, msg, wp, lp);
 	if (msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORSTATIC) {
 		LRESULT r = SendMessage(g_hwnd, msg, wp, lp);
@@ -18,7 +19,8 @@ static LRESULT CALLBACK sort_group_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
 }
 
 static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
-	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(id);
+	UNREFERENCED_PARAMETER(data);
 	if (msg == WM_GETDLGCODE) {
 		LRESULT r = DefSubclassProc(hwnd, msg, wp, lp) | DLGC_WANTARROWS;
 		MSG* pmsg = (MSG*)lp;
@@ -38,7 +40,10 @@ static LRESULT CALLBACK sort_btn_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 		if (wp == VK_LEFT || wp == VK_RIGHT) {
 			int idx = -1;
 			for (int i = 0; i < g_sort_btn_count; ++i) {
-				if (g_sort_btns[i] == hwnd) { idx = i; break; }
+				if (g_sort_btns[i] == hwnd) {
+					idx = i;
+					break;
+				}
 			}
 			if (idx >= 0) {
 				int next = (wp == VK_RIGHT) ? idx + 1 : idx - 1;
@@ -75,8 +80,10 @@ void update_sort_ui() {
 		column_id cid = g_sort_btn_cols[i];
 		BOOL active = (COLUMNS[cid].field == g_prefs.field);
 		wchar_t buf[64];
-		if (active) wnsprintf(buf, 64, L"%s (%s)", COLUMNS[cid].label, g_prefs.desc[(int)g_prefs.field] ? L"descending" : L"ascending");
-		else lstrcpy(buf, COLUMNS[cid].label);
+		if (active)
+			wnsprintf(buf, 64, L"%s (%s)", COLUMNS[cid].label, g_prefs.desc[(int)g_prefs.field] ? L"descending" : L"ascending");
+		else
+			lstrcpy(buf, COLUMNS[cid].label);
 		SetWindowText(g_sort_btns[i], buf);
 		SendMessage(g_sort_btns[i], BM_SETCHECK, active ? BST_CHECKED : BST_UNCHECKED, 0);
 	}

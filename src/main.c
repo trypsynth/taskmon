@@ -1,7 +1,7 @@
-#include "wndproc.h"
 #include "resource.h"
-#include <windows.h>
+#include "wndproc.h"
 #include <objbase.h>
+#include <windows.h>
 
 static const wchar_t MUTEX_NAME[] = L"Local\\TaskmonSingleInstance";
 
@@ -37,7 +37,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmd_line, int show)
 		MessageBox(NULL, L"Failed to register window class.", L"Error", MB_ICONERROR);
 		return 1;
 	}
-	RECT rc = { 0, 0, 760, 560 };
+	RECT rc = {0, 0, 760, 560};
 	AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
 	HWND hwnd = CreateWindowEx(0, CLASS_NAME, WINDOW_TITLE, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
 	if (!hwnd) {

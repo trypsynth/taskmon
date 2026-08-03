@@ -1,41 +1,44 @@
 #include "wndproc.h"
-#include "settings.h"
-#include "tray.h"
+#include "listview.h"
 #include "process.h"
 #include "resource.h"
-#include "listview.h"
+#include "run.h"
+#include "settings.h"
 #include "sortbar.h"
 #include "theme.h"
-#include "run.h"
+#include "tray.h"
 #include "treeview.h"
-#include <windowsx.h>
+#include <commctrl.h>
 #include <shellapi.h>
 #include <shlobj.h>
-#include <commctrl.h>
 #include <shlwapi.h>
 #include <uxtheme.h>
+#include <windowsx.h>
 
 #define ID_LISTVIEW 105
 #define ID_TREEVIEW 106
 #define ID_TRAY_RESTORE 201
 #define ID_TRAY_EXIT 202
-#define ID_CTX_OPEN_LOCATION   301
-#define ID_CTX_SUSPEND         303
-#define ID_CTX_RESUME          304
-#define ID_CTX_PRIORITY_BASE   310  // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
+#define ID_CTX_OPEN_LOCATION 301
+#define ID_CTX_SUSPEND 303
+#define ID_CTX_RESUME 304
+#define ID_CTX_PRIORITY_BASE 310 // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
 
-static const struct { DWORD cls; const wchar_t* label; } PRIORITY_CLASSES[] = {
-	{ IDLE_PRIORITY_CLASS,          L"Idle"         },
-	{ BELOW_NORMAL_PRIORITY_CLASS,  L"Below Normal" },
-	{ NORMAL_PRIORITY_CLASS,        L"Normal"       },
-	{ ABOVE_NORMAL_PRIORITY_CLASS,  L"Above Normal" },
-	{ HIGH_PRIORITY_CLASS,          L"High"         },
-	{ REALTIME_PRIORITY_CLASS,      L"Realtime"     },
+static const struct {
+	DWORD cls;
+	const wchar_t* label;
+} PRIORITY_CLASSES[] = {
+	{IDLE_PRIORITY_CLASS, L"Idle"},
+	{BELOW_NORMAL_PRIORITY_CLASS, L"Below Normal"},
+	{NORMAL_PRIORITY_CLASS, L"Normal"},
+	{ABOVE_NORMAL_PRIORITY_CLASS, L"Above Normal"},
+	{HIGH_PRIORITY_CLASS, L"High"},
+	{REALTIME_PRIORITY_CLASS, L"Realtime"},
 };
 #define PRIORITY_CLASS_COUNT 6
 #define WM_TRAYICON (WM_APP + 1)
 #define ID_REFRESH_TIMER 1
-#define ID_PRIME_TIMER   2
+#define ID_PRIME_TIMER 2
 #define ID_HOTKEY_TOGGLE 1
 
 const wchar_t CLASS_NAME[] = L"TaskmonWndClass";
@@ -56,7 +59,10 @@ snapshot_entry g_snapshots[SNAPSHOT_CAPACITY] = {0};
 static void set_refresh_interval(HWND hwnd, UINT ms) {
 	BOOL found = FALSE;
 	for (int i = 0; i < REFRESH_OPTION_COUNT; ++i) {
-		if (REFRESH_MS[i] == ms) { found = TRUE; break; }
+		if (REFRESH_MS[i] == ms) {
+			found = TRUE;
+			break;
+		}
 	}
 	if (!found) ms = 0;
 	g_prefs.refresh_ms = ms;
@@ -101,7 +107,7 @@ static BOOL open_item_location(const wchar_t* path) {
 		return FALSE;
 	}
 	LPCITEMIDLIST child = ILFindLastID(item_pidl);
-	LPCITEMIDLIST children[] = { child };
+	LPCITEMIDLIST children[] = {child};
 	HRESULT hr = SHOpenFolderAndSelectItems(folder_pidl, 1, children, 0);
 	ILFree(item_pidl);
 	ILFree(folder_pidl);
@@ -122,7 +128,7 @@ static void create_menu_bar(HWND hwnd) {
 	AppendMenu(view, MF_STRING, ID_VIEW_REFRESH, L"Refresh\tF5");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
 	AppendMenu(view, MF_STRING | (g_prefs.always_on_top ? MF_CHECKED : 0), ID_VIEW_ALWAYS_ON_TOP, L"Always on Top");
-	AppendMenu(view, MF_STRING | (g_prefs.tree_mode    ? MF_CHECKED : 0), ID_VIEW_TREE_MODE,    L"Process Tree\tCtrl+T");
+	AppendMenu(view, MF_STRING | (g_prefs.tree_mode ? MF_CHECKED : 0), ID_VIEW_TREE_MODE, L"Process Tree\tCtrl+T");
 	AppendMenu(view, MF_SEPARATOR, 0, NULL);
 	AppendMenu(view, MF_STRING, ID_VIEW_SETTINGS, L"Settings...\tCtrl+,");
 	AppendMenu(bar, MF_POPUP, (UINT_PTR)view, L"View");
@@ -132,13 +138,15 @@ static void create_menu_bar(HWND hwnd) {
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	switch (msg) {
 	case WM_ACTIVATE:
-		if (LOWORD(wp) == WA_INACTIVE) g_last_focus = GetFocus();
-		else SetFocus(g_last_focus ? g_last_focus : (g_prefs.tree_mode ? g_hwnd_tree : g_hwnd_list));
+		if (LOWORD(wp) == WA_INACTIVE)
+			g_last_focus = GetFocus();
+		else
+			SetFocus(g_last_focus ? g_last_focus : (g_prefs.tree_mode ? g_hwnd_tree : g_hwnd_list));
 		return 0;
 	case WM_CREATE: {
 		g_hwnd = hwnd;
 		RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_OEM_3);
-		INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TREEVIEW_CLASSES };
+		INITCOMMONCONTROLSEX icc = {sizeof(icc), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TREEVIEW_CLASSES};
 		InitCommonControlsEx(&icc);
 		g_hwnd_sort_group = sortbar_create(hwnd);
 		// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
@@ -168,7 +176,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (g_prefs.always_on_top)
 			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		if (g_prefs.window_width > 0) {
-			POINT pt = { g_prefs.window_left + 50, g_prefs.window_top + 50 };
+			POINT pt = {g_prefs.window_left + 50, g_prefs.window_top + 50};
 			if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL))
 				SetWindowPos(hwnd, NULL, g_prefs.window_left, g_prefs.window_top,
 					g_prefs.window_width, g_prefs.window_height, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -243,14 +251,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 				if (selected != -1) {
 					LVITEM lvi = {0};
-					lvi.iItem = selected; lvi.mask = LVIF_PARAM;
+					lvi.iItem = selected;
+					lvi.mask = LVIF_PARAM;
 					ListView_GetItem(g_hwnd_list, &lvi);
 					pid = (DWORD)lvi.lParam;
 				}
 			}
 			if (pid) {
-				if (id == ID_CTX_SUSPEND) suspend_process(pid);
-				else                       resume_process(pid);
+				if (id == ID_CTX_SUSPEND)
+					suspend_process(pid);
+				else
+					resume_process(pid);
 				do_refresh();
 			}
 			return 0;
@@ -348,7 +359,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				int selected = ListView_GetNextItem(g_hwnd_list, -1, LVNI_SELECTED);
 				if (selected != -1) {
 					LVITEM lvi = {0};
-					lvi.iItem = selected; lvi.mask = LVIF_PARAM;
+					lvi.iItem = selected;
+					lvi.mask = LVIF_PARAM;
 					ListView_GetItem(g_hwnd_list, &lvi);
 					pid = (DWORD)lvi.lParam;
 				}
@@ -366,7 +378,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		if (id == ID_FILE_RESTART_AS_ADMIN) {
 			wchar_t path[MAX_PATH];
 			GetModuleFileName(NULL, path, MAX_PATH);
-			if (g_mutex) { CloseHandle(g_mutex); g_mutex = NULL; }
+			if (g_mutex) {
+				CloseHandle(g_mutex);
+				g_mutex = NULL;
+			}
 			if ((INT_PTR)ShellExecute(NULL, L"runas", path, NULL, NULL, SW_SHOW) > 32)
 				DestroyWindow(hwnd);
 			else if (!g_mutex)
@@ -398,12 +413,18 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			if (open_settings(hwnd, g_prefs.refresh_ms, g_prefs.visible, g_prefs.skip_kill_confirm, g_prefs.start_minimized_to_tray, &new_ms, new_visible, &new_skip_confirm, &new_start_minimized)) {
 				BOOL cols_changed = FALSE;
 				for (int i = 0; i < COL_COUNT; ++i)
-					if (new_visible[i] != g_prefs.visible[i]) { cols_changed = TRUE; break; }
+					if (new_visible[i] != g_prefs.visible[i]) {
+						cols_changed = TRUE;
+						break;
+					}
 				for (int i = 0; i < COL_COUNT; ++i) g_prefs.visible[i] = new_visible[i];
 				g_prefs.skip_kill_confirm = new_skip_confirm;
 				g_prefs.start_minimized_to_tray = new_start_minimized;
 				if (new_ms != g_prefs.refresh_ms) set_refresh_interval(hwnd, new_ms);
-				if (cols_changed) { apply_columns(); do_refresh(); }
+				if (cols_changed) {
+					apply_columns();
+					do_refresh();
+				}
 				settings_save(&g_prefs);
 			}
 			return 0;
@@ -412,8 +433,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			for (int i = 0; i < g_sort_btn_count; ++i) {
 				if ((ID_SORT_BASE + (int)g_sort_btn_cols[i]) == id) {
 					column_id cid = g_sort_btn_cols[i];
-					if (COLUMNS[cid].field == g_prefs.field) g_prefs.desc[(int)g_prefs.field] = !g_prefs.desc[(int)g_prefs.field];
-					else g_prefs.field = COLUMNS[cid].field;
+					if (COLUMNS[cid].field == g_prefs.field)
+						g_prefs.desc[(int)g_prefs.field] = !g_prefs.desc[(int)g_prefs.field];
+					else
+						g_prefs.field = COLUMNS[cid].field;
 					update_sort_ui();
 					update_tab_stop();
 					do_refresh();
@@ -460,15 +483,18 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				get_process_path(pid, path, MAX_PATH);
 				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
 				if (is_process_suspended(pid))
-					AppendMenu(menu, MF_STRING, ID_CTX_RESUME,  L"Resume");
+					AppendMenu(menu, MF_STRING, ID_CTX_RESUME, L"Resume");
 				else
 					AppendMenu(menu, MF_STRING, ID_CTX_SUSPEND, L"Suspend");
-				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK,         L"End task\tDelete");
+				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tDelete");
 				AppendMenu(menu, MF_STRING, ID_CTX_END_PROCESS_TREE, L"End process tree");
 				HMENU pri_menu = CreatePopupMenu();
 				DWORD cur_cls = 0;
 				HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-				if (ph) { cur_cls = GetPriorityClass(ph); CloseHandle(ph); }
+				if (ph) {
+					cur_cls = GetPriorityClass(ph);
+					CloseHandle(ph);
+				}
 				for (int i = 0; i < PRIORITY_CLASS_COUNT; ++i) {
 					UINT flags = MF_STRING | (PRIORITY_CLASSES[i].cls == cur_cls ? MF_CHECKED : 0);
 					AppendMenu(pri_menu, flags, ID_CTX_PRIORITY_BASE + i, PRIORITY_CLASSES[i].label);
@@ -502,14 +528,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 				get_process_path(pid, path, MAX_PATH);
 				if (path[0]) AppendMenu(menu, MF_STRING, ID_CTX_OPEN_LOCATION, L"Open file location");
 				if (is_process_suspended(pid))
-					AppendMenu(menu, MF_STRING, ID_CTX_RESUME,  L"Resume");
+					AppendMenu(menu, MF_STRING, ID_CTX_RESUME, L"Resume");
 				else
 					AppendMenu(menu, MF_STRING, ID_CTX_SUSPEND, L"Suspend");
 				AppendMenu(menu, MF_STRING, ID_CTX_END_TASK, L"End task\tDelete");
 				HMENU pri_menu = CreatePopupMenu();
 				DWORD cur_cls = 0;
 				HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-				if (ph) { cur_cls = GetPriorityClass(ph); CloseHandle(ph); }
+				if (ph) {
+					cur_cls = GetPriorityClass(ph);
+					CloseHandle(ph);
+				}
 				for (int i = 0; i < PRIORITY_CLASS_COUNT; ++i) {
 					UINT flags = MF_STRING | (PRIORITY_CLASSES[i].cls == cur_cls ? MF_CHECKED : 0);
 					AppendMenu(pri_menu, flags, ID_CTX_PRIORITY_BASE + i, PRIORITY_CLASSES[i].label);
@@ -528,8 +557,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 			int col = nmlv->iSubItem;
 			if (col >= 0 && col < g_sort_btn_count) {
 				column_id cid = g_sort_btn_cols[col];
-				if (COLUMNS[cid].field == g_prefs.field) g_prefs.desc[(int)g_prefs.field] = !g_prefs.desc[(int)g_prefs.field];
-				else g_prefs.field = COLUMNS[cid].field;
+				if (COLUMNS[cid].field == g_prefs.field)
+					g_prefs.desc[(int)g_prefs.field] = !g_prefs.desc[(int)g_prefs.field];
+				else
+					g_prefs.field = COLUMNS[cid].field;
 				update_sort_ui();
 				update_tab_stop();
 				do_refresh();
@@ -588,11 +619,11 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		break;
 	}
 	case WM_DESTROY: {
-		WINDOWPLACEMENT wpl = { sizeof(wpl) };
+		WINDOWPLACEMENT wpl = {sizeof(wpl)};
 		GetWindowPlacement(hwnd, &wpl);
-		g_prefs.window_left   = wpl.rcNormalPosition.left;
-		g_prefs.window_top    = wpl.rcNormalPosition.top;
-		g_prefs.window_width  = wpl.rcNormalPosition.right  - wpl.rcNormalPosition.left;
+		g_prefs.window_left = wpl.rcNormalPosition.left;
+		g_prefs.window_top = wpl.rcNormalPosition.top;
+		g_prefs.window_width = wpl.rcNormalPosition.right - wpl.rcNormalPosition.left;
 		g_prefs.window_height = wpl.rcNormalPosition.bottom - wpl.rcNormalPosition.top;
 		settings_save(&g_prefs);
 		UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);

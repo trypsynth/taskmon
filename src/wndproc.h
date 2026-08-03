@@ -1,7 +1,7 @@
 #pragma once
-#include <windows.h>
-#include "settings.h"
 #include "process.h"
+#include "settings.h"
+#include <windows.h>
 
 #define WM_HIDE_TO_TRAY (WM_APP + 2)
 

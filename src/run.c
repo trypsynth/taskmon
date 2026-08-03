@@ -1,8 +1,8 @@
 #include "run.h"
 #include "resource.h"
 #include "theme.h"
-#include <commdlg.h>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <shellapi.h>
 #include <shlwapi.h>
 

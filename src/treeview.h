@@ -1,7 +1,7 @@
 #pragma once
-#include <windows.h>
-#include <commctrl.h>
 #include "process.h"
+#include <commctrl.h>
+#include <windows.h>
 
 double populate_tree_view(process_entry* entries, int count);
 void terminate_tree_from_item(HTREEITEM item);

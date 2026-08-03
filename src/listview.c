@@ -1,9 +1,9 @@
 #include "listview.h"
-#include "wndproc.h"
-#include "settings.h"
 #include "process.h"
+#include "settings.h"
 #include "tray.h"
 #include "treeview.h"
+#include "wndproc.h"
 #include <commctrl.h>
 #include <shlwapi.h>
 
@@ -15,7 +15,10 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_CPU: {
 		int whole = (int)e->cpu_percent;
 		int frac = (int)((e->cpu_percent - whole) * 100 + 0.5);
-		if (frac >= 100) { whole++; frac = 0; }
+		if (frac >= 100) {
+			whole++;
+			frac = 0;
+		}
 		wnsprintf(buf, len, L"%d.%02d", whole, frac);
 		break;
 	}
@@ -31,12 +34,24 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_PRIORITY: {
 		const wchar_t* label;
 		switch (e->base_priority) {
-		case 4:  label = L"Idle"; break;
-		case 6:  label = L"Below Normal"; break;
-		case 8:  label = L"Normal"; break;
-		case 10: label = L"Above Normal"; break;
-		case 13: label = L"High"; break;
-		case 24: label = L"Realtime"; break;
+		case 4:
+			label = L"Idle";
+			break;
+		case 6:
+			label = L"Below Normal";
+			break;
+		case 8:
+			label = L"Normal";
+			break;
+		case 10:
+			label = L"Above Normal";
+			break;
+		case 13:
+			label = L"High";
+			break;
+		case 24:
+			label = L"Realtime";
+			break;
 		default:
 			wnsprintf(buf, len, L"%d", e->base_priority);
 			return;
@@ -45,7 +60,10 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	}
 	case COL_STARTTIME: {
-		if (!e->start_time) { buf[0] = L'\0'; break; }
+		if (!e->start_time) {
+			buf[0] = L'\0';
+			break;
+		}
 		FILETIME ft, lft;
 		ft.dwLowDateTime = (DWORD)(e->start_time & 0xFFFFFFFF);
 		ft.dwHighDateTime = (DWORD)(e->start_time >> 32);
@@ -65,15 +83,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		if (e->disk_io_rate > 0) {
 			StrFormatByteSizeW((LONGLONG)e->disk_io_rate, buf, len);
 			lstrcat(buf, L"/s");
-		} else buf[0] = L'\0';
+		} else
+			buf[0] = L'\0';
 		break;
 	case COL_PRIVATE_BYTES:
 		StrFormatByteSizeW(e->private_bytes, buf, len);
 		break;
 	case COL_PAGE_FAULTS: {
 		UINT pf = (UINT)(e->page_faults_per_sec + 0.5);
-		if (pf > 0) wnsprintf(buf, len, L"%u /s", pf);
-		else buf[0] = L'\0';
+		if (pf > 0)
+			wnsprintf(buf, len, L"%u /s", pf);
+		else
+			buf[0] = L'\0';
 		break;
 	}
 	case COL_USER:
@@ -84,10 +105,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_ARCH:
 		switch (e->arch_machine) {
-		case 0x014c: lstrcpyn(buf, L"x86",   len); break;
-		case 0x8664: lstrcpyn(buf, L"x64",   len); break;
-		case 0xAA64: lstrcpyn(buf, L"ARM64", len); break;
-		default:     buf[0] = L'\0';               break;
+		case 0x014c:
+			lstrcpyn(buf, L"x86", len);
+			break;
+		case 0x8664:
+			lstrcpyn(buf, L"x64", len);
+			break;
+		case 0xAA64:
+			lstrcpyn(buf, L"ARM64", len);
+			break;
+		default:
+			buf[0] = L'\0';
+			break;
 		}
 		break;
 	case COL_SESSION:
@@ -100,32 +129,56 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		StrFormatByteSizeW(e->virtual_size, buf, len);
 		break;
 	case COL_GDI_OBJECTS:
-		if (e->gdi_objects) wnsprintf(buf, len, L"%u", e->gdi_objects);
-		else buf[0] = L'\0';
+		if (e->gdi_objects)
+			wnsprintf(buf, len, L"%u", e->gdi_objects);
+		else
+			buf[0] = L'\0';
 		break;
 	case COL_USER_OBJECTS:
-		if (e->user_objects) wnsprintf(buf, len, L"%u", e->user_objects);
-		else buf[0] = L'\0';
+		if (e->user_objects)
+			wnsprintf(buf, len, L"%u", e->user_objects);
+		else
+			buf[0] = L'\0';
 		break;
 	case COL_INTEGRITY: {
 		const wchar_t* label;
 		switch (e->integrity_level) {
-		case 0x0000: label = L"Untrusted"; break;
-		case 0x1000: label = L"Low";       break;
-		case 0x2000: label = L"Medium";    break;
-		case 0x2100: label = L"Medium+";   break;
-		case 0x3000: label = L"High";      break;
-		case 0x4000: label = L"System";    break;
-		case 0x5000: label = L"Protected"; break;
-		default:     label = NULL;         break;
+		case 0x0000:
+			label = L"Untrusted";
+			break;
+		case 0x1000:
+			label = L"Low";
+			break;
+		case 0x2000:
+			label = L"Medium";
+			break;
+		case 0x2100:
+			label = L"Medium+";
+			break;
+		case 0x3000:
+			label = L"High";
+			break;
+		case 0x4000:
+			label = L"System";
+			break;
+		case 0x5000:
+			label = L"Protected";
+			break;
+		default:
+			label = NULL;
+			break;
 		}
-		if (label) lstrcpyn(buf, label, len);
-		else wnsprintf(buf, len, L"0x%04X", e->integrity_level);
+		if (label)
+			lstrcpyn(buf, label, len);
+		else
+			wnsprintf(buf, len, L"0x%04X", e->integrity_level);
 		break;
 	}
 	case COL_PPID:
-		if (e->parent_pid) wnsprintf(buf, len, L"%u", e->parent_pid);
-		else buf[0] = L'\0';
+		if (e->parent_pid)
+			wnsprintf(buf, len, L"%u", e->parent_pid);
+		else
+			buf[0] = L'\0';
 		break;
 	case COL_PRIVATE_WS:
 		StrFormatByteSizeW(e->private_working_set, buf, len);
@@ -140,19 +193,22 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		if (e->io_read_rate > 0) {
 			StrFormatByteSizeW((LONGLONG)e->io_read_rate, buf, len);
 			lstrcat(buf, L"/s");
-		} else buf[0] = L'\0';
+		} else
+			buf[0] = L'\0';
 		break;
 	case COL_IO_WRITE:
 		if (e->io_write_rate > 0) {
 			StrFormatByteSizeW((LONGLONG)e->io_write_rate, buf, len);
 			lstrcat(buf, L"/s");
-		} else buf[0] = L'\0';
+		} else
+			buf[0] = L'\0';
 		break;
 	case COL_IO_OTHER:
 		if (e->io_other_rate > 0) {
 			StrFormatByteSizeW((LONGLONG)e->io_other_rate, buf, len);
 			lstrcat(buf, L"/s");
-		} else buf[0] = L'\0';
+		} else
+			buf[0] = L'\0';
 		break;
 	case COL_DESCRIPTION:
 		lstrcpyn(buf, e->description, len);
@@ -163,10 +219,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_DPI: {
 		const wchar_t* label;
 		switch (e->dpi_awareness) {
-		case TM_DPI_UNAWARE:            label = L"Unaware"; break;
-		case TM_DPI_SYSTEM_AWARE:       label = L"System"; break;
-		case TM_DPI_PER_MONITOR_AWARE:  label = L"Per-Monitor"; break;
-		default:                        label = L"Unknown"; break;
+		case TM_DPI_UNAWARE:
+			label = L"Unaware";
+			break;
+		case TM_DPI_SYSTEM_AWARE:
+			label = L"System";
+			break;
+		case TM_DPI_PER_MONITOR_AWARE:
+			label = L"Per-Monitor";
+			break;
+		default:
+			label = L"Unknown";
+			break;
 		}
 		lstrcpyn(buf, label, len);
 		break;
@@ -177,7 +241,10 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_GPU: {
 		int whole = (int)e->gpu_percent;
 		int frac = (int)((e->gpu_percent - whole) * 100 + 0.5);
-		if (frac >= 100) { whole++; frac = 0; }
+		if (frac >= 100) {
+			whole++;
+			frac = 0;
+		}
 		wnsprintf(buf, len, L"%d.%02d", whole, frac);
 		break;
 	}
@@ -193,8 +260,10 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	}
 	case COL_ELEVATED:
-		if (e->elevated < 0) buf[0] = L'\0';
-		else lstrcpyn(buf, e->elevated ? L"Yes" : L"No", len);
+		if (e->elevated < 0)
+			buf[0] = L'\0';
+		else
+			lstrcpyn(buf, e->elevated ? L"Yes" : L"No", len);
 		break;
 	case COL_PATH:
 		lstrcpyn(buf, e->path, len);
@@ -280,25 +349,28 @@ static double populate_list(process_entry* entries, int count) {
 void do_refresh() {
 	int count = 0;
 	sort_field field = g_prefs.tree_mode ? SORT_FIELD_NAME : g_prefs.field;
-	BOOL desc  = g_prefs.tree_mode ? FALSE : g_prefs.desc[(int)g_prefs.field];
+	BOOL desc = g_prefs.tree_mode ? FALSE : g_prefs.desc[(int)g_prefs.field];
 	process_entry* entries = snapshot_processes(g_snapshots, &count, field, desc);
 	if (entries) {
 		double total_cpu = g_prefs.tree_mode
-			? populate_tree_view(entries, count)
-			: populate_list(entries, count);
+							   ? populate_tree_view(entries, count)
+							   : populate_list(entries, count);
 		free_process_entries(entries);
 		if (g_hwnd_status) {
 			int cpu_w = (int)total_cpu;
 			int cpu_f = (int)((total_cpu - cpu_w) * 100 + 0.5);
-			if (cpu_f >= 100) { cpu_w++; cpu_f = 0; }
-			MEMORYSTATUSEX ms = { sizeof(ms) };
+			if (cpu_f >= 100) {
+				cpu_w++;
+				cpu_f = 0;
+			}
+			MEMORYSTATUSEX ms = {sizeof(ms)};
 			GlobalMemoryStatusEx(&ms);
 			ULONGLONG in_use = ms.ullTotalPhys - ms.ullAvailPhys;
-			ULONGLONG total  = ms.ullTotalPhys;
+			ULONGLONG total = ms.ullTotalPhys;
 			int iu_w = (int)(in_use / (1024ULL * 1024 * 1024));
 			int iu_f = (int)((in_use % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
-			int t_w  = (int)(total  / (1024ULL * 1024 * 1024));
-			int t_f  = (int)((total  % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
+			int t_w = (int)(total / (1024ULL * 1024 * 1024));
+			int t_f = (int)((total % (1024ULL * 1024 * 1024)) * 10 / (1024ULL * 1024 * 1024));
 			wchar_t status[128];
 			wnsprintf(status, 128, L"  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB",
 				count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f);
@@ -308,7 +380,8 @@ void do_refresh() {
 }
 
 LRESULT CALLBACK list_key_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data) {
-	UNREFERENCED_PARAMETER(id); UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(id);
+	UNREFERENCED_PARAMETER(data);
 	if (msg == WM_KEYDOWN && wp == VK_ESCAPE) {
 		PostMessage(GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
 		return 0;

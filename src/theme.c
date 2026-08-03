@@ -1,16 +1,16 @@
 #include "theme.h"
 #include <commctrl.h>
-#include <uxtheme.h>
 #include <dwmapi.h>
+#include <uxtheme.h>
 
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
-#define DARK_BG   RGB(32, 32, 32)
+#define DARK_BG RGB(32, 32, 32)
 #define DARK_TEXT RGB(255, 255, 255)
 
-static BOOL   g_dark = FALSE;
+static BOOL g_dark = FALSE;
 static HBRUSH g_dark_brush = NULL;
 
 void theme_update() {
