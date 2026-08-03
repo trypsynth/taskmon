@@ -492,26 +492,27 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	return descending ? -res : res;
 }
 
+/* Explicit-stack quicksort. Always continuing on the smaller of the two
+ * partitions and pushing the larger one bounds the stack at O(log n): each
+ * pushed range is at most half of the one it split from. A 64-entry stack
+ * therefore comfortably covers any array up to 2^64 elements, so it can be a
+ * small fixed-size local instead of a heap allocation sized to n. */
 static void quicksort(process_entry* entries, int low, int high, sort_field field, BOOL descending) {
 	if (low >= high) return;
 	typedef struct {
 		int low, high;
 	} stack_entry;
-	stack_entry* stack = heap_alloc((high - low + 1) * sizeof(stack_entry));
+	stack_entry stack[64];
 	process_entry* pivot = heap_alloc(sizeof(process_entry));
 	process_entry* swap_tmp = heap_alloc(sizeof(process_entry));
-	if (!stack || !pivot || !swap_tmp) {
-		heap_free(stack);
+	if (!pivot || !swap_tmp) {
 		heap_free(pivot);
 		heap_free(swap_tmp);
 		return;
 	}
 	int top = -1;
-	stack[++top] = (stack_entry){low, high};
-	while (top >= 0) {
-		stack_entry range = stack[top--];
-		int l = range.low;
-		int h = range.high;
+	int l = low, h = high;
+	for (;;) {
 		memcpy(pivot, &entries[l + (h - l) / 2], sizeof(process_entry));
 		int i = l, j = h;
 		while (i <= j) {
@@ -523,12 +524,29 @@ static void quicksort(process_entry* entries, int low, int high, sort_field fiel
 				j--;
 			}
 		}
-		if (l < j) stack[++top] = (stack_entry){l, j};
-		if (i < h) stack[++top] = (stack_entry){i, h};
+		BOOL left_smaller = (j - l) < (h - i);
+		int next_low = 0, next_high = 0;
+		BOOL have_next = FALSE;
+		if (left_smaller) {
+			if (l < j) { next_low = l; next_high = j; have_next = TRUE; }
+			if (i < h) stack[++top] = (stack_entry){i, h};
+		} else {
+			if (i < h) { next_low = i; next_high = h; have_next = TRUE; }
+			if (l < j) stack[++top] = (stack_entry){l, j};
+		}
+		if (have_next) {
+			l = next_low;
+			h = next_high;
+		} else if (top >= 0) {
+			stack_entry range = stack[top--];
+			l = range.low;
+			h = range.high;
+		} else {
+			break;
+		}
 	}
 	heap_free(pivot);
 	heap_free(swap_tmp);
-	heap_free(stack);
 }
 
 static USHORT get_native_machine() {
