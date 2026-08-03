@@ -109,8 +109,6 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ### Version 0.3.0 (unreleased)
 * Added a hierarchical Process Tree view (Ctrl+T) that groups processes under the parent that launched them, with an End process tree action that terminates a process and all of its descendants.
 * Added a Windows installer, built with Inno Setup, alongside the existing portable executable.
-* Installed copies now store their settings in your user profile instead of next to the executable, since Program Files isn't writable without administrator rights.
-* The installer now ships LICENSE.txt with the install instead of requiring you to click through it during setup.
 * Added File > Restart as administrator to relaunch Taskmon elevated.
 * Added an option to start Taskmon already minimized to the tray.
 * Added Ctrl+Q as a shortcut to exit Taskmon completely.
