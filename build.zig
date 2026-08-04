@@ -22,7 +22,6 @@ const sources = [_][]const u8{
 pub fn build(b: *std.Build) void {
 	const target = b.standardTargetOptions(.{});
 	const optimize: std.builtin.OptimizeMode = .ReleaseSmall;
-
 	const exe_mod = b.createModule(.{
 		.target = target,
 		.optimize = optimize,
@@ -30,7 +29,6 @@ pub fn build(b: *std.Build) void {
 		.stack_protector = false,
 		.omit_frame_pointer = true,
 	});
-
 	// Zig only adds its bundled mingw-w64 Win32/CRT headers when link_libc is
 	// true, but link_libc also pulls in CRT startup objects we don't want.
 	// Add the header path by hand so windows.h etc. resolve without linking libc.
@@ -42,12 +40,10 @@ pub fn build(b: *std.Build) void {
 		"any-windows-any",
 	}));
 	exe_mod.addSystemIncludePath(win32_headers);
-
 	exe_mod.addCMacro("UNICODE", "1");
 	exe_mod.addCMacro("_UNICODE", "1");
 	exe_mod.addCMacro("WIN32_LEAN_AND_MEAN", "1");
 	exe_mod.addCMacro("NOMINMAX", "1");
-
 	exe_mod.addCSourceFiles(.{
 		.files = &sources,
 		.flags = &.{ "-std=c17", "-Wall", "-Wextra" },
@@ -62,9 +58,7 @@ pub fn build(b: *std.Build) void {
 		.file = b.path("src/taskmon.rc"),
 		.include_paths = &.{win32_headers},
 	});
-
 	for (libs) |lib| exe_mod.linkSystemLibrary(lib, .{ .use_pkg_config = .no });
-
 	const exe = b.addExecutable(.{
 		.name = "taskmon",
 		.root_module = exe_mod,
@@ -72,6 +66,33 @@ pub fn build(b: *std.Build) void {
 	exe.subsystem = .windows;
 	exe.entry = .{ .symbol_name = "WinMainCRTStartup" };
 	exe.link_gc_sections = true;
-
 	b.installArtifact(exe);
+	// std.Build.findProgram's Windows PATHEXT search is broken in this Zig build
+	// (calls the old 2-arg mem.concat), so these are explicit opt-in flags
+	// instead of auto-detecting pandoc/ISCC on PATH like the CMake build did.
+	const build_docs = b.option(bool, "docs", "Generate HTML docs with pandoc") orelse false;
+	const build_installer = b.option(bool, "installer", "Build the Inno Setup installer with ISCC") orelse false;
+	if (build_docs) {
+		const doc_run = b.addSystemCommand(&.{ "pandoc", "-s" });
+		doc_run.addFileArg(b.path("doc/readme.md"));
+		doc_run.addArg("-o");
+		const readme_html = doc_run.addOutputFileArg("readme.html");
+		b.getInstallStep().dependOn(&b.addInstallBinFile(readme_html, "readme.html").step);
+	}
+	if (build_installer) {
+		const arch = if (target.result.cpu.arch == .aarch64) "arm64" else "x64";
+		const version = b.graph.environ_map.get("TASKMON_VERSION") orelse "0.2.1";
+		const installer_run = b.addSystemCommand(&.{"ISCC"});
+		installer_run.setCwd(b.path("installer"));
+		installer_run.addArg(b.fmt("/DMyAppArch={s}", .{arch}));
+		installer_run.addArg(b.fmt("/DMyAppVersion={s}", .{version}));
+		installer_run.addPrefixedDirectoryArg("/DSourceExeDir=", exe.getEmittedBinDirectory());
+		const installer_dir = installer_run.addPrefixedOutputDirectoryArg("/DMyOutputDir=", "installer");
+		installer_run.addFileArg(b.path("installer/taskmon.iss"));
+		b.getInstallStep().dependOn(&b.addInstallDirectory(.{
+			.source_dir = installer_dir,
+			.install_dir = .bin,
+			.install_subdir = "",
+		}).step);
+	}
 }
