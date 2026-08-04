@@ -492,11 +492,6 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	return descending ? -res : res;
 }
 
-/* Explicit-stack quicksort. Always continuing on the smaller of the two
- * partitions and pushing the larger one bounds the stack at O(log n): each
- * pushed range is at most half of the one it split from. A 64-entry stack
- * therefore comfortably covers any array up to 2^64 elements, so it can be a
- * small fixed-size local instead of a heap allocation sized to n. */
 static void quicksort(process_entry* entries, int low, int high, sort_field field, BOOL descending) {
 	if (low >= high) return;
 	typedef struct {
