@@ -8,6 +8,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 * Choose from over 35 customizable columns to display; see Available Columns below for the full list.
 * Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
 * Available as a portable executable or via a Windows installer. Portable copies keep their settings alongside the executable so you can carry them on a USB drive; installed copies store settings per-user automatically, since Program Files isn't writable without administrator rights.
+* Optionally replace the system Task Manager during installation, so Ctrl+Shift+Esc and the taskbar's "Task Manager" entry open Taskmon instead.
 * Minimize to the system tray to keep your taskbar clean.
 * Optionally launch Taskmon already minimized to the tray, with no window shown on startup.
 * Hover over the system tray icon to quickly view CPU and memory usage.
@@ -106,13 +107,13 @@ Bringing up the context menu on a process in the list or tree view provides acce
 
 ## Changelog
 
-### Version 0.3.0 (unreleased)
+### Version 0.3.0
 * Added Ctrl+Q as a shortcut to exit Taskmon completely.
 * Added 11 new columns: Service, GPU, GPU Memory, CPU Time, Elevated, Path, Window Title, File Version, Product Version, Session Name, and Package Name.
 * Added File > Restart as administrator to relaunch Taskmon elevated.
 * Added a hierarchical Process Tree view (Ctrl+T) that groups processes under the parent that launched them, with an End process tree action that terminates a process and all of its descendants.
 * Added an option to start Taskmon already minimized to the tray.
-* Added a Windows installer alongside the existing portable version.
+* Added a Windows installer alongside the existing portable version, with an option to replace the system Task Manager with Taskmon.
 * Fixed a stack overflow that could occur when sorting by CPU usage.
 * Fixed Ctrl+A not selecting all text in the Run dialog's edit box.
 
