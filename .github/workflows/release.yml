@@ -13,7 +13,11 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        arch: [x64, ARM64]
+        include:
+          - arch: x64
+            target: x86_64-windows
+          - arch: arm64
+            target: aarch64-windows
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -30,25 +34,27 @@ jobs:
           $version = "${{ github.ref_name }}" -replace '^v', ''
           echo "TASKMON_VERSION=$version" >> $env:GITHUB_ENV
 
-      - name: Configure CMake
-        run: cmake -B build -A ${{ matrix.arch }}
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0-dev.1606+a06534d73
 
       - name: Build
-        run: cmake --build build --config Release
+        run: zig build -Dtarget=${{ matrix.target }} --summary all
 
       - name: Prepare Package
         shell: pwsh
         run: |
-          $arch = "${{ matrix.arch }}".ToLower()
+          $arch = "${{ matrix.arch }}"
           $dist = "dist-$arch"
           New-Item -ItemType Directory -Path $dist
 
           # Copy executable
-          Copy-Item build/Release/taskmon.exe -Destination "$dist/taskmon.exe"
+          Copy-Item zig-out/bin/taskmon.exe -Destination "$dist/taskmon.exe"
 
           # Copy documentation (HTML if generated, otherwise fallback to MD)
-          if (Test-Path "build/readme.html") {
-            Copy-Item build/readme.html -Destination "$dist/readme.html"
+          if (Test-Path "zig-out/bin/readme.html") {
+            Copy-Item zig-out/bin/readme.html -Destination "$dist/readme.html"
           } else {
             Copy-Item doc/readme.md -Destination "$dist/readme.md"
           }
@@ -66,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: taskmon-installer-${{ matrix.arch }}
-          path: build/taskmon-setup-*.exe
+          path: zig-out/bin/taskmon-setup-*.exe
 
   release:
     needs: build
@@ -89,7 +95,7 @@ jobs:
           prerelease: false
           files: |
             ./artifacts/taskmon-x64/taskmon-x64.zip
-            ./artifacts/taskmon-ARM64/taskmon-arm64.zip
+            ./artifacts/taskmon-arm64/taskmon-arm64.zip
             ./artifacts/taskmon-installer-x64/taskmon-setup-x64.exe
-            ./artifacts/taskmon-installer-ARM64/taskmon-setup-arm64.exe
+            ./artifacts/taskmon-installer-arm64/taskmon-setup-arm64.exe
 
