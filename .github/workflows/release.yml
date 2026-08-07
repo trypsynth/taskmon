@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
@@ -28,10 +30,15 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup
 
-      - name: Set version from tag
+      - name: Set version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          } else {
+            $shortSha = "${{ github.sha }}".Substring(0, 7)
+            $version = "0.0.0-nightly.$shortSha"
+          }
           echo "TASKMON_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Setup Zig
@@ -77,8 +84,17 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push'
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Move nightly tag
+        if: github.ref_type == 'branch'
+        run: |
+          git tag -f nightly
+          git push -f origin nightly
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -90,10 +106,11 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Taskmon Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
+          name: ${{ github.ref_type == 'tag' && format('Taskmon Release {0}', github.ref_name) || 'Taskmon Nightly Build' }}
+          target_commitish: ${{ github.sha }}
           draft: false
-          prerelease: false
+          prerelease: ${{ github.ref_type != 'tag' }}
           files: |
             ./artifacts/taskmon-x64/taskmon-x64.zip
             ./artifacts/taskmon-arm64/taskmon-arm64.zip
