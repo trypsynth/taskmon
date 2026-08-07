@@ -67,22 +67,17 @@ pub fn build(b: *std.Build) void {
 	exe.entry = .{ .symbol_name = "WinMainCRTStartup" };
 	exe.link_gc_sections = true;
 	b.installArtifact(exe);
-	// std.Build.findProgram's Windows PATHEXT search is broken in this Zig build
-	// (calls the old 2-arg mem.concat), so these are explicit opt-in flags
-	// instead of auto-detecting pandoc/ISCC on PATH like the CMake build did.
-	const build_docs = b.option(bool, "docs", "Generate HTML docs with pandoc") orelse false;
-	const build_installer = b.option(bool, "installer", "Build the Inno Setup installer with ISCC") orelse false;
-	if (build_docs) {
-		const doc_run = b.addSystemCommand(&.{ "pandoc", "-s" });
+	if (b.findProgram(.{ .names = &.{"pandoc"} })) |pandoc| {
+		const doc_run = b.addSystemCommand(&.{ pandoc, "-s" });
 		doc_run.addFileArg(b.path("doc/readme.md"));
 		doc_run.addArg("-o");
 		const readme_html = doc_run.addOutputFileArg("readme.html");
 		b.getInstallStep().dependOn(&b.addInstallBinFile(readme_html, "readme.html").step);
 	}
-	if (build_installer) {
+	if (b.findProgram(.{ .names = &.{"ISCC"} })) |iscc| {
 		const arch = if (target.result.cpu.arch == .aarch64) "arm64" else "x64";
 		const version = b.graph.environ_map.get("TASKMON_VERSION") orelse "0.2.1";
-		const installer_run = b.addSystemCommand(&.{"ISCC"});
+		const installer_run = b.addSystemCommand(&.{iscc});
 		installer_run.setCwd(b.path("installer"));
 		installer_run.addArg(b.fmt("/DMyAppArch={s}", .{arch}));
 		installer_run.addArg(b.fmt("/DMyAppVersion={s}", .{version}));
