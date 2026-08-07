@@ -8,24 +8,19 @@ For a comprehensive user guide, including a full list of features and hotkeys, p
 
 ## Prerequisites
 
-To compile Taskmon from source, you need to have the following tools installed on your system:
+To compile Taskmon from source, you need [Zig](https://ziglang.org/) installed and on your system path. No Visual Studio or Windows SDK install is required — Zig brings its own Windows headers and import libraries.
 
-* Visual Studio Build Tools with C support.
-* Windows SDK.
-* CMake, version 3.20 or higher. Make sure CMake is in your system path.
+Optionally, install [Pandoc](https://pandoc.org/) and [Inno Setup](https://jrsoftware.org/isinfo.php) to also build the HTML user manual and the Windows installer; both are auto-detected and skipped if not found.
 
 ## Building
 
-Once the dependencies are installed, you can build the application by running the following commands in the repository root:
+From the repository root:
 
 ```batch
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
+zig build
 ```
 
-When the build is finished, the executable will be located in the build\Release directory.
+When the build is finished, the executable will be located in zig-out\bin.
 
 ## License
 

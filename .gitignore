@@ -1,5 +1,4 @@
 .claude/
-build
 .worktrees/
 zig-out
 .zig-cache
