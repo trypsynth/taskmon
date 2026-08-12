@@ -5,7 +5,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 ## Core Features
 
 * View all running processes and sort them by various resource usage metrics.
-* Choose from over 35 customizable columns to display; see Available Columns below for the full list.
+* Choose from over 45 customizable columns to display; see Available Columns below for the full list.
 * Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
 * Available as a portable executable or via a Windows installer. Portable copies keep their settings alongside the executable so you can carry them on a USB drive; installed copies store settings per-user automatically, since Program Files isn't writable without administrator rights.
 * Optionally replace the system Task Manager during installation, so Ctrl+Shift+Esc and the taskbar's "Task Manager" entry open Taskmon instead.
@@ -74,6 +74,11 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Product Version: The product version recorded in the executable's version information.
 * Session Name: The friendly name of the Windows session the process belongs to, such as Console or Services.
 * Package Name: The full package name for processes installed as a UWP or Store app, blank for regular Win32 processes.
+* Peak Virtual Memory: The largest amount of virtual address space the process has reserved at any point since it started.
+* Peak Private Bytes: The highest amount of memory the process has ever committed exclusively to itself.
+* Peak Paged Pool: The highest amount of pageable kernel memory ever allocated on the process's behalf.
+* Peak Non-paged Pool: The highest amount of non-pageable kernel memory ever allocated on the process's behalf.
+* Peak Threads: The largest number of threads the process has had running at once since it started.
 
 ## Column Reordering and Accessible Sorting
 
@@ -108,6 +113,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ## Changelog
 
 ### Version 0.3.0
+* Added 5 peak usage columns: Peak Virtual Memory, Peak Private Bytes, Peak Paged Pool, Peak Non-paged Pool, and Peak Threads.
 * Added Ctrl+Q as a shortcut to exit Taskmon completely.
 * Added 11 new columns: Service, GPU, GPU Memory, CPU Time, Elevated, Path, Window Title, File Version, Product Version, Session Name, and Package Name.
 * Added File > Restart as administrator to relaunch Taskmon elevated.

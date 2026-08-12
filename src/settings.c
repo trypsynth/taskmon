@@ -48,6 +48,11 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"Product Version", L"Product Version", 100, SORT_FIELD_PRODUCT_VERSION, FALSE, FALSE},
 	{L"Session Name", L"Session Name", 120, SORT_FIELD_SESSION_NAME, FALSE, FALSE},
 	{L"Package Name", L"Package Name", 300, SORT_FIELD_PACKAGE_NAME, FALSE, FALSE},
+	{L"Peak Virtual Memory", L"Peak Virtual Memory", 120, SORT_FIELD_PEAK_VIRTUAL_MEM, FALSE, FALSE},
+	{L"Peak Private Bytes", L"Peak Private Bytes", 120, SORT_FIELD_PEAK_PRIVATE_BYTES, FALSE, FALSE},
+	{L"Peak Paged Pool", L"Peak Paged Pool", 100, SORT_FIELD_PEAK_PAGED_POOL, FALSE, FALSE},
+	{L"Peak Non-paged Pool", L"Peak Non-paged Pool", 100, SORT_FIELD_PEAK_NONPAGED_POOL, FALSE, FALSE},
+	{L"Peak Threads", L"Peak Threads", 70, SORT_FIELD_PEAK_THREADS, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

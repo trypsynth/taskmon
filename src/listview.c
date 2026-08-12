@@ -283,6 +283,21 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_PACKAGE_NAME:
 		lstrcpyn(buf, e->package_name, len);
 		break;
+	case COL_PEAK_VIRTUAL_MEM:
+		StrFormatByteSizeW(e->peak_virtual_size, buf, len);
+		break;
+	case COL_PEAK_PRIVATE_BYTES:
+		StrFormatByteSizeW(e->peak_private_bytes, buf, len);
+		break;
+	case COL_PEAK_PAGED_POOL:
+		StrFormatByteSizeW(e->peak_paged_pool, buf, len);
+		break;
+	case COL_PEAK_NONPAGED_POOL:
+		StrFormatByteSizeW(e->peak_non_paged_pool, buf, len);
+		break;
+	case COL_PEAK_THREADS:
+		wnsprintf(buf, len, L"%u", e->peak_threads);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

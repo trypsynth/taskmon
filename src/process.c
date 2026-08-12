@@ -486,6 +486,21 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_PACKAGE_NAME:
 		res = StrCmpI(a->package_name, b->package_name);
 		break;
+	case SORT_FIELD_PEAK_VIRTUAL_MEM:
+		res = (a->peak_virtual_size < b->peak_virtual_size) ? -1 : (a->peak_virtual_size > b->peak_virtual_size);
+		break;
+	case SORT_FIELD_PEAK_PRIVATE_BYTES:
+		res = (a->peak_private_bytes < b->peak_private_bytes) ? -1 : (a->peak_private_bytes > b->peak_private_bytes);
+		break;
+	case SORT_FIELD_PEAK_PAGED_POOL:
+		res = (a->peak_paged_pool < b->peak_paged_pool) ? -1 : (a->peak_paged_pool > b->peak_paged_pool);
+		break;
+	case SORT_FIELD_PEAK_NONPAGED_POOL:
+		res = (a->peak_non_paged_pool < b->peak_non_paged_pool) ? -1 : (a->peak_non_paged_pool > b->peak_non_paged_pool);
+		break;
+	case SORT_FIELD_PEAK_THREADS:
+		res = (a->peak_threads < b->peak_threads) ? -1 : (a->peak_threads > b->peak_threads);
+		break;
 	default:
 		break;
 	}
@@ -839,6 +854,11 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->session_id = spi->SessionId;
 		e->peak_working_set = spi->PeakWorkingSetSize;
 		e->virtual_size = spi->VirtualSize;
+		e->peak_virtual_size = spi->PeakVirtualSize;
+		e->peak_private_bytes = spi->PeakPagefileUsage;
+		e->peak_paged_pool = spi->QuotaPeakPagedPoolUsage;
+		e->peak_non_paged_pool = spi->QuotaPeakNonPagedPoolUsage;
+		e->peak_threads = spi->NumberOfThreadsHighWatermark;
 		e->gdi_objects = get_process_gui_resources(pid, GR_GDIOBJECTS);
 		e->user_objects = get_process_gui_resources(pid, GR_USEROBJECTS);
 		e->integrity_level = get_process_integrity(pid);

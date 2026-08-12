@@ -43,6 +43,11 @@ typedef enum {
 	SORT_FIELD_PRODUCT_VERSION,
 	SORT_FIELD_SESSION_NAME,
 	SORT_FIELD_PACKAGE_NAME,
+	SORT_FIELD_PEAK_VIRTUAL_MEM,
+	SORT_FIELD_PEAK_PRIVATE_BYTES,
+	SORT_FIELD_PEAK_PAGED_POOL,
+	SORT_FIELD_PEAK_NONPAGED_POOL,
+	SORT_FIELD_PEAK_THREADS,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -95,6 +100,11 @@ typedef struct {
 	wchar_t product_version[64];
 	wchar_t session_name[64];
 	wchar_t package_name[256];
+	SIZE_T peak_virtual_size;
+	SIZE_T peak_private_bytes;
+	SIZE_T peak_paged_pool;
+	SIZE_T peak_non_paged_pool;
+	DWORD peak_threads;
 } process_entry;
 
 typedef struct {
