@@ -57,6 +57,9 @@ typedef enum {
 	COL_IO_WRITE_OPS,
 	COL_IO_OTHER_OPS,
 	COL_TOTAL_IO,
+	COL_ELAPSED,
+	COL_SHARED_WS,
+	COL_PARENT_NAME,
 	COL_COUNT,
 } column_id;
 

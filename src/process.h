@@ -57,6 +57,9 @@ typedef enum {
 	SORT_FIELD_IO_WRITE_OPS,
 	SORT_FIELD_IO_OTHER_OPS,
 	SORT_FIELD_TOTAL_IO,
+	SORT_FIELD_ELAPSED,
+	SORT_FIELD_SHARED_WS,
+	SORT_FIELD_PARENT_NAME,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -123,6 +126,9 @@ typedef struct {
 	ULONGLONG io_write_ops;
 	ULONGLONG io_other_ops;
 	ULONGLONG total_io_bytes;
+	ULONGLONG elapsed_time;
+	SIZE_T shared_working_set;
+	wchar_t parent_name[64];
 } process_entry;
 
 typedef struct {

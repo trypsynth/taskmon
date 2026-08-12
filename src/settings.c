@@ -62,6 +62,9 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"I/O Write Ops", L"I/O Write Ops", 100, SORT_FIELD_IO_WRITE_OPS, FALSE, FALSE},
 	{L"I/O Other Ops", L"I/O Other Ops", 100, SORT_FIELD_IO_OTHER_OPS, FALSE, FALSE},
 	{L"Total I/O", L"Total I/O", 110, SORT_FIELD_TOTAL_IO, FALSE, FALSE},
+	{L"Elapsed Time", L"Elapsed Time", 110, SORT_FIELD_ELAPSED, FALSE, FALSE},
+	{L"Shared Working Set", L"Shared Working Set", 120, SORT_FIELD_SHARED_WS, FALSE, FALSE},
+	{L"Parent Name", L"Parent Name", 150, SORT_FIELD_PARENT_NAME, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

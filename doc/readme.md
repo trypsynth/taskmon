@@ -88,6 +88,9 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * I/O Write Ops: The total number of write operations the process has issued since it started.
 * I/O Other Ops: The total number of I/O operations that are neither reads nor writes, such as device control requests.
 * Total I/O: The total number of bytes the process has transferred across all reads, writes, and other I/O since it started.
+* Elapsed Time: How long the process has been running, in days, hours, minutes, and seconds. This is wall clock time, unlike CPU Time, which counts only time spent actually executing.
+* Shared Working Set: The portion of the process's physical memory that is shared with other processes, such as loaded system DLLs. Together with Private Working Set this accounts for the whole Memory figure.
+* Parent Name: The executable name of the process that launched this one. Shows "(exited)" when the parent has already terminated.
 
 ## Column Reordering and Accessible Sorting
 

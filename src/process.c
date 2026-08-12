@@ -528,6 +528,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_TOTAL_IO:
 		res = (a->total_io_bytes < b->total_io_bytes) ? -1 : (a->total_io_bytes > b->total_io_bytes);
 		break;
+	case SORT_FIELD_ELAPSED:
+		res = (a->elapsed_time < b->elapsed_time) ? -1 : (a->elapsed_time > b->elapsed_time);
+		break;
+	case SORT_FIELD_SHARED_WS:
+		res = (a->shared_working_set < b->shared_working_set) ? -1 : (a->shared_working_set > b->shared_working_set);
+		break;
+	case SORT_FIELD_PARENT_NAME:
+		res = StrCmpI(a->parent_name, b->parent_name);
+		break;
 	default:
 		break;
 	}
@@ -842,6 +851,12 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	uli_u.HighPart = sys_user_ft.dwHighDateTime;
 	ULONGLONG sys_time = uli_k.QuadPart + uli_u.QuadPart;
 	ULONGLONG tick_ms = GetTickCount64();
+	FILETIME now_ft;
+	GetSystemTimeAsFileTime(&now_ft);
+	ULARGE_INTEGER uli_now;
+	uli_now.LowPart = now_ft.dwLowDateTime;
+	uli_now.HighPart = now_ft.dwHighDateTime;
+	ULONGLONG now_ticks = uli_now.QuadPart;
 	ULONG buf_size = 0;
 	BYTE* buf = query_all_processes(&buf_size);
 	if (!buf) return NULL;
@@ -865,11 +880,15 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->cpu_percent = 0.0;
 		e->working_set = spi->WorkingSetSize;
 		e->private_working_set = (SIZE_T)spi->WorkingSetPrivateSize.QuadPart;
+		e->shared_working_set = (e->working_set > e->private_working_set)
+									? e->working_set - e->private_working_set
+									: 0;
 		e->paged_pool = spi->QuotaPagedPoolUsage;
 		e->non_paged_pool = spi->QuotaNonPagedPoolUsage;
 		e->threads = spi->NumberOfThreads;
 		e->handles = spi->HandleCount;
 		e->start_time = (pid == 0) ? 0 : (ULONGLONG)spi->CreateTime.QuadPart;
+		e->elapsed_time = (e->start_time && now_ticks > e->start_time) ? now_ticks - e->start_time : 0;
 		e->base_priority = spi->BasePriority;
 		e->suspended = is_process_suspended(pid);
 		e->private_bytes = spi->PagefileUsage;
@@ -967,6 +986,21 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	}
 	heap_free(buf);
 	heap_free(old_snaps);
+	/* Resolve parent names now that every entry is known. A recycled PID can
+	 * point at a process that started after its supposed child, in which case
+	 * the real parent is gone rather than whatever now holds the PID. */
+	for (int i = 0; i < count; i++) {
+		entries[i].parent_name[0] = L'\0';
+		DWORD ppid = entries[i].parent_pid;
+		if (!ppid || ppid == entries[i].pid) continue;
+		for (int j = 0; j < count; j++) {
+			if (entries[j].pid != ppid) continue;
+			if (entries[j].start_time <= entries[i].start_time)
+				lstrcpyn(entries[i].parent_name, entries[j].name, 64);
+			break;
+		}
+		if (!entries[i].parent_name[0]) lstrcpyn(entries[i].parent_name, L"(exited)", 64);
+	}
 	quicksort(entries, 0, count - 1, field, descending);
 	*out_count = count;
 	return entries;

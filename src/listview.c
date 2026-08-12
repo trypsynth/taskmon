@@ -16,6 +16,24 @@ static void format_duration(ULONGLONG ticks, wchar_t* buf, int len) {
 	wnsprintf(buf, len, L"%llu:%02u:%02u", hours, mins, secs);
 }
 
+/* Like format_duration, but processes routinely run for weeks, so break out days
+ * rather than letting the hour count grow without bound. */
+static void format_elapsed(ULONGLONG ticks, wchar_t* buf, int len) {
+	if (!ticks) {
+		buf[0] = L'\0';
+		return;
+	}
+	ULONGLONG total_secs = ticks / 10000000ULL;
+	ULONGLONG days = total_secs / 86400;
+	UINT hours = (UINT)((total_secs % 86400) / 3600);
+	UINT mins = (UINT)((total_secs % 3600) / 60);
+	UINT secs = (UINT)(total_secs % 60);
+	if (days)
+		wnsprintf(buf, len, L"%llud %02u:%02u:%02u", days, hours, mins, secs);
+	else
+		wnsprintf(buf, len, L"%02u:%02u:%02u", hours, mins, secs);
+}
+
 /* Cycle counts run to billions per second, so scale them down to a K/M/G suffix
  * the way StrFormatByteSizeW does for bytes. */
 static void format_cycle_rate(double rate, wchar_t* buf, int len) {
@@ -365,6 +383,15 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_TOTAL_IO:
 		StrFormatByteSizeW((LONGLONG)e->total_io_bytes, buf, len);
+		break;
+	case COL_ELAPSED:
+		format_elapsed(e->elapsed_time, buf, len);
+		break;
+	case COL_SHARED_WS:
+		StrFormatByteSizeW(e->shared_working_set, buf, len);
+		break;
+	case COL_PARENT_NAME:
+		lstrcpyn(buf, e->parent_name, len);
 		break;
 	default:
 		buf[0] = L'\0';
