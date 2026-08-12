@@ -55,6 +55,9 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"Peak Threads", L"Peak Threads", 70, SORT_FIELD_PEAK_THREADS, FALSE, FALSE},
 	{L"Hard Faults", L"Hard Faults", 100, SORT_FIELD_HARD_FAULTS, FALSE, FALSE},
 	{L"CPU Cycles", L"CPU Cycles", 110, SORT_FIELD_CYCLES, FALSE, FALSE},
+	{L"Kernel Time", L"Kernel Time", 90, SORT_FIELD_KERNEL_TIME, FALSE, FALSE},
+	{L"User Time", L"User Time", 90, SORT_FIELD_USER_TIME, FALSE, FALSE},
+	{L"Total Page Faults", L"Total Page Faults", 110, SORT_FIELD_TOTAL_PAGE_FAULTS, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

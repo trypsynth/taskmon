@@ -50,6 +50,9 @@ typedef enum {
 	SORT_FIELD_PEAK_THREADS,
 	SORT_FIELD_HARD_FAULTS,
 	SORT_FIELD_CYCLES,
+	SORT_FIELD_KERNEL_TIME,
+	SORT_FIELD_USER_TIME,
+	SORT_FIELD_TOTAL_PAGE_FAULTS,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -109,6 +112,9 @@ typedef struct {
 	DWORD peak_threads;
 	double hard_faults_per_sec;
 	double cycles_per_sec;
+	ULONGLONG kernel_time;
+	ULONGLONG user_time;
+	ULONG total_page_faults;
 } process_entry;
 
 typedef struct {

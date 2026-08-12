@@ -81,6 +81,9 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Peak Threads: The largest number of threads the process has had running at once since it started.
 * Hard Faults: The rate of hard page faults per second, counting only the faults that had to be satisfied by reading from disk. Unlike Page Faults, this reflects real disk pressure.
 * CPU Cycles: The rate at which the process is consuming CPU clock cycles. On processors with a mix of performance and efficiency cores, this is a more accurate measure of work done than CPU %.
+* Kernel Time: The portion of the process's accumulated CPU time spent inside the Windows kernel, such as during system calls.
+* User Time: The portion of the process's accumulated CPU time spent running its own code.
+* Total Page Faults: The total number of page faults the process has taken since it started, as a running count rather than a rate.
 
 ## Column Reordering and Accessible Sorting
 

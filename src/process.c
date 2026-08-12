@@ -507,6 +507,15 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_CYCLES:
 		res = (a->cycles_per_sec < b->cycles_per_sec) ? -1 : (a->cycles_per_sec > b->cycles_per_sec);
 		break;
+	case SORT_FIELD_KERNEL_TIME:
+		res = (a->kernel_time < b->kernel_time) ? -1 : (a->kernel_time > b->kernel_time);
+		break;
+	case SORT_FIELD_USER_TIME:
+		res = (a->user_time < b->user_time) ? -1 : (a->user_time > b->user_time);
+		break;
+	case SORT_FIELD_TOTAL_PAGE_FAULTS:
+		res = (a->total_page_faults < b->total_page_faults) ? -1 : (a->total_page_faults > b->total_page_faults);
+		break;
 	default:
 		break;
 	}
@@ -895,6 +904,9 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		}
 		ULONGLONG proc_time = (ULONGLONG)spi->KernelTime.QuadPart + (ULONGLONG)spi->UserTime.QuadPart;
 		e->cpu_time = proc_time;
+		e->kernel_time = (ULONGLONG)spi->KernelTime.QuadPart;
+		e->user_time = (ULONGLONG)spi->UserTime.QuadPart;
+		e->total_page_faults = spi->PageFaultCount;
 		ULONGLONG io_read = (ULONGLONG)spi->ReadTransferCount.QuadPart;
 		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
 		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;

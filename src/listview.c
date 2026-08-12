@@ -7,6 +7,15 @@
 #include <commctrl.h>
 #include <shlwapi.h>
 
+/* 100-nanosecond FILETIME ticks to h:mm:ss. */
+static void format_duration(ULONGLONG ticks, wchar_t* buf, int len) {
+	ULONGLONG total_secs = ticks / 10000000ULL;
+	ULONGLONG hours = total_secs / 3600;
+	UINT mins = (UINT)((total_secs % 3600) / 60);
+	UINT secs = (UINT)(total_secs % 60);
+	wnsprintf(buf, len, L"%llu:%02u:%02u", hours, mins, secs);
+}
+
 /* Cycle counts run to billions per second, so scale them down to a K/M/G suffix
  * the way StrFormatByteSizeW does for bytes. */
 static void format_cycle_rate(double rate, wchar_t* buf, int len) {
@@ -283,14 +292,9 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_GPU_MEMORY:
 		StrFormatByteSizeW((LONGLONG)e->gpu_memory, buf, len);
 		break;
-	case COL_CPU_TIME: {
-		ULONGLONG total_secs = e->cpu_time / 10000000ULL;
-		ULONGLONG hours = total_secs / 3600;
-		UINT mins = (UINT)((total_secs % 3600) / 60);
-		UINT secs = (UINT)(total_secs % 60);
-		wnsprintf(buf, len, L"%llu:%02u:%02u", hours, mins, secs);
+	case COL_CPU_TIME:
+		format_duration(e->cpu_time, buf, len);
 		break;
-	}
 	case COL_ELEVATED:
 		if (e->elevated < 0)
 			buf[0] = L'\0';
@@ -340,6 +344,15 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	}
 	case COL_CYCLES:
 		format_cycle_rate(e->cycles_per_sec, buf, len);
+		break;
+	case COL_KERNEL_TIME:
+		format_duration(e->kernel_time, buf, len);
+		break;
+	case COL_USER_TIME:
+		format_duration(e->user_time, buf, len);
+		break;
+	case COL_TOTAL_PAGE_FAULTS:
+		wnsprintf(buf, len, L"%u", e->total_page_faults);
 		break;
 	default:
 		buf[0] = L'\0';
