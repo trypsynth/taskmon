@@ -455,6 +455,43 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_USER_SID:
 		lstrcpyn(buf, e->user_sid, len);
 		break;
+	case COL_EFFICIENCY:
+		if (e->efficiency_mode < 0)
+			buf[0] = L'\0';
+		else
+			lstrcpyn(buf, e->efficiency_mode ? L"On" : L"Off", len);
+		break;
+	case COL_IO_PRIORITY: {
+		static const wchar_t* const names[] = {L"Very Low", L"Low", L"Normal", L"High", L"Critical"};
+		if (e->io_priority < 0 || e->io_priority > 4)
+			buf[0] = L'\0';
+		else
+			lstrcpyn(buf, names[e->io_priority], len);
+		break;
+	}
+	case COL_PAGE_PRIORITY: {
+		static const wchar_t* const names[] = {L"Idle", L"Very Low", L"Low", L"Medium", L"Below Normal", L"Normal"};
+		if (e->page_priority < 0 || e->page_priority > 5)
+			buf[0] = L'\0';
+		else
+			lstrcpyn(buf, names[e->page_priority], len);
+		break;
+	}
+	case COL_PROTECTION: {
+		/* PS_PROTECTION: type in bits 0-2, signer in bits 4-7. Type 0 means the
+		 * process is not protected at all, which is the common case. */
+		static const wchar_t* const signers[] = {L"None", L"Authenticode", L"CodeGen", L"Antimalware",
+			L"Lsa", L"Windows", L"WinTcb", L"WinSystem", L"App"};
+		int type = e->protection & 0x07;
+		int signer = (e->protection >> 4) & 0x0F;
+		if (e->protection <= 0 || type == 0 || signer >= (int)(sizeof(signers) / sizeof(signers[0])))
+			buf[0] = L'\0';
+		else if (type == 1)
+			wnsprintf(buf, len, L"%s-Light", signers[signer]);
+		else
+			lstrcpyn(buf, signers[signer], len);
+		break;
+	}
 	default:
 		buf[0] = L'\0';
 		break;

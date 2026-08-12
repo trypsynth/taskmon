@@ -73,6 +73,10 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"AppContainer", L"AppContainer", 90, SORT_FIELD_APP_CONTAINER, FALSE, FALSE},
 	{L"Domain", L"Domain", 120, SORT_FIELD_DOMAIN, FALSE, FALSE},
 	{L"User SID", L"User SID", 220, SORT_FIELD_USER_SID, FALSE, FALSE},
+	{L"Efficiency Mode", L"Efficiency Mode", 100, SORT_FIELD_EFFICIENCY, FALSE, FALSE},
+	{L"I/O Priority", L"I/O Priority", 90, SORT_FIELD_IO_PRIORITY, FALSE, FALSE},
+	{L"Memory Priority", L"Memory Priority", 100, SORT_FIELD_PAGE_PRIORITY, FALSE, FALSE},
+	{L"Protection", L"Protection", 130, SORT_FIELD_PROTECTION, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

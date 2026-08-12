@@ -99,6 +99,10 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * AppContainer: Whether the process runs inside an AppContainer sandbox, as Store apps and many browser child processes do.
 * Domain: The domain or authority that owns the process's account, such as your machine name, NT AUTHORITY, or an Active Directory domain. Use this alongside User to tell apart identically named accounts from different domains.
 * User SID: The full security identifier of the process's account.
+* Efficiency Mode: Whether the process is running under EcoQoS, where Windows deliberately runs it at a reduced clock speed to save power. This is the same state Task Manager marks with a leaf icon.
+* I/O Priority: The priority Windows gives the process's disk requests, from Very Low to Critical. Background tasks such as indexing run at Very Low so they stay out of the way.
+* Memory Priority: How readily Windows will trim the process's pages out of physical memory under pressure, from Idle to Normal.
+* Protection: The process's protection level, such as WinTcb-Light or Antimalware-Light. Protected processes cannot be terminated or inspected even by an administrator, which is why some processes resist ending. Blank means the process is not protected.
 
 ## Column Reordering and Accessible Sorting
 

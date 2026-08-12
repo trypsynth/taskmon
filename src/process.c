@@ -562,6 +562,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_USER_SID:
 		res = StrCmpI(a->user_sid, b->user_sid);
 		break;
+	case SORT_FIELD_EFFICIENCY:
+		res = (a->efficiency_mode < b->efficiency_mode) ? -1 : (a->efficiency_mode > b->efficiency_mode);
+		break;
+	case SORT_FIELD_IO_PRIORITY:
+		res = (a->io_priority < b->io_priority) ? -1 : (a->io_priority > b->io_priority);
+		break;
+	case SORT_FIELD_PAGE_PRIORITY:
+		res = (a->page_priority < b->page_priority) ? -1 : (a->page_priority > b->page_priority);
+		break;
+	case SORT_FIELD_PROTECTION:
+		res = (a->protection < b->protection) ? -1 : (a->protection > b->protection);
+		break;
 	default:
 		break;
 	}
@@ -645,16 +657,13 @@ static USHORT get_native_machine() {
 	return native;
 }
 
-static USHORT get_process_arch(DWORD pid) {
+static USHORT get_process_arch(HANDLE h) {
 	static PFN_IsWow64Process2 fn = NULL;
 	static BOOL fn_checked = FALSE;
 	if (!fn_checked) {
 		fn_checked = TRUE;
 		fn = (PFN_IsWow64Process2)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "IsWow64Process2");
 	}
-	if (pid == 0) return get_native_machine();
-	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!h) return 0;
 	USHORT arch = 0;
 	if (fn) {
 		USHORT proc_machine, native;
@@ -665,17 +674,7 @@ static USHORT get_process_arch(DWORD pid) {
 		IsWow64Process(h, &is_wow64);
 		arch = is_wow64 ? 0x014c : get_native_machine();
 	}
-	CloseHandle(h);
 	return arch;
-}
-
-static DWORD get_process_gui_resources(DWORD pid, DWORD flags) {
-	if (pid == 0) return 0;
-	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!h) return 0;
-	DWORD count = GetGuiResources(h, flags);
-	CloseHandle(h);
-	return count;
 }
 
 typedef struct {
@@ -755,14 +754,16 @@ static void get_process_token_info(DWORD pid, token_info* ti) {
 	CloseHandle(htok);
 }
 
-static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
-	buf[0] = L'\0';
-	if (pid == 0) return;
+static PFN_NtQIP get_nt_query_process(void) {
 	static PFN_NtQIP fn = NULL;
 	if (!fn) fn = (PFN_NtQIP)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtQueryInformationProcess");
+	return fn;
+}
+
+static void get_process_cmdline(HANDLE h, wchar_t* buf, int len) {
+	buf[0] = L'\0';
+	PFN_NtQIP fn = get_nt_query_process();
 	if (!fn) return;
-	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!h) return;
 	ULONG needed = 0;
 	fn(h, 60, NULL, 0, &needed);
 	if (needed == 0) needed = 1024;
@@ -780,17 +781,14 @@ static void get_process_cmdline(DWORD pid, wchar_t* buf, int len) {
 		}
 		heap_free(cbuf);
 	}
-	CloseHandle(h);
 }
 
-static void get_process_version_info(DWORD pid, wchar_t* desc, int desc_len, wchar_t* company, int comp_len,
+static void get_process_version_info(const wchar_t* path, wchar_t* desc, int desc_len, wchar_t* company, int comp_len,
 	wchar_t* file_ver, int file_ver_len, wchar_t* product_ver, int product_ver_len) {
 	desc[0] = L'\0';
 	company[0] = L'\0';
 	file_ver[0] = L'\0';
 	product_ver[0] = L'\0';
-	wchar_t path[MAX_PATH];
-	get_process_path(pid, path, MAX_PATH);
 	if (!path[0]) return;
 	DWORD dummy;
 	DWORD size = GetFileVersionInfoSizeW(path, &dummy);
@@ -831,11 +829,8 @@ static void get_session_name(DWORD session_id, wchar_t* buf, int len) {
 	}
 }
 
-static void get_package_name(DWORD pid, wchar_t* buf, int len) {
+static void get_package_name(HANDLE h, wchar_t* buf, int len) {
 	buf[0] = L'\0';
-	if (pid == 0) return;
-	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!h) return;
 	UINT32 length = 0;
 	GetPackageFullName(h, &length, NULL);
 	if (length > 0) {
@@ -846,10 +841,9 @@ static void get_package_name(DWORD pid, wchar_t* buf, int len) {
 			heap_free(name);
 		}
 	}
-	CloseHandle(h);
 }
 
-static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
+static tm_dpi_awareness get_process_dpi_awareness(HANDLE h) {
 	typedef HRESULT(WINAPI * PFN_GPDA)(HANDLE, int*);
 	static PFN_GPDA fn = NULL;
 	static BOOL checked = FALSE;
@@ -860,12 +854,100 @@ static tm_dpi_awareness get_process_dpi_awareness(DWORD pid) {
 		checked = TRUE;
 	}
 	if (!fn) return TM_DPI_UNAWARE;
-	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!h) return TM_DPI_UNAWARE;
 	int awareness = 0;
 	fn(h, &awareness);
-	CloseHandle(h);
 	return (tm_dpi_awareness)awareness;
+}
+
+typedef BOOL(WINAPI* PFN_GetProcessInformation)(HANDLE, PROCESS_INFORMATION_CLASS, LPVOID, DWORD);
+
+/* EcoQoS: the process is opted into reduced clock speed, which is what Task
+ * Manager surfaces as "Efficiency mode". */
+static int get_efficiency_mode(HANDLE h) {
+	static PFN_GetProcessInformation fn = NULL;
+	static BOOL checked = FALSE;
+	if (!checked) {
+		checked = TRUE;
+		fn = (PFN_GetProcessInformation)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "GetProcessInformation");
+	}
+	if (!fn) return -1;
+	PROCESS_POWER_THROTTLING_STATE state = {0};
+	state.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+	if (!fn(h, ProcessPowerThrottling, &state, sizeof(state))) return -1;
+	return ((state.ControlMask & PROCESS_POWER_THROTTLING_EXECUTION_SPEED) &&
+			   (state.StateMask & PROCESS_POWER_THROTTLING_EXECUTION_SPEED))
+			   ? 1
+			   : 0;
+}
+
+#define ProcessIoPriority 33
+#define ProcessPagePriority 39
+#define ProcessProtectionInformation 61
+
+static int get_nt_process_ulong(HANDLE h, DWORD info_class) {
+	PFN_NtQIP fn = get_nt_query_process();
+	if (!fn) return -1;
+	ULONG value = 0;
+	if (!NT_SUCCESS(fn(h, info_class, &value, sizeof(value), NULL))) return -1;
+	return (int)value;
+}
+
+/* PS_PROTECTION is a single byte: Type in bits 0-2, Signer in bits 4-7. */
+static int get_process_protection(HANDLE h) {
+	PFN_NtQIP fn = get_nt_query_process();
+	if (!fn) return -1;
+	UCHAR level = 0;
+	if (!NT_SUCCESS(fn(h, ProcessProtectionInformation, &level, sizeof(level), NULL))) return -1;
+	return (int)level;
+}
+
+typedef struct {
+	USHORT arch_machine;
+	DWORD gdi_objects;
+	DWORD user_objects;
+	tm_dpi_awareness dpi_awareness;
+	int efficiency_mode; /* -1 = unknown, 0 = no, 1 = yes */
+	int io_priority;     /* -1 = unknown, else 0-4 */
+	int page_priority;   /* -1 = unknown, else 0-5 */
+	int protection;      /* -1 = unknown, else raw PS_PROTECTION byte */
+	wchar_t path[MAX_PATH];
+	wchar_t cmdline[256];
+	wchar_t package_name[256];
+} handle_info;
+
+/* One handle serves every per-process query below. Opening one per attribute
+ * cost eight OpenProcess round trips per process on every single refresh. */
+static void get_process_handle_info(DWORD pid, handle_info* hi) {
+	hi->arch_machine = 0;
+	hi->gdi_objects = 0;
+	hi->user_objects = 0;
+	hi->dpi_awareness = TM_DPI_UNAWARE;
+	hi->efficiency_mode = -1;
+	hi->io_priority = -1;
+	hi->page_priority = -1;
+	hi->protection = -1;
+	hi->path[0] = L'\0';
+	hi->cmdline[0] = L'\0';
+	hi->package_name[0] = L'\0';
+	if (pid == 0) {
+		hi->arch_machine = get_native_machine();
+		return;
+	}
+	HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!h) return;
+	hi->arch_machine = get_process_arch(h);
+	hi->gdi_objects = GetGuiResources(h, GR_GDIOBJECTS);
+	hi->user_objects = GetGuiResources(h, GR_USEROBJECTS);
+	hi->dpi_awareness = get_process_dpi_awareness(h);
+	hi->efficiency_mode = get_efficiency_mode(h);
+	hi->io_priority = get_nt_process_ulong(h, ProcessIoPriority);
+	hi->page_priority = get_nt_process_ulong(h, ProcessPagePriority);
+	hi->protection = get_process_protection(h);
+	get_process_cmdline(h, hi->cmdline, 256);
+	get_package_name(h, hi->package_name, 256);
+	DWORD path_size = MAX_PATH;
+	if (!QueryFullProcessImageName(h, 0, hi->path, &path_size)) hi->path[0] = L'\0';
+	CloseHandle(h);
 }
 
 process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sort_field field, BOOL descending) {
@@ -893,6 +975,15 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	int capacity = 256;
 	int count = 0;
 	process_entry* entries = heap_alloc(capacity * sizeof(process_entry));
+	/* Reused across every process rather than living on the stack, which has no
+	 * room to spare for a buffer this size without __chkstk. */
+	handle_info* hi = heap_alloc(sizeof(handle_info));
+	if (!entries || !hi) {
+		heap_free(buf);
+		heap_free(entries);
+		heap_free(hi);
+		return NULL;
+	}
 	snapshot_entry* old_snaps = heap_alloc(SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
 	memcpy(old_snaps, snapshots, SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
 	memset(snapshots, 0, SNAPSHOT_CAPACITY * sizeof(snapshot_entry));
@@ -941,8 +1032,18 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->peak_paged_pool = spi->QuotaPeakPagedPoolUsage;
 		e->peak_non_paged_pool = spi->QuotaPeakNonPagedPoolUsage;
 		e->peak_threads = spi->NumberOfThreadsHighWatermark;
-		e->gdi_objects = get_process_gui_resources(pid, GR_GDIOBJECTS);
-		e->user_objects = get_process_gui_resources(pid, GR_USEROBJECTS);
+		get_process_handle_info(pid, hi);
+		e->gdi_objects = hi->gdi_objects;
+		e->user_objects = hi->user_objects;
+		e->arch_machine = hi->arch_machine;
+		e->dpi_awareness = hi->dpi_awareness;
+		e->efficiency_mode = hi->efficiency_mode;
+		e->io_priority = hi->io_priority;
+		e->page_priority = hi->page_priority;
+		e->protection = hi->protection;
+		lstrcpyn(e->cmdline, hi->cmdline, 256);
+		lstrcpyn(e->package_name, hi->package_name, 256);
+		lstrcpyn(e->path, hi->path, MAX_PATH);
 		token_info ti;
 		get_process_token_info(pid, &ti);
 		e->integrity_level = ti.integrity_level;
@@ -952,16 +1053,11 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		lstrcpyn(e->user, ti.user, 64);
 		lstrcpyn(e->domain, ti.domain, 64);
 		lstrcpyn(e->user_sid, ti.sid, 128);
-		get_process_cmdline(pid, e->cmdline, 256);
-		get_process_version_info(pid, e->description, 128, e->company, 128,
+		get_process_version_info(hi->path, e->description, 128, e->company, 128,
 			e->file_version, 64, e->product_version, 64);
 		get_services_for_pid(pid, e->services, 256);
-		e->dpi_awareness = get_process_dpi_awareness(pid);
-		e->arch_machine = get_process_arch(pid);
 		get_gpu_stat(pid, &e->gpu_percent, &e->gpu_memory);
-		get_process_path(pid, e->path, MAX_PATH);
 		get_session_name(e->session_id, e->session_name, 64);
-		get_package_name(pid, e->package_name, 256);
 		get_window_title_for_pid(pid, e->window_title, 128);
 		if (pid == 0) {
 			lstrcpy(e->name, L"System Idle Process");
@@ -1031,6 +1127,7 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 	}
 	heap_free(buf);
 	heap_free(old_snaps);
+	heap_free(hi);
 	/* Resolve parent names now that every entry is known. A recycled PID can
 	 * point at a process that started after its supposed child, in which case
 	 * the real parent is gone rather than whatever now holds the PID. */

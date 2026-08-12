@@ -68,6 +68,10 @@ typedef enum {
 	SORT_FIELD_APP_CONTAINER,
 	SORT_FIELD_DOMAIN,
 	SORT_FIELD_USER_SID,
+	SORT_FIELD_EFFICIENCY,
+	SORT_FIELD_IO_PRIORITY,
+	SORT_FIELD_PAGE_PRIORITY,
+	SORT_FIELD_PROTECTION,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -146,6 +150,10 @@ typedef struct {
 	int app_container; /* -1 = unknown, 0 = no, 1 = yes */
 	wchar_t domain[64];
 	wchar_t user_sid[128];
+	int efficiency_mode; /* -1 = unknown, 0 = no, 1 = yes */
+	int io_priority;     /* -1 = unknown, else 0-4 */
+	int page_priority;   /* -1 = unknown, else 0-5 */
+	int protection;      /* -1 = unknown, else raw PS_PROTECTION byte */
 } process_entry;
 
 typedef struct {
