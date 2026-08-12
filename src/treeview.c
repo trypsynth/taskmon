@@ -69,16 +69,23 @@ static void restore_expanded(HTREEITEM item) {
 	}
 }
 
-static BOOL pid_in_list(DWORD pid, const process_entry* entries, int count) {
+/* Windows recycles PIDs, so a matching parent PID is only really the parent if
+ * it also started no later than the child. Otherwise the true parent has exited
+ * and some unrelated process now holds its PID; nesting under it would be wrong. */
+static BOOL is_parent_of(const process_entry* parent, const process_entry* child) {
+	return parent->pid == child->parent_pid && parent->start_time <= child->start_time;
+}
+
+static BOOL has_live_parent(const process_entry* child, const process_entry* entries, int count) {
 	for (int i = 0; i < count; i++)
-		if (entries[i].pid == pid) return TRUE;
+		if (is_parent_of(&entries[i], child)) return TRUE;
 	return FALSE;
 }
 
-static void insert_children(HTREEITEM parent, DWORD parent_pid,
+static void insert_children(HTREEITEM parent, const process_entry* parent_entry,
 	process_entry* entries, int count, BOOL* done) {
 	for (int i = 0; i < count; i++) {
-		if (done[i] || entries[i].parent_pid != parent_pid) continue;
+		if (done[i] || !is_parent_of(parent_entry, &entries[i])) continue;
 		done[i] = TRUE;
 		TVINSERTSTRUCTW tvis = {0};
 		tvis.hParent = parent;
@@ -87,7 +94,7 @@ static void insert_children(HTREEITEM parent, DWORD parent_pid,
 		tvis.item.pszText = entries[i].name;
 		tvis.item.lParam = (LPARAM)entries[i].pid;
 		HTREEITEM hc = TV_InsertItem(g_hwnd_tree, &tvis);
-		if (hc) insert_children(hc, entries[i].pid, entries, count, done);
+		if (hc) insert_children(hc, &entries[i], entries, count, done);
 	}
 }
 
@@ -99,7 +106,7 @@ static void insert_root(process_entry* e, process_entry* entries, int count, BOO
 	tvis.item.pszText = e->name;
 	tvis.item.lParam = (LPARAM)e->pid;
 	HTREEITEM hr = TV_InsertItem(g_hwnd_tree, &tvis);
-	if (hr) insert_children(hr, e->pid, entries, count, done);
+	if (hr) insert_children(hr, e, entries, count, done);
 }
 
 double populate_tree_view(process_entry* entries, int count) {
@@ -121,11 +128,11 @@ double populate_tree_view(process_entry* entries, int count) {
 
 	BOOL* done = (BOOL*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, count * sizeof(BOOL));
 	if (done) {
-		// Roots: parent is zero, self-referential, or not present in list
+		// Roots: parent is zero, self-referential, or already gone
 		for (int i = 0; i < count; i++) {
 			if (done[i]) continue;
 			DWORD ppid = entries[i].parent_pid;
-			if (ppid == 0 || ppid == entries[i].pid || !pid_in_list(ppid, entries, count)) {
+			if (ppid == 0 || ppid == entries[i].pid || !has_live_parent(&entries[i], entries, count)) {
 				done[i] = TRUE;
 				insert_root(&entries[i], entries, count, done);
 			}
