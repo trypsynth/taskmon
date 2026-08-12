@@ -537,6 +537,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_PARENT_NAME:
 		res = StrCmpI(a->parent_name, b->parent_name);
 		break;
+	case SORT_FIELD_PRIVATE_BYTES_DELTA:
+		res = (a->private_bytes_delta < b->private_bytes_delta) ? -1 : (a->private_bytes_delta > b->private_bytes_delta);
+		break;
+	case SORT_FIELD_WORKING_SET_DELTA:
+		res = (a->working_set_delta < b->working_set_delta) ? -1 : (a->working_set_delta > b->working_set_delta);
+		break;
+	case SORT_FIELD_HANDLE_DELTA:
+		res = (a->handle_delta < b->handle_delta) ? -1 : (a->handle_delta > b->handle_delta);
+		break;
+	case SORT_FIELD_THREAD_DELTA:
+		res = (a->thread_delta < b->thread_delta) ? -1 : (a->thread_delta > b->thread_delta);
+		break;
 	default:
 		break;
 	}
@@ -899,6 +911,10 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->page_faults_per_sec = 0.0;
 		e->hard_faults_per_sec = 0.0;
 		e->cycles_per_sec = 0.0;
+		e->private_bytes_delta = 0;
+		e->working_set_delta = 0;
+		e->handle_delta = 0;
+		e->thread_delta = 0;
 		e->session_id = spi->SessionId;
 		e->peak_working_set = spi->PeakWorkingSetSize;
 		e->virtual_size = spi->VirtualSize;
@@ -947,10 +963,15 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->io_other_ops = (ULONGLONG)spi->OtherOperationCount.QuadPart;
 		e->total_io_bytes = io_bytes;
 		cpu_snapshot current_snap = {proc_time, sys_time, io_bytes, io_read, io_write, io_other,
-			spi->PageFaultCount, spi->HardFaultCount, spi->CycleTime, tick_ms};
+			spi->PageFaultCount, spi->HardFaultCount, spi->CycleTime, e->private_bytes,
+			e->working_set, e->handles, e->threads, tick_ms};
 		update_snapshot(snapshots, pid, current_snap);
 		cpu_snapshot* prev = find_snapshot(old_snaps, pid);
 		if (prev) {
+			e->private_bytes_delta = (LONGLONG)e->private_bytes - (LONGLONG)prev->private_bytes;
+			e->working_set_delta = (LONGLONG)e->working_set - (LONGLONG)prev->working_set;
+			e->handle_delta = (int)e->handles - (int)prev->handles;
+			e->thread_delta = (int)e->threads - (int)prev->threads;
 			ULONGLONG delta_proc = proc_time - prev->process_time;
 			ULONGLONG delta_sys = sys_time - prev->system_time;
 			if (delta_sys > 0) {

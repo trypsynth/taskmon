@@ -91,6 +91,10 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Elapsed Time: How long the process has been running, in days, hours, minutes, and seconds. This is wall clock time, unlike CPU Time, which counts only time spent actually executing.
 * Shared Working Set: The portion of the process's physical memory that is shared with other processes, such as loaded system DLLs. Together with Private Working Set this accounts for the whole Memory figure.
 * Parent Name: The executable name of the process that launched this one. Shows "(exited)" when the parent has already terminated.
+* Private Bytes Delta: How much the process's committed memory has grown or shrunk since the last refresh. A process that climbs steadily here is leaking memory.
+* Working Set Delta: How much the process's physical memory usage has grown or shrunk since the last refresh.
+* Handle Delta: How many kernel handles the process has gained or released since the last refresh. Steady growth here indicates a handle leak.
+* Thread Delta: How many threads the process has created or ended since the last refresh.
 
 ## Column Reordering and Accessible Sorting
 

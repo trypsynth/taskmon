@@ -60,6 +60,10 @@ typedef enum {
 	SORT_FIELD_ELAPSED,
 	SORT_FIELD_SHARED_WS,
 	SORT_FIELD_PARENT_NAME,
+	SORT_FIELD_PRIVATE_BYTES_DELTA,
+	SORT_FIELD_WORKING_SET_DELTA,
+	SORT_FIELD_HANDLE_DELTA,
+	SORT_FIELD_THREAD_DELTA,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -129,6 +133,10 @@ typedef struct {
 	ULONGLONG elapsed_time;
 	SIZE_T shared_working_set;
 	wchar_t parent_name[64];
+	LONGLONG private_bytes_delta;
+	LONGLONG working_set_delta;
+	int handle_delta;
+	int thread_delta;
 } process_entry;
 
 typedef struct {
@@ -141,6 +149,10 @@ typedef struct {
 	ULONG page_fault_count;
 	ULONG hard_fault_count;
 	ULONGLONG cycle_time;
+	SIZE_T private_bytes;
+	SIZE_T working_set;
+	DWORD handles;
+	DWORD threads;
 	ULONGLONG tick_ms;
 } cpu_snapshot;
 

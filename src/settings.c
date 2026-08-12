@@ -65,6 +65,10 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"Elapsed Time", L"Elapsed Time", 110, SORT_FIELD_ELAPSED, FALSE, FALSE},
 	{L"Shared Working Set", L"Shared Working Set", 120, SORT_FIELD_SHARED_WS, FALSE, FALSE},
 	{L"Parent Name", L"Parent Name", 150, SORT_FIELD_PARENT_NAME, FALSE, FALSE},
+	{L"Private Bytes Delta", L"Private Bytes Delta", 120, SORT_FIELD_PRIVATE_BYTES_DELTA, FALSE, FALSE},
+	{L"Working Set Delta", L"Working Set Delta", 120, SORT_FIELD_WORKING_SET_DELTA, FALSE, FALSE},
+	{L"Handle Delta", L"Handle Delta", 90, SORT_FIELD_HANDLE_DELTA, FALSE, FALSE},
+	{L"Thread Delta", L"Thread Delta", 90, SORT_FIELD_THREAD_DELTA, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

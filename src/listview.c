@@ -16,6 +16,25 @@ static void format_duration(ULONGLONG ticks, wchar_t* buf, int len) {
 	wnsprintf(buf, len, L"%llu:%02u:%02u", hours, mins, secs);
 }
 
+/* Deltas read as a change since the previous refresh, so they carry an explicit
+ * sign and go blank when nothing moved. wnsprintf has no '+' flag of its own. */
+static void format_byte_delta(LONGLONG delta, wchar_t* buf, int len) {
+	if (delta == 0) {
+		buf[0] = L'\0';
+		return;
+	}
+	wchar_t size[64];
+	StrFormatByteSizeW(delta < 0 ? -delta : delta, size, 64);
+	wnsprintf(buf, len, L"%s%s", delta < 0 ? L"-" : L"+", size);
+}
+
+static void format_count_delta(int delta, wchar_t* buf, int len) {
+	if (delta == 0)
+		buf[0] = L'\0';
+	else
+		wnsprintf(buf, len, L"%s%d", delta < 0 ? L"-" : L"+", delta < 0 ? -delta : delta);
+}
+
 /* Like format_duration, but processes routinely run for weeks, so break out days
  * rather than letting the hour count grow without bound. */
 static void format_elapsed(ULONGLONG ticks, wchar_t* buf, int len) {
@@ -392,6 +411,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_PARENT_NAME:
 		lstrcpyn(buf, e->parent_name, len);
+		break;
+	case COL_PRIVATE_BYTES_DELTA:
+		format_byte_delta(e->private_bytes_delta, buf, len);
+		break;
+	case COL_WORKING_SET_DELTA:
+		format_byte_delta(e->working_set_delta, buf, len);
+		break;
+	case COL_HANDLE_DELTA:
+		format_count_delta(e->handle_delta, buf, len);
+		break;
+	case COL_THREAD_DELTA:
+		format_count_delta(e->thread_delta, buf, len);
 		break;
 	default:
 		buf[0] = L'\0';
