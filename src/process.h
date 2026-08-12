@@ -53,6 +53,10 @@ typedef enum {
 	SORT_FIELD_KERNEL_TIME,
 	SORT_FIELD_USER_TIME,
 	SORT_FIELD_TOTAL_PAGE_FAULTS,
+	SORT_FIELD_IO_READ_OPS,
+	SORT_FIELD_IO_WRITE_OPS,
+	SORT_FIELD_IO_OTHER_OPS,
+	SORT_FIELD_TOTAL_IO,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -115,6 +119,10 @@ typedef struct {
 	ULONGLONG kernel_time;
 	ULONGLONG user_time;
 	ULONG total_page_faults;
+	ULONGLONG io_read_ops;
+	ULONGLONG io_write_ops;
+	ULONGLONG io_other_ops;
+	ULONGLONG total_io_bytes;
 } process_entry;
 
 typedef struct {

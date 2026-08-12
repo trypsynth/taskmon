@@ -516,6 +516,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_TOTAL_PAGE_FAULTS:
 		res = (a->total_page_faults < b->total_page_faults) ? -1 : (a->total_page_faults > b->total_page_faults);
 		break;
+	case SORT_FIELD_IO_READ_OPS:
+		res = (a->io_read_ops < b->io_read_ops) ? -1 : (a->io_read_ops > b->io_read_ops);
+		break;
+	case SORT_FIELD_IO_WRITE_OPS:
+		res = (a->io_write_ops < b->io_write_ops) ? -1 : (a->io_write_ops > b->io_write_ops);
+		break;
+	case SORT_FIELD_IO_OTHER_OPS:
+		res = (a->io_other_ops < b->io_other_ops) ? -1 : (a->io_other_ops > b->io_other_ops);
+		break;
+	case SORT_FIELD_TOTAL_IO:
+		res = (a->total_io_bytes < b->total_io_bytes) ? -1 : (a->total_io_bytes > b->total_io_bytes);
+		break;
 	default:
 		break;
 	}
@@ -911,6 +923,10 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
 		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;
 		ULONGLONG io_bytes = io_read + io_write + io_other;
+		e->io_read_ops = (ULONGLONG)spi->ReadOperationCount.QuadPart;
+		e->io_write_ops = (ULONGLONG)spi->WriteOperationCount.QuadPart;
+		e->io_other_ops = (ULONGLONG)spi->OtherOperationCount.QuadPart;
+		e->total_io_bytes = io_bytes;
 		cpu_snapshot current_snap = {proc_time, sys_time, io_bytes, io_read, io_write, io_other,
 			spi->PageFaultCount, spi->HardFaultCount, spi->CycleTime, tick_ms};
 		update_snapshot(snapshots, pid, current_snap);

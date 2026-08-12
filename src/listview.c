@@ -354,6 +354,18 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_TOTAL_PAGE_FAULTS:
 		wnsprintf(buf, len, L"%u", e->total_page_faults);
 		break;
+	case COL_IO_READ_OPS:
+		wnsprintf(buf, len, L"%llu", e->io_read_ops);
+		break;
+	case COL_IO_WRITE_OPS:
+		wnsprintf(buf, len, L"%llu", e->io_write_ops);
+		break;
+	case COL_IO_OTHER_OPS:
+		wnsprintf(buf, len, L"%llu", e->io_other_ops);
+		break;
+	case COL_TOTAL_IO:
+		StrFormatByteSizeW((LONGLONG)e->total_io_bytes, buf, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

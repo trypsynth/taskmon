@@ -84,6 +84,10 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Kernel Time: The portion of the process's accumulated CPU time spent inside the Windows kernel, such as during system calls.
 * User Time: The portion of the process's accumulated CPU time spent running its own code.
 * Total Page Faults: The total number of page faults the process has taken since it started, as a running count rather than a rate.
+* I/O Read Ops: The total number of read operations the process has issued since it started. A process moving few bytes across many operations behaves very differently from one moving the same bytes in a single read.
+* I/O Write Ops: The total number of write operations the process has issued since it started.
+* I/O Other Ops: The total number of I/O operations that are neither reads nor writes, such as device control requests.
+* Total I/O: The total number of bytes the process has transferred across all reads, writes, and other I/O since it started.
 
 ## Column Reordering and Accessible Sorting
 
