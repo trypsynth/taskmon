@@ -69,6 +69,10 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"Working Set Delta", L"Working Set Delta", 120, SORT_FIELD_WORKING_SET_DELTA, FALSE, FALSE},
 	{L"Handle Delta", L"Handle Delta", 90, SORT_FIELD_HANDLE_DELTA, FALSE, FALSE},
 	{L"Thread Delta", L"Thread Delta", 90, SORT_FIELD_THREAD_DELTA, FALSE, FALSE},
+	{L"Virtualization", L"Virtualization", 100, SORT_FIELD_VIRTUALIZATION, FALSE, FALSE},
+	{L"AppContainer", L"AppContainer", 90, SORT_FIELD_APP_CONTAINER, FALSE, FALSE},
+	{L"Domain", L"Domain", 120, SORT_FIELD_DOMAIN, FALSE, FALSE},
+	{L"User SID", L"User SID", 220, SORT_FIELD_USER_SID, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

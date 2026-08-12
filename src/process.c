@@ -2,6 +2,7 @@
 #include <appmodel.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <sddl.h>
 #include <shlwapi.h>
 #include <winternl.h>
 #include <wtsapi32.h>
@@ -549,6 +550,18 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_THREAD_DELTA:
 		res = (a->thread_delta < b->thread_delta) ? -1 : (a->thread_delta > b->thread_delta);
 		break;
+	case SORT_FIELD_VIRTUALIZATION:
+		res = (a->virtualization < b->virtualization) ? -1 : (a->virtualization > b->virtualization);
+		break;
+	case SORT_FIELD_APP_CONTAINER:
+		res = (a->app_container < b->app_container) ? -1 : (a->app_container > b->app_container);
+		break;
+	case SORT_FIELD_DOMAIN:
+		res = StrCmpI(a->domain, b->domain);
+		break;
+	case SORT_FIELD_USER_SID:
+		res = StrCmpI(a->user_sid, b->user_sid);
+		break;
 	default:
 		break;
 	}
@@ -665,65 +678,62 @@ static DWORD get_process_gui_resources(DWORD pid, DWORD flags) {
 	return count;
 }
 
-static DWORD get_process_integrity(DWORD pid) {
-	if (pid == 0) return 0x4000; /* SYSTEM */
-	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!hproc) return 0;
-	HANDLE htok = NULL;
-	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
-		CloseHandle(hproc);
-		return 0;
-	}
-	CloseHandle(hproc);
-	DWORD needed = 0;
-	GetTokenInformation(htok, TokenIntegrityLevel, NULL, 0, &needed);
-	BYTE* buf = heap_alloc(needed);
-	DWORD rid = 0;
-	if (buf && GetTokenInformation(htok, TokenIntegrityLevel, buf, needed, &needed)) {
-		TOKEN_MANDATORY_LABEL* tml = (TOKEN_MANDATORY_LABEL*)buf;
-		DWORD sub_count = *GetSidSubAuthorityCount(tml->Label.Sid);
-		rid = *GetSidSubAuthority(tml->Label.Sid, sub_count - 1);
-	}
-	heap_free(buf);
-	CloseHandle(htok);
-	return rid;
-}
+typedef struct {
+	DWORD integrity_level;
+	int elevated;       /* -1 = unknown, 0 = no, 1 = yes */
+	int virtualization; /* -1 = unknown, 0 = not allowed, 1 = disabled, 2 = enabled */
+	int app_container;  /* -1 = unknown, 0 = no, 1 = yes */
+	wchar_t user[64];
+	wchar_t domain[64];
+	wchar_t sid[128];
+} token_info;
 
-/* -1 = couldn't determine (e.g. protected process, other user without rights), 0 = no, 1 = yes */
-static int get_process_elevation(DWORD pid) {
-	if (pid == 0) return 0;
-	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-	if (!hproc) return -1;
-	HANDLE htok = NULL;
-	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
-		CloseHandle(hproc);
-		return -1;
-	}
-	CloseHandle(hproc);
-	TOKEN_ELEVATION elev = {0};
-	DWORD needed = 0;
-	int result = -1;
-	if (GetTokenInformation(htok, TokenElevation, &elev, sizeof(elev), &needed))
-		result = elev.TokenIsElevated ? 1 : 0;
-	CloseHandle(htok);
-	return result;
-}
-
-static void get_process_user(DWORD pid, wchar_t* buf, int len) {
-	buf[0] = L'\0';
+/* Everything here comes off one token, so open the process and its token once
+ * rather than once per attribute. "Unknown" values mean the token was out of
+ * reach, which is normal for protected processes and other users' processes. */
+static void get_process_token_info(DWORD pid, token_info* ti) {
+	ti->integrity_level = 0;
+	ti->elevated = -1;
+	ti->virtualization = -1;
+	ti->app_container = -1;
+	ti->user[0] = L'\0';
+	ti->domain[0] = L'\0';
+	ti->sid[0] = L'\0';
 	if (pid == 0) {
-		lstrcpyn(buf, L"SYSTEM", len);
+		ti->integrity_level = 0x4000; /* SYSTEM */
+		ti->elevated = 0;
+		lstrcpyn(ti->user, L"SYSTEM", 64);
 		return;
 	}
 	HANDLE hproc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
 	if (!hproc) return;
 	HANDLE htok = NULL;
-	if (!OpenProcessToken(hproc, TOKEN_QUERY, &htok)) {
-		CloseHandle(hproc);
-		return;
-	}
+	BOOL opened = OpenProcessToken(hproc, TOKEN_QUERY, &htok);
 	CloseHandle(hproc);
+	if (!opened) return;
 	DWORD needed = 0;
+	GetTokenInformation(htok, TokenIntegrityLevel, NULL, 0, &needed);
+	BYTE* buf = heap_alloc(needed);
+	if (buf && GetTokenInformation(htok, TokenIntegrityLevel, buf, needed, &needed)) {
+		TOKEN_MANDATORY_LABEL* tml = (TOKEN_MANDATORY_LABEL*)buf;
+		DWORD sub_count = *GetSidSubAuthorityCount(tml->Label.Sid);
+		ti->integrity_level = *GetSidSubAuthority(tml->Label.Sid, sub_count - 1);
+	}
+	heap_free(buf);
+	TOKEN_ELEVATION elev = {0};
+	if (GetTokenInformation(htok, TokenElevation, &elev, sizeof(elev), &needed))
+		ti->elevated = elev.TokenIsElevated ? 1 : 0;
+	DWORD allowed = 0, enabled = 0;
+	if (GetTokenInformation(htok, TokenVirtualizationAllowed, &allowed, sizeof(allowed), &needed)) {
+		if (!allowed)
+			ti->virtualization = 0;
+		else if (GetTokenInformation(htok, TokenVirtualizationEnabled, &enabled, sizeof(enabled), &needed))
+			ti->virtualization = enabled ? 2 : 1;
+	}
+	DWORD is_container = 0;
+	if (GetTokenInformation(htok, TokenIsAppContainer, &is_container, sizeof(is_container), &needed))
+		ti->app_container = is_container ? 1 : 0;
+	needed = 0;
 	GetTokenInformation(htok, TokenUser, NULL, 0, &needed);
 	BYTE* ubuf = heap_alloc(needed);
 	if (ubuf && GetTokenInformation(htok, TokenUser, ubuf, needed, &needed)) {
@@ -731,7 +741,15 @@ static void get_process_user(DWORD pid, wchar_t* buf, int len) {
 		wchar_t name[64], domain[64];
 		DWORD nlen = 64, dlen = 64;
 		SID_NAME_USE use;
-		if (LookupAccountSidW(NULL, tu->User.Sid, name, &nlen, domain, &dlen, &use)) lstrcpyn(buf, name, len);
+		if (LookupAccountSidW(NULL, tu->User.Sid, name, &nlen, domain, &dlen, &use)) {
+			lstrcpyn(ti->user, name, 64);
+			lstrcpyn(ti->domain, domain, 64);
+		}
+		LPWSTR sid_str = NULL;
+		if (ConvertSidToStringSidW(tu->User.Sid, &sid_str)) {
+			lstrcpyn(ti->sid, sid_str, 128);
+			LocalFree(sid_str);
+		}
 	}
 	heap_free(ubuf);
 	CloseHandle(htok);
@@ -925,8 +943,15 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->peak_threads = spi->NumberOfThreadsHighWatermark;
 		e->gdi_objects = get_process_gui_resources(pid, GR_GDIOBJECTS);
 		e->user_objects = get_process_gui_resources(pid, GR_USEROBJECTS);
-		e->integrity_level = get_process_integrity(pid);
-		get_process_user(pid, e->user, 64);
+		token_info ti;
+		get_process_token_info(pid, &ti);
+		e->integrity_level = ti.integrity_level;
+		e->elevated = ti.elevated;
+		e->virtualization = ti.virtualization;
+		e->app_container = ti.app_container;
+		lstrcpyn(e->user, ti.user, 64);
+		lstrcpyn(e->domain, ti.domain, 64);
+		lstrcpyn(e->user_sid, ti.sid, 128);
 		get_process_cmdline(pid, e->cmdline, 256);
 		get_process_version_info(pid, e->description, 128, e->company, 128,
 			e->file_version, 64, e->product_version, 64);
@@ -934,7 +959,6 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->dpi_awareness = get_process_dpi_awareness(pid);
 		e->arch_machine = get_process_arch(pid);
 		get_gpu_stat(pid, &e->gpu_percent, &e->gpu_memory);
-		e->elevated = get_process_elevation(pid);
 		get_process_path(pid, e->path, MAX_PATH);
 		get_session_name(e->session_id, e->session_name, 64);
 		get_package_name(pid, e->package_name, 256);

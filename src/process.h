@@ -64,6 +64,10 @@ typedef enum {
 	SORT_FIELD_WORKING_SET_DELTA,
 	SORT_FIELD_HANDLE_DELTA,
 	SORT_FIELD_THREAD_DELTA,
+	SORT_FIELD_VIRTUALIZATION,
+	SORT_FIELD_APP_CONTAINER,
+	SORT_FIELD_DOMAIN,
+	SORT_FIELD_USER_SID,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -137,6 +141,11 @@ typedef struct {
 	LONGLONG working_set_delta;
 	int handle_delta;
 	int thread_delta;
+	/* -1 = unknown, 0 = not allowed, 1 = disabled, 2 = enabled */
+	int virtualization;
+	int app_container; /* -1 = unknown, 0 = no, 1 = yes */
+	wchar_t domain[64];
+	wchar_t user_sid[128];
 } process_entry;
 
 typedef struct {

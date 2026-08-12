@@ -424,6 +424,37 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 	case COL_THREAD_DELTA:
 		format_count_delta(e->thread_delta, buf, len);
 		break;
+	case COL_VIRTUALIZATION: {
+		const wchar_t* label;
+		switch (e->virtualization) {
+		case 0:
+			label = L"Not allowed";
+			break;
+		case 1:
+			label = L"Disabled";
+			break;
+		case 2:
+			label = L"Enabled";
+			break;
+		default:
+			label = L"";
+			break;
+		}
+		lstrcpyn(buf, label, len);
+		break;
+	}
+	case COL_APP_CONTAINER:
+		if (e->app_container < 0)
+			buf[0] = L'\0';
+		else
+			lstrcpyn(buf, e->app_container ? L"Yes" : L"No", len);
+		break;
+	case COL_DOMAIN:
+		lstrcpyn(buf, e->domain, len);
+		break;
+	case COL_USER_SID:
+		lstrcpyn(buf, e->user_sid, len);
+		break;
 	default:
 		buf[0] = L'\0';
 		break;

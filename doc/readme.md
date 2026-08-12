@@ -95,6 +95,10 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Working Set Delta: How much the process's physical memory usage has grown or shrunk since the last refresh.
 * Handle Delta: How many kernel handles the process has gained or released since the last refresh. Steady growth here indicates a handle leak.
 * Thread Delta: How many threads the process has created or ended since the last refresh.
+* Virtualization: Whether UAC file and registry virtualization is Enabled, Disabled, or Not allowed for the process. Virtualization silently redirects writes that older programs make to protected locations.
+* AppContainer: Whether the process runs inside an AppContainer sandbox, as Store apps and many browser child processes do.
+* Domain: The domain or authority that owns the process's account, such as your machine name, NT AUTHORITY, or an Active Directory domain. Use this alongside User to tell apart identically named accounts from different domains.
+* User SID: The full security identifier of the process's account.
 
 ## Column Reordering and Accessible Sorting
 
