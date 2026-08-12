@@ -53,6 +53,8 @@ const column_def COLUMNS[COL_COUNT] = {
 	{L"Peak Paged Pool", L"Peak Paged Pool", 100, SORT_FIELD_PEAK_PAGED_POOL, FALSE, FALSE},
 	{L"Peak Non-paged Pool", L"Peak Non-paged Pool", 100, SORT_FIELD_PEAK_NONPAGED_POOL, FALSE, FALSE},
 	{L"Peak Threads", L"Peak Threads", 70, SORT_FIELD_PEAK_THREADS, FALSE, FALSE},
+	{L"Hard Faults", L"Hard Faults", 100, SORT_FIELD_HARD_FAULTS, FALSE, FALSE},
+	{L"CPU Cycles", L"CPU Cycles", 110, SORT_FIELD_CYCLES, FALSE, FALSE},
 };
 
 const UINT REFRESH_MS[REFRESH_OPTION_COUNT] = {0, 5000, 10000, 30000, 60000};

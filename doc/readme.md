@@ -79,6 +79,8 @@ All columns are optional except Name, which is always shown. Enable the ones you
 * Peak Paged Pool: The highest amount of pageable kernel memory ever allocated on the process's behalf.
 * Peak Non-paged Pool: The highest amount of non-pageable kernel memory ever allocated on the process's behalf.
 * Peak Threads: The largest number of threads the process has had running at once since it started.
+* Hard Faults: The rate of hard page faults per second, counting only the faults that had to be satisfied by reading from disk. Unlike Page Faults, this reflects real disk pressure.
+* CPU Cycles: The rate at which the process is consuming CPU clock cycles. On processors with a mix of performance and efficiency cores, this is a more accurate measure of work done than CPU %.
 
 ## Column Reordering and Accessible Sorting
 

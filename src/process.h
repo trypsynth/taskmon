@@ -48,6 +48,8 @@ typedef enum {
 	SORT_FIELD_PEAK_PAGED_POOL,
 	SORT_FIELD_PEAK_NONPAGED_POOL,
 	SORT_FIELD_PEAK_THREADS,
+	SORT_FIELD_HARD_FAULTS,
+	SORT_FIELD_CYCLES,
 	SORT_FIELD_COUNT,
 } sort_field;
 
@@ -105,6 +107,8 @@ typedef struct {
 	SIZE_T peak_paged_pool;
 	SIZE_T peak_non_paged_pool;
 	DWORD peak_threads;
+	double hard_faults_per_sec;
+	double cycles_per_sec;
 } process_entry;
 
 typedef struct {
@@ -115,6 +119,8 @@ typedef struct {
 	ULONGLONG io_write;
 	ULONGLONG io_other;
 	ULONG page_fault_count;
+	ULONG hard_fault_count;
+	ULONGLONG cycle_time;
 	ULONGLONG tick_ms;
 } cpu_snapshot;
 

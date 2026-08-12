@@ -7,6 +7,38 @@
 #include <commctrl.h>
 #include <shlwapi.h>
 
+/* Cycle counts run to billions per second, so scale them down to a K/M/G suffix
+ * the way StrFormatByteSizeW does for bytes. */
+static void format_cycle_rate(double rate, wchar_t* buf, int len) {
+	if (rate <= 0) {
+		buf[0] = L'\0';
+		return;
+	}
+	const wchar_t* suffix = L"";
+	double divisor = 1.0;
+	if (rate >= 1000000000.0) {
+		suffix = L" G";
+		divisor = 1000000000.0;
+	} else if (rate >= 1000000.0) {
+		suffix = L" M";
+		divisor = 1000000.0;
+	} else if (rate >= 1000.0) {
+		suffix = L" K";
+		divisor = 1000.0;
+	}
+	double scaled = rate / divisor;
+	UINT whole = (UINT)scaled;
+	UINT frac = (UINT)((scaled - whole) * 100 + 0.5);
+	if (frac >= 100) {
+		whole++;
+		frac = 0;
+	}
+	if (divisor == 1.0)
+		wnsprintf(buf, len, L"%u/s", whole);
+	else
+		wnsprintf(buf, len, L"%u.%02u%s/s", whole, frac, suffix);
+}
+
 static void format_column(const process_entry* e, column_id cid, wchar_t* buf, int len) {
 	switch (cid) {
 	case COL_PID:
@@ -297,6 +329,17 @@ static void format_column(const process_entry* e, column_id cid, wchar_t* buf, i
 		break;
 	case COL_PEAK_THREADS:
 		wnsprintf(buf, len, L"%u", e->peak_threads);
+		break;
+	case COL_HARD_FAULTS: {
+		UINT hf = (UINT)(e->hard_faults_per_sec + 0.5);
+		if (hf > 0)
+			wnsprintf(buf, len, L"%u /s", hf);
+		else
+			buf[0] = L'\0';
+		break;
+	}
+	case COL_CYCLES:
+		format_cycle_rate(e->cycles_per_sec, buf, len);
 		break;
 	default:
 		buf[0] = L'\0';

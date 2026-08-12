@@ -501,6 +501,12 @@ static int compare_entries(const process_entry* a, const process_entry* b, sort_
 	case SORT_FIELD_PEAK_THREADS:
 		res = (a->peak_threads < b->peak_threads) ? -1 : (a->peak_threads > b->peak_threads);
 		break;
+	case SORT_FIELD_HARD_FAULTS:
+		res = (a->hard_faults_per_sec < b->hard_faults_per_sec) ? -1 : (a->hard_faults_per_sec > b->hard_faults_per_sec);
+		break;
+	case SORT_FIELD_CYCLES:
+		res = (a->cycles_per_sec < b->cycles_per_sec) ? -1 : (a->cycles_per_sec > b->cycles_per_sec);
+		break;
 	default:
 		break;
 	}
@@ -851,6 +857,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		e->io_write_rate = 0.0;
 		e->io_other_rate = 0.0;
 		e->page_faults_per_sec = 0.0;
+		e->hard_faults_per_sec = 0.0;
+		e->cycles_per_sec = 0.0;
 		e->session_id = spi->SessionId;
 		e->peak_working_set = spi->PeakWorkingSetSize;
 		e->virtual_size = spi->VirtualSize;
@@ -891,7 +899,8 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 		ULONGLONG io_write = (ULONGLONG)spi->WriteTransferCount.QuadPart;
 		ULONGLONG io_other = (ULONGLONG)spi->OtherTransferCount.QuadPart;
 		ULONGLONG io_bytes = io_read + io_write + io_other;
-		cpu_snapshot current_snap = {proc_time, sys_time, io_bytes, io_read, io_write, io_other, spi->PageFaultCount, tick_ms};
+		cpu_snapshot current_snap = {proc_time, sys_time, io_bytes, io_read, io_write, io_other,
+			spi->PageFaultCount, spi->HardFaultCount, spi->CycleTime, tick_ms};
 		update_snapshot(snapshots, pid, current_snap);
 		cpu_snapshot* prev = find_snapshot(old_snaps, pid);
 		if (prev) {
@@ -917,6 +926,12 @@ process_entry* snapshot_processes(snapshot_entry* snapshots, int* out_count, sor
 										 ? spi->PageFaultCount - prev->page_fault_count
 										 : 0;
 				e->page_faults_per_sec = (double)delta_pf * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_hf = (spi->HardFaultCount >= prev->hard_fault_count)
+										 ? spi->HardFaultCount - prev->hard_fault_count
+										 : 0;
+				e->hard_faults_per_sec = (double)delta_hf * 1000.0 / (double)delta_ms;
+				ULONGLONG delta_cycles = (spi->CycleTime >= prev->cycle_time) ? spi->CycleTime - prev->cycle_time : 0;
+				e->cycles_per_sec = (double)delta_cycles * 1000.0 / (double)delta_ms;
 			}
 		}
 		if (spi->NextEntryOffset == 0) break;
