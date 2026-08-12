@@ -113,7 +113,6 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ## Changelog
 
 ### Version 0.3.0
-* Added 5 peak usage columns: Peak Virtual Memory, Peak Private Bytes, Peak Paged Pool, Peak Non-paged Pool, and Peak Threads.
 * Added Ctrl+Q as a shortcut to exit Taskmon completely.
 * Added 11 new columns: Service, GPU, GPU Memory, CPU Time, Elevated, Path, Window Title, File Version, Product Version, Session Name, and Package Name.
 * Added File > Restart as administrator to relaunch Taskmon elevated.
