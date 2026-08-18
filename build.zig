@@ -8,7 +8,6 @@ const libs = [_][]const u8{
 
 const sources = [_][]const u8{
 	"src/main.c",
-	"src/wndproc.c",
 };
 
 pub fn build(b: *std.Build) void {

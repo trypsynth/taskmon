@@ -1,5 +1,7 @@
 // Hand rolled, non zigwin32 Win32 bindings, grown incrementally as more of
 // taskmon is ported from C to Zig. Mirrors the approach used in ../sysinfo.
+const std = @import("std");
+const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub const HANDLE = ?*anyopaque;
 pub const HWND = ?*anyopaque;
@@ -123,6 +125,7 @@ pub const LR_DEFAULTSIZE: UINT = 0x0040;
 pub const LR_SHARED: UINT = 0x8000;
 pub const IDI_APPLICATION: usize = 32512;
 pub const SW_SHOW: i32 = 5;
+pub const SW_HIDE: i32 = 0;
 
 pub const MEMORYSTATUSEX = extern struct {
 	dwLength: DWORD,
@@ -241,7 +244,8 @@ pub extern "comctl32" fn SetWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC
 pub extern "user32" fn SetWindowLongPtrW(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) callconv(.c) LONG_PTR;
 pub extern "user32" fn GetWindowLongPtrW(hWnd: HWND, nIndex: c_int) callconv(.c) LONG_PTR;
 pub extern "user32" fn GetDlgItem(hDlg: HWND, nIDDlgItem: c_int) callconv(.c) HWND;
-pub extern "user32" fn CreateWindowExW(dwExStyle: DWORD, lpClassName: LPCWSTR, lpWindowName: LPCWSTR, dwStyle: DWORD, X: i32, Y: i32, nWidth: i32, nHeight: i32, hWndParent: HWND, hMenu: HMENU, hInstance: HINSTANCE, lpParam: ?*anyopaque) callconv(.c) HWND;
+pub extern "user32" fn SetMenu(hWnd: HWND, hMenu: HMENU) callconv(.c) BOOL;
+pub extern "user32" fn CreateWindowExW(dwExStyle: DWORD, lpClassName: LPCWSTR, lpWindowName: ?LPCWSTR, dwStyle: DWORD, X: i32, Y: i32, nWidth: i32, nHeight: i32, hWndParent: HWND, hMenu: HMENU, hInstance: HINSTANCE, lpParam: ?*anyopaque) callconv(.c) HWND;
 pub extern "user32" fn DialogBoxParamW(hInstance: HINSTANCE, lpTemplateName: LPCWSTR, hWndParent: HWND, lpDialogFunc: DLGPROC, dwInitParam: LPARAM) callconv(.c) INT_PTR;
 pub extern "user32" fn EndDialog(hDlg: HWND, nResult: INT_PTR) callconv(.c) BOOL;
 pub extern "user32" fn SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, X: i32, Y: i32, cx: i32, cy: i32, uFlags: UINT) callconv(.c) BOOL;
@@ -436,6 +440,8 @@ pub const LVM_DELETEALLITEMS: UINT = LVM_FIRST + 9;
 pub const LVM_SETITEMTEXTW: UINT = LVM_FIRST + 116;
 pub const LVM_SCROLL: UINT = LVM_FIRST + 20;
 pub const LVM_GETITEMRECT: UINT = LVM_FIRST + 14;
+pub const LVM_ENSUREVISIBLE: UINT = LVM_FIRST + 19;
+pub const LVM_GETITEMTEXTW: UINT = LVM_FIRST + 115;
 
 pub extern "shlwapi" fn StrFormatByteSizeW(qwSize: i64, pszBuf: [*:0]u16, cchBuf: UINT) callconv(.c) ?[*:0]u16;
 pub extern "kernel32" fn FileTimeToLocalFileTime(lpFileTime: *const FILETIME, lpLocalFileTime: *FILETIME) callconv(.c) BOOL;
@@ -474,6 +480,152 @@ pub extern "shlwapi" fn ConvertSidToStringSidW(Sid: ?*anyopaque, StringSid: *LPW
 pub extern "user32" fn GetGuiResources(hProcess: HANDLE, uiFlags: DWORD) callconv(.c) DWORD;
 pub extern "user32" fn IsWindowVisible(hWnd: HWND) callconv(.c) BOOL;
 pub extern "user32" fn GetWindowThreadProcessId(hWnd: HWND, lpdwProcessId: *DWORD) callconv(.c) DWORD;
+
+pub const HMONITOR = ?*anyopaque;
+pub const HRGN = ?*anyopaque;
+
+pub const WM_NULL: UINT = 0x0000;
+pub const WM_CREATE: UINT = 0x0001;
+pub const WM_DESTROY: UINT = 0x0002;
+pub const WM_SIZE: UINT = 0x0005;
+pub const WM_ACTIVATE: UINT = 0x0006;
+pub const WA_INACTIVE: WORD = 0;
+pub const WM_ERASEBKGND: UINT = 0x0014;
+pub const WM_WININICHANGE: UINT = 0x001A;
+pub const WM_SETTINGCHANGE: UINT = WM_WININICHANGE;
+pub const WM_NOTIFY: UINT = 0x004E;
+pub const WM_CONTEXTMENU: UINT = 0x007B;
+pub const WM_TIMER: UINT = 0x0113;
+pub const WM_LBUTTONUP: UINT = 0x0202;
+pub const WM_RBUTTONUP: UINT = 0x0205;
+pub const WM_HOTKEY: UINT = 0x0312;
+pub const MOD_CONTROL: UINT = 0x0002;
+pub const MOD_SHIFT: UINT = 0x0004;
+pub const MOD_NOREPEAT: UINT = 0x4000;
+pub const VK_OEM_3: usize = 0xC0;
+pub const SS_LEFT: DWORD = 0x00000000;
+
+pub const HWND_DESKTOP: HWND = @ptrFromInt(0);
+pub const HWND_TOPMOST: HWND = @ptrFromInt(@as(usize, @bitCast(@as(isize, -1))));
+pub const HWND_NOTOPMOST: HWND = @ptrFromInt(@as(usize, @bitCast(@as(isize, -2))));
+pub const MONITOR_DEFAULTTONULL: DWORD = 0x00000000;
+pub const TPM_RIGHTBUTTON: UINT = 0x0002;
+pub const RDW_INVALIDATE: UINT = 0x0001;
+pub const RDW_ERASE: UINT = 0x0004;
+pub const RDW_ALLCHILDREN: UINT = 0x0080;
+pub const MB_YESNO: UINT = 0x00000004;
+pub const MB_ICONQUESTION: UINT = 0x00000020;
+pub const MB_DEFBUTTON2: UINT = 0x00000100;
+pub const IDYES: c_int = 6;
+pub const MF_STRING: UINT = 0x00000000;
+pub const MF_UNCHECKED: UINT = 0x00000000;
+pub const MF_GRAYED: UINT = 0x00000001;
+pub const MF_CHECKED: UINT = 0x00000008;
+pub const MF_POPUP: UINT = 0x00000010;
+pub const MF_SEPARATOR: UINT = 0x00000800;
+
+pub const TVHT_ONITEMICON: UINT = 0x2;
+pub const TVHT_ONITEMLABEL: UINT = 0x4;
+pub const TVHT_ONITEMSTATEICON: UINT = 0x40;
+pub const TVHT_ONITEM: UINT = TVHT_ONITEMICON | TVHT_ONITEMLABEL | TVHT_ONITEMSTATEICON;
+pub const TVM_SETEXTENDEDSTYLE: UINT = TV_FIRST + 44;
+
+pub const ICC_LISTVIEW_CLASSES: DWORD = 0x1;
+pub const ICC_TREEVIEW_CLASSES: DWORD = 0x2;
+pub const ICC_BAR_CLASSES: DWORD = 0x4;
+pub const WC_LISTVIEWW = L("SysListView32");
+pub const WC_TREEVIEWW = L("SysTreeView32");
+pub const STATUSCLASSNAMEW = L("msctls_statusbar32");
+pub const LVS_REPORT: DWORD = 0x1;
+pub const LVS_SHOWSELALWAYS: DWORD = 0x8;
+pub const LVS_EX_GRIDLINES: DWORD = 0x1;
+pub const LVS_EX_HEADERDRAGDROP: DWORD = 0x10;
+pub const LVS_EX_FULLROWSELECT: DWORD = 0x20;
+pub const TVS_HASBUTTONS: DWORD = 0x1;
+pub const TVS_HASLINES: DWORD = 0x2;
+pub const TVS_LINESATROOT: DWORD = 0x4;
+pub const TVS_SHOWSELALWAYS: DWORD = 0x20;
+pub const TVS_EX_DOUBLEBUFFER: DWORD = 0x4;
+const LVN_FIRST: i32 = -100;
+pub const LVN_COLUMNCLICK: i32 = LVN_FIRST - 8;
+
+pub const IDLE_PRIORITY_CLASS: DWORD = 0x40;
+pub const NORMAL_PRIORITY_CLASS: DWORD = 0x20;
+pub const HIGH_PRIORITY_CLASS: DWORD = 0x80;
+pub const REALTIME_PRIORITY_CLASS: DWORD = 0x100;
+pub const BELOW_NORMAL_PRIORITY_CLASS: DWORD = 0x4000;
+pub const ABOVE_NORMAL_PRIORITY_CLASS: DWORD = 0x8000;
+
+pub const INITCOMMONCONTROLSEX = extern struct {
+	dwSize: DWORD,
+	dwICC: DWORD,
+};
+
+pub const NMHDR = extern struct {
+	hwndFrom: HWND,
+	idFrom: UINT_PTR,
+	code: UINT,
+};
+
+pub const NMLISTVIEW = extern struct {
+	hdr: NMHDR,
+	iItem: i32,
+	iSubItem: i32,
+	uNewState: UINT,
+	uOldState: UINT,
+	uChanged: UINT,
+	ptAction: POINT,
+	lParam: LPARAM,
+};
+
+pub const WINDOWPLACEMENT = extern struct {
+	length: UINT,
+	flags: UINT,
+	showCmd: UINT,
+	ptMinPosition: POINT,
+	ptMaxPosition: POINT,
+	rcNormalPosition: RECT,
+};
+
+pub const PIDLIST_ABSOLUTE = ?*anyopaque;
+pub const PIDLIST_RELATIVE = ?*anyopaque;
+pub const PUITEMID_CHILD = ?*anyopaque;
+pub const PCUIDLIST_RELATIVE = ?*const anyopaque;
+
+pub extern "user32" fn RegisterHotKey(hWnd: HWND, id: c_int, fsModifiers: UINT, vk: UINT) callconv(.c) BOOL;
+pub extern "user32" fn UnregisterHotKey(hWnd: HWND, id: c_int) callconv(.c) BOOL;
+pub extern "user32" fn DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) LRESULT;
+pub extern "user32" fn PostQuitMessage(nExitCode: c_int) callconv(.c) void;
+pub extern "user32" fn GetWindowPlacement(hWnd: HWND, lpwndpl: *WINDOWPLACEMENT) callconv(.c) BOOL;
+pub extern "user32" fn GetFocus() callconv(.c) HWND;
+pub extern "user32" fn SetTimer(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: ?*anyopaque) callconv(.c) UINT_PTR;
+pub extern "user32" fn KillTimer(hWnd: HWND, uIDEvent: UINT_PTR) callconv(.c) BOOL;
+pub extern "user32" fn GetMenu(hWnd: HWND) callconv(.c) HMENU;
+pub extern "user32" fn CreateMenu() callconv(.c) HMENU;
+pub extern "user32" fn CreatePopupMenu() callconv(.c) HMENU;
+pub extern "user32" fn DestroyMenu(hMenu: HMENU) callconv(.c) BOOL;
+pub extern "user32" fn CheckMenuItem(hMenu: HMENU, uIDCheckItem: UINT, uCheck: UINT) callconv(.c) DWORD;
+pub extern "user32" fn GetSubMenu(hMenu: HMENU, nPos: c_int) callconv(.c) HMENU;
+pub extern "user32" fn AppendMenuW(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: ?LPCWSTR) callconv(.c) BOOL;
+pub extern "user32" fn TrackPopupMenu(hMenu: HMENU, uFlags: UINT, x: c_int, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ?*const RECT) callconv(.c) BOOL;
+pub extern "user32" fn GetForegroundWindow() callconv(.c) HWND;
+pub extern "user32" fn RedrawWindow(hWnd: HWND, lprcUpdate: ?*const RECT, hrgnUpdate: HRGN, flags: UINT) callconv(.c) BOOL;
+pub extern "user32" fn GetClientRect(hWnd: HWND, lpRect: *RECT) callconv(.c) BOOL;
+pub extern "user32" fn MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) callconv(.c) c_int;
+pub extern "user32" fn GetCursorPos(lpPoint: *POINT) callconv(.c) BOOL;
+pub extern "user32" fn ScreenToClient(hWnd: HWND, lpPoint: *POINT) callconv(.c) BOOL;
+pub extern "user32" fn MapWindowPoints(hWndFrom: HWND, hWndTo: HWND, lpPoints: [*]POINT, cPoints: UINT) callconv(.c) c_int;
+pub extern "user32" fn FillRect(hDC: HDC, lprc: *const RECT, hbr: HBRUSH) callconv(.c) c_int;
+pub extern "user32" fn MonitorFromPoint(pt: POINT, dwFlags: DWORD) callconv(.c) HMONITOR;
+pub extern "kernel32" fn lstrcmpW(lpString1: LPCWSTR, lpString2: LPCWSTR) callconv(.c) c_int;
+pub extern "kernel32" fn GetPriorityClass(hProcess: HANDLE) callconv(.c) DWORD;
+pub extern "comctl32" fn InitCommonControlsEx(icc: *const INITCOMMONCONTROLSEX) callconv(.c) BOOL;
+pub extern "shell32" fn ILCreateFromPathW(pszPath: LPCWSTR) callconv(.c) PIDLIST_ABSOLUTE;
+pub extern "shell32" fn ILFree(pidl: PIDLIST_RELATIVE) callconv(.c) void;
+pub extern "shell32" fn ILFindLastID(pidl: PCUIDLIST_RELATIVE) callconv(.c) PUITEMID_CHILD;
+pub extern "shell32" fn SHOpenFolderAndSelectItems(pidlFolder: PIDLIST_ABSOLUTE, cidl: UINT, apidl: [*]const PUITEMID_CHILD, dwFlags: DWORD) callconv(.c) c_long;
+pub extern "shell32" fn ShellExecuteW(hwnd: HWND, lpOperation: ?LPCWSTR, lpFile: ?LPCWSTR, lpParameters: ?LPCWSTR, lpDirectory: ?LPCWSTR, nShowCmd: c_int) callconv(.c) HINSTANCE;
+pub extern "kernel32" fn CreateMutexW(lpMutexAttributes: ?*anyopaque, bInitialOwner: BOOL, lpName: ?LPCWSTR) callconv(.c) HANDLE;
 pub extern "user32" fn EnumWindows(lpEnumFunc: *const fn (HWND, LPARAM) callconv(.c) BOOL, lParam: LPARAM) callconv(.c) BOOL;
 pub extern "user32" fn GetWindow(hWnd: HWND, uCmd: UINT) callconv(.c) HWND;
 pub extern "user32" fn GetWindowTextW(hWnd: HWND, lpString: [*:0]u16, nMaxCount: c_int) callconv(.c) c_int;

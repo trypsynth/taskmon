@@ -8,6 +8,7 @@ comptime {
 	_ = @import("treeview.zig");
 	_ = @import("listview.zig");
 	_ = @import("process.zig");
+	_ = @import("wndproc.zig");
 }
 
 // _fltused is required by the linker whenever floating point is used in a
