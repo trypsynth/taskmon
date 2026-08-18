@@ -4,11 +4,27 @@
 pub const HANDLE = ?*anyopaque;
 pub const HWND = ?*anyopaque;
 pub const HINSTANCE = ?*anyopaque;
+pub const HDC = ?*anyopaque;
+pub const HBRUSH = ?*anyopaque;
+pub const HKEY = ?*anyopaque;
 pub const WORD = u16;
 pub const DWORD = u32;
 pub const BOOL = i32;
+pub const UINT = u32;
+pub const WPARAM = usize;
+pub const LPARAM = isize;
+pub const LRESULT = isize;
+pub const LSTATUS = i32;
+pub const COLORREF = u32;
 pub const LPWSTR = ?[*:0]u16;
 pub const LPCWSTR = [*:0]const u16;
+
+pub const RECT = extern struct {
+	left: i32,
+	top: i32,
+	right: i32,
+	bottom: i32,
+};
 
 pub const STARTUPINFOW = extern struct {
 	cb: DWORD,
@@ -37,3 +53,19 @@ pub const SW_SHOWDEFAULT: i32 = 10;
 pub extern "kernel32" fn GetModuleHandleW(lpModuleName: ?LPCWSTR) callconv(.c) HINSTANCE;
 pub extern "kernel32" fn GetStartupInfoW(lpStartupInfo: *STARTUPINFOW) callconv(.c) void;
 pub extern "kernel32" fn ExitProcess(uExitCode: c_uint) callconv(.c) noreturn;
+
+pub const HKEY_CURRENT_USER: HKEY = @ptrFromInt(0x80000001);
+pub const RRF_RT_REG_DWORD: DWORD = 0x00000010;
+
+pub extern "advapi32" fn RegGetValueW(hkey: HKEY, lpSubKey: LPCWSTR, lpValue: LPCWSTR, dwFlags: DWORD, pdwType: ?*DWORD, pvData: ?*anyopaque, pcbData: ?*DWORD) callconv(.c) LSTATUS;
+
+pub extern "dwmapi" fn DwmSetWindowAttribute(hwnd: HWND, dwAttribute: DWORD, pvAttribute: *const anyopaque, cbAttribute: DWORD) callconv(.c) c_long;
+
+pub extern "uxtheme" fn SetWindowTheme(hwnd: HWND, pszSubAppName: ?LPCWSTR, pszSubIdList: ?LPCWSTR) callconv(.c) c_long;
+
+pub extern "user32" fn SendMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) LRESULT;
+pub extern "user32" fn InvalidateRect(hWnd: HWND, lpRect: ?*const RECT, bErase: BOOL) callconv(.c) BOOL;
+
+pub extern "gdi32" fn CreateSolidBrush(color: COLORREF) callconv(.c) HBRUSH;
+pub extern "gdi32" fn SetTextColor(hdc: HDC, color: COLORREF) callconv(.c) COLORREF;
+pub extern "gdi32" fn SetBkColor(hdc: HDC, color: COLORREF) callconv(.c) COLORREF;
