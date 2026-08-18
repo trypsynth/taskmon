@@ -69,3 +69,63 @@ pub extern "user32" fn InvalidateRect(hWnd: HWND, lpRect: ?*const RECT, bErase: 
 pub extern "gdi32" fn CreateSolidBrush(color: COLORREF) callconv(.c) HBRUSH;
 pub extern "gdi32" fn SetTextColor(hdc: HDC, color: COLORREF) callconv(.c) COLORREF;
 pub extern "gdi32" fn SetBkColor(hdc: HDC, color: COLORREF) callconv(.c) COLORREF;
+
+pub const GUID = extern struct {
+	Data1: u32,
+	Data2: u16,
+	Data3: u16,
+	Data4: [8]u8,
+};
+
+pub const NOTIFYICONDATAW = extern struct {
+	cbSize: DWORD,
+	hWnd: HWND,
+	uID: UINT,
+	uFlags: UINT,
+	uCallbackMessage: UINT,
+	hIcon: HANDLE,
+	szTip: [128]u16,
+	dwState: DWORD,
+	dwStateMask: DWORD,
+	szInfo: [256]u16,
+	anon: extern union {
+		uTimeout: UINT,
+		uVersion: UINT,
+	},
+	szInfoTitle: [64]u16,
+	dwInfoFlags: DWORD,
+	guidItem: GUID,
+	hBalloonIcon: HANDLE,
+};
+
+pub const NIM_ADD: DWORD = 0x00000000;
+pub const NIM_MODIFY: DWORD = 0x00000001;
+pub const NIM_DELETE: DWORD = 0x00000002;
+pub const NIF_MESSAGE: UINT = 0x00000001;
+pub const NIF_ICON: UINT = 0x00000002;
+pub const NIF_TIP: UINT = 0x00000004;
+pub const IMAGE_ICON: UINT = 1;
+pub const LR_DEFAULTSIZE: UINT = 0x0040;
+pub const LR_SHARED: UINT = 0x8000;
+pub const IDI_APPLICATION: usize = 32512;
+pub const SW_SHOW: i32 = 5;
+
+pub const MEMORYSTATUSEX = extern struct {
+	dwLength: DWORD,
+	dwMemoryLoad: DWORD,
+	ullTotalPhys: u64,
+	ullAvailPhys: u64,
+	ullTotalPageFile: u64,
+	ullAvailPageFile: u64,
+	ullTotalVirtual: u64,
+	ullAvailVirtual: u64,
+	ullAvailExtendedVirtual: u64,
+};
+
+pub extern "kernel32" fn lstrcpyW(lpString1: [*:0]u16, lpString2: [*:0]const u16) callconv(.c) ?[*:0]u16;
+pub extern "kernel32" fn GlobalMemoryStatusEx(lpBuffer: *MEMORYSTATUSEX) callconv(.c) BOOL;
+pub extern "user32" fn LoadImageW(hInst: HINSTANCE, name: LPCWSTR, imgType: UINT, cx: i32, cy: i32, fuLoad: UINT) callconv(.c) HANDLE;
+pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: i32) callconv(.c) BOOL;
+pub extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.c) BOOL;
+pub extern "shell32" fn Shell_NotifyIconW(dwMessage: DWORD, lpData: *NOTIFYICONDATAW) callconv(.c) BOOL;
+pub extern "shlwapi" fn wnsprintfW(pszDest: [*:0]u16, cchDest: i32, pszFmt: LPCWSTR, ...) callconv(.c) i32;
