@@ -387,7 +387,7 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	return total_cpu;
 }
 
-pub export fn doRefresh() callconv(.c) void {
+pub fn doRefresh() void {
 	var count: i32 = 0;
 	const field: settings.SortField = if (g_prefs.tree_mode != 0) .name else g_prefs.field;
 	const desc: win32.BOOL = if (g_prefs.tree_mode != 0) 0 else g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))];
@@ -419,7 +419,7 @@ pub export fn doRefresh() callconv(.c) void {
 	}
 }
 
-pub export fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
+pub fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_KEYDOWN and wp == win32.VK_ESCAPE) {

@@ -81,7 +81,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
 }
 
-pub export fn updateTabStop() callconv(.c) void {
+pub fn updateTabStop() void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -95,7 +95,7 @@ pub export fn updateTabStop() callconv(.c) void {
 	}
 }
 
-pub export fn updateSortUi() callconv(.c) void {
+pub fn updateSortUi() void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -129,7 +129,7 @@ pub export fn updateSortUi() callconv(.c) void {
 	}
 }
 
-pub export fn applyColumns() callconv(.c) void {
+pub fn applyColumns() void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -173,13 +173,13 @@ pub export fn applyColumns() callconv(.c) void {
 	applyTheme();
 }
 
-pub export fn applyTheme() callconv(.c) void {
+pub fn applyTheme() void {
 	theme.applyButton(g_hwnd_sort_group);
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) theme.applyButton(g_sort_btns[@intCast(i)]);
 }
 
-pub export fn create(parent: win32.HWND) callconv(.c) win32.HWND {
+pub fn create(parent: win32.HWND) win32.HWND {
 	const group = win32.CreateWindowExW(win32.WS_EX_CONTROLPARENT, L("BUTTON"), L("Sort by"), win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_GROUPBOX, 0, 0, 0, 1, parent, null, win32.GetModuleHandleW(null), null);
 	_ = win32.SetWindowSubclass(group, sortGroupProc, 0, 0);
 	return group;

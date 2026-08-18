@@ -25,23 +25,23 @@ const TVM_SETTEXTCOLOR: win32.UINT = 0x1100 + 30;
 var g_dark: win32.BOOL = 0;
 var g_dark_brush: win32.HBRUSH = null;
 
-pub export fn update() callconv(.c) void {
+pub fn update() void {
 	var value: win32.DWORD = 1;
 	var size: win32.DWORD = @sizeOf(win32.DWORD);
 	_ = win32.RegGetValueW(win32.HKEY_CURRENT_USER, L("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"), L("AppsUseLightTheme"), win32.RRF_RT_REG_DWORD, null, &value, &size);
 	g_dark = if (value == 0) 1 else 0;
 }
 
-pub export fn isDark() callconv(.c) win32.BOOL {
+pub fn isDark() win32.BOOL {
 	return g_dark;
 }
 
-pub export fn applyTitlebar(hwnd: win32.HWND) callconv(.c) void {
+pub fn applyTitlebar(hwnd: win32.HWND) void {
 	const dark = g_dark;
 	_ = win32.DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, @sizeOf(win32.BOOL));
 }
 
-pub export fn applyListview(hwnd_list: win32.HWND) callconv(.c) void {
+pub fn applyListview(hwnd_list: win32.HWND) void {
 	if (g_dark != 0) {
 		_ = win32.SetWindowTheme(hwnd_list, L("DarkMode_Explorer"), null);
 		_ = win32.SendMessageW(hwnd_list, LVM_SETBKCOLOR, 0, colorParam(DARK_BG));
@@ -56,11 +56,11 @@ pub export fn applyListview(hwnd_list: win32.HWND) callconv(.c) void {
 	_ = win32.InvalidateRect(hwnd_list, null, 1);
 }
 
-pub export fn applyButton(hwnd: win32.HWND) callconv(.c) void {
+pub fn applyButton(hwnd: win32.HWND) void {
 	_ = win32.SetWindowTheme(hwnd, if (g_dark != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 }
 
-pub export fn applyTreeview(hwnd_tree: win32.HWND) callconv(.c) void {
+pub fn applyTreeview(hwnd_tree: win32.HWND) void {
 	if (g_dark != 0) {
 		_ = win32.SetWindowTheme(hwnd_tree, L("DarkMode_Explorer"), null);
 		_ = win32.SendMessageW(hwnd_tree, TVM_SETBKCOLOR, 0, colorParam(DARK_BG));
@@ -73,7 +73,7 @@ pub export fn applyTreeview(hwnd_tree: win32.HWND) callconv(.c) void {
 	_ = win32.InvalidateRect(hwnd_tree, null, 1);
 }
 
-pub export fn ctlColor(hdc: win32.HDC) callconv(.c) win32.HBRUSH {
+pub fn ctlColor(hdc: win32.HDC) win32.HBRUSH {
 	if (g_dark == 0) return null;
 	if (g_dark_brush == null) g_dark_brush = win32.CreateSolidBrush(DARK_BG);
 	_ = win32.SetTextColor(hdc, DARK_TEXT);
@@ -81,7 +81,7 @@ pub export fn ctlColor(hdc: win32.HDC) callconv(.c) win32.HBRUSH {
 	return g_dark_brush;
 }
 
-pub export fn bgBrush() callconv(.c) win32.HBRUSH {
+pub fn bgBrush() win32.HBRUSH {
 	if (g_dark == 0) return null;
 	if (g_dark_brush == null) g_dark_brush = win32.CreateSolidBrush(DARK_BG);
 	return g_dark_brush;

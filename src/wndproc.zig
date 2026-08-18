@@ -460,7 +460,7 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 	return 0;
 }
 
-pub export fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.LRESULT {
+pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.LRESULT {
 	switch (msg) {
 		win32.WM_ACTIVATE => {
 			const low: u16 = @truncate(wp);

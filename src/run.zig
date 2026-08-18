@@ -88,6 +88,6 @@ fn runDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPA
 	return 0;
 }
 
-pub export fn openDialog(parent: win32.HWND) callconv(.c) void {
+pub fn openDialog(parent: win32.HWND) void {
 	_ = win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_RUN), parent, runDlgProc, 0);
 }

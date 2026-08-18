@@ -312,7 +312,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	return 0;
 }
 
-pub export fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) callconv(.c) win32.BOOL {
+pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) win32.BOOL {
 	var data: SettingsDlgData = undefined;
 	data.refresh_ms = current_ms;
 	var i: usize = 0;
@@ -349,7 +349,7 @@ fn getIniPath(buf: [*:0]u16) void {
 	}
 }
 
-pub export fn load(prefs: *SortPrefs) callconv(.c) void {
+pub fn load(prefs: *SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	prefs.field = .name;
@@ -413,7 +413,7 @@ pub export fn load(prefs: *SortPrefs) callconv(.c) void {
 	}
 }
 
-pub export fn save(prefs: *const SortPrefs) callconv(.c) void {
+pub fn save(prefs: *const SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	var i: usize = 0;

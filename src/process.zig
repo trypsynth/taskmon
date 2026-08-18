@@ -104,7 +104,7 @@ fn initGpuCounters() void {
 	g_pdh_ready = true;
 }
 
-pub export fn gpuCleanup() callconv(.c) void {
+pub fn gpuCleanup() void {
 	if (g_pdh_query != null) {
 		_ = win32.PdhCloseQuery(g_pdh_query);
 		g_pdh_query = null;
@@ -864,7 +864,7 @@ fn getProcessHandleInfo(pid: win32.DWORD, hi: *HandleInfo) void {
 	_ = win32.CloseHandle(h);
 }
 
-pub export fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: win32.BOOL) callconv(.c) ?[*]pt.ProcessEntry {
+pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: win32.BOOL) ?[*]pt.ProcessEntry {
 	buildServiceMap();
 	buildWindowMap();
 	refreshGpuStats();
@@ -1070,11 +1070,11 @@ pub export fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32,
 	return entries;
 }
 
-pub export fn freeProcessEntries(entries: ?[*]pt.ProcessEntry) callconv(.c) void {
+pub fn freeProcessEntries(entries: ?[*]pt.ProcessEntry) void {
 	heapFree(@ptrCast(entries));
 }
 
-pub export fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) callconv(.c) void {
+pub fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) void {
 	var size = size_in;
 	const h = win32.OpenProcess(win32.PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
 	if (h == null) {
@@ -1085,7 +1085,7 @@ pub export fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DW
 	_ = win32.CloseHandle(h);
 }
 
-pub export fn terminateProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub fn terminateProcess(pid: win32.DWORD) win32.BOOL {
 	const h = win32.OpenProcess(win32.PROCESS_TERMINATE, 0, pid);
 	if (h == null) return 0;
 	const success = win32.TerminateProcess(h, 1);
@@ -1093,7 +1093,7 @@ pub export fn terminateProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	return success;
 }
 
-pub export fn isProcessSuspended(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub fn isProcessSuspended(pid: win32.DWORD) win32.BOOL {
 	var i: i32 = 0;
 	while (i < g_suspended_count) : (i += 1) {
 		if (g_suspended_pids[@intCast(i)] == pid) return 1;
@@ -1103,7 +1103,7 @@ pub export fn isProcessSuspended(pid: win32.DWORD) callconv(.c) win32.BOOL {
 
 var g_nt_suspend_fn: ?FnNtProc = null;
 
-pub export fn suspendProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub fn suspendProcess(pid: win32.DWORD) win32.BOOL {
 	if (g_nt_suspend_fn == null) {
 		g_nt_suspend_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtSuspendProcess"));
 	}
@@ -1121,7 +1121,7 @@ pub export fn suspendProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 
 var g_nt_resume_fn: ?FnNtProc = null;
 
-pub export fn resumeProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub fn resumeProcess(pid: win32.DWORD) win32.BOOL {
 	if (g_nt_resume_fn == null) {
 		g_nt_resume_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtResumeProcess"));
 	}
@@ -1143,7 +1143,7 @@ pub export fn resumeProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	return if (ok) 1 else 0;
 }
 
-pub export fn setProcessPriority(pid: win32.DWORD, priority_class: win32.DWORD) callconv(.c) win32.BOOL {
+pub fn setProcessPriority(pid: win32.DWORD, priority_class: win32.DWORD) win32.BOOL {
 	const h = win32.OpenProcess(win32.PROCESS_SET_INFORMATION, 0, pid);
 	if (h == null) return 0;
 	const success = win32.SetPriorityClass(h, priority_class);

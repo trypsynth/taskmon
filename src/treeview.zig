@@ -2,6 +2,7 @@ const std = @import("std");
 const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
 const tray = @import("tray.zig");
+const process = @import("process.zig");
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
 const MAX_EXPANDED = 512;
@@ -151,7 +152,7 @@ fn insertRoot(e: *pt.ProcessEntry, entries: [*]pt.ProcessEntry, count: i32, done
 	if (hr != null) insertChildren(hr, e, entries, count, done);
 }
 
-pub export fn populate(entries: [*]pt.ProcessEntry, count: i32) callconv(.c) f64 {
+pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	// Save current UI state
 	const old_sel = tvGetSel();
 	s_selected_pid = 0;
@@ -218,7 +219,7 @@ pub export fn populate(entries: [*]pt.ProcessEntry, count: i32) callconv(.c) f64
 }
 
 // Terminates children bottom-up so parents outlive their children as briefly as possible
-pub export fn terminateFromItem(item: win32.HTREEITEM) callconv(.c) void {
+pub fn terminateFromItem(item: win32.HTREEITEM) void {
 	if (item == null) return;
 	var child = tvGetChild(item);
 	while (child != null) {
@@ -230,10 +231,10 @@ pub export fn terminateFromItem(item: win32.HTREEITEM) callconv(.c) void {
 	tvi.mask = win32.TVIF_PARAM;
 	tvi.hItem = item;
 	tvGetItem(&tvi);
-	_ = pt.terminateProcess(@intCast(tvi.lParam));
+	_ = process.terminateProcess(@intCast(tvi.lParam));
 }
 
-pub export fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
+pub fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_KEYDOWN and wp == win32.VK_ESCAPE) {
@@ -244,7 +245,7 @@ pub export fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: w
 }
 
 // Returns the PID from the tree item currently selected, 0 if none
-pub export fn getSelectedPid() callconv(.c) win32.DWORD {
+pub fn getSelectedPid() win32.DWORD {
 	const sel = tvGetSel();
 	if (sel == null) return 0;
 	var tvi: win32.TVITEMW = std.mem.zeroes(win32.TVITEMW);
@@ -255,7 +256,7 @@ pub export fn getSelectedPid() callconv(.c) win32.DWORD {
 }
 
 // Writes the text label of the selected tree item into buf (the process name)
-pub export fn getSelectedName(buf: [*:0]u16, cch: i32) callconv(.c) void {
+pub fn getSelectedName(buf: [*:0]u16, cch: i32) void {
 	buf[0] = 0;
 	const sel = tvGetSel();
 	if (sel == null) return;
@@ -267,6 +268,6 @@ pub export fn getSelectedName(buf: [*:0]u16, cch: i32) callconv(.c) void {
 	tvGetItem(&tvi);
 }
 
-pub export fn getSelection() callconv(.c) win32.HTREEITEM {
+pub fn getSelection() win32.HTREEITEM {
 	return tvGetSel();
 }
