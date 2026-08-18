@@ -4,6 +4,8 @@
 pub const HANDLE = ?*anyopaque;
 pub const HWND = ?*anyopaque;
 pub const HINSTANCE = ?*anyopaque;
+pub const HMODULE = ?*anyopaque;
+pub const HMENU = ?*anyopaque;
 pub const HDC = ?*anyopaque;
 pub const HBRUSH = ?*anyopaque;
 pub const HKEY = ?*anyopaque;
@@ -14,10 +16,22 @@ pub const UINT = u32;
 pub const WPARAM = usize;
 pub const LPARAM = isize;
 pub const LRESULT = isize;
+pub const INT_PTR = isize;
+pub const LONG_PTR = isize;
+pub const UINT_PTR = usize;
+pub const DWORD_PTR = usize;
 pub const LSTATUS = i32;
 pub const COLORREF = u32;
-pub const LPWSTR = ?[*:0]u16;
-pub const LPCWSTR = [*:0]const u16;
+pub const LPWSTR = ?[*:0]align(1) u16;
+// align(1): lets MAKEINTRESOURCE-style small-integer "pointers" (e.g. a
+// dialog resource ID cast to LPCWSTR) round-trip through @ptrFromInt even
+// when the id is odd; Windows never actually dereferences those, so the
+// weaker alignment costs nothing for real string data either.
+pub const LPCWSTR = [*:0]align(1) const u16;
+pub const MAX_PATH: usize = 260;
+
+pub const DLGPROC = *const fn (hwnd: HWND, msg: UINT, wp: WPARAM, lp: LPARAM) callconv(.c) INT_PTR;
+pub const SUBCLASSPROC = *const fn (hwnd: HWND, msg: UINT, wp: WPARAM, lp: LPARAM, id: UINT_PTR, data: DWORD_PTR) callconv(.c) LRESULT;
 
 pub const RECT = extern struct {
 	left: i32,
@@ -129,3 +143,116 @@ pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: i32) callconv(.c) BOOL;
 pub extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.c) BOOL;
 pub extern "shell32" fn Shell_NotifyIconW(dwMessage: DWORD, lpData: *NOTIFYICONDATAW) callconv(.c) BOOL;
 pub extern "shlwapi" fn wnsprintfW(pszDest: [*:0]u16, cchDest: i32, pszFmt: LPCWSTR, ...) callconv(.c) i32;
+
+pub const WM_CHAR: UINT = 0x0102;
+pub const WM_INITDIALOG: UINT = 0x0110;
+pub const WM_COMMAND: UINT = 0x0111;
+pub const WM_SETFONT: UINT = 0x0030;
+pub const WM_GETFONT: UINT = 0x0031;
+pub const WM_CTLCOLOREDIT: UINT = 0x0133;
+pub const WM_CTLCOLORLISTBOX: UINT = 0x0134;
+pub const WM_CTLCOLORBTN: UINT = 0x0135;
+pub const WM_CTLCOLORDLG: UINT = 0x0136;
+pub const WM_CTLCOLORSTATIC: UINT = 0x0138;
+
+pub const WS_CHILD: DWORD = 0x40000000;
+pub const WS_VISIBLE: DWORD = 0x10000000;
+pub const WS_TABSTOP: DWORD = 0x00010000;
+pub const BS_AUTOCHECKBOX: DWORD = 0x00000003;
+pub const SWP_NOSIZE: UINT = 0x0001;
+pub const SWP_NOMOVE: UINT = 0x0002;
+
+pub const BM_GETCHECK: UINT = 0x00F0;
+pub const BM_SETCHECK: UINT = 0x00F1;
+pub const BST_UNCHECKED = 0x0000;
+pub const BST_CHECKED = 0x0001;
+
+pub const CB_ADDSTRING: UINT = 0x0143;
+pub const CB_GETCURSEL: UINT = 0x0147;
+pub const CB_SETCURSEL: UINT = 0x014E;
+
+pub const CSIDL_LOCAL_APPDATA: c_int = 0x001c;
+pub const CSIDL_PROGRAM_FILES: c_int = 0x0026;
+
+pub const DWLP_USER: c_int = 16;
+pub const IDOK = 1;
+pub const IDCANCEL = 2;
+
+pub const LVIF_TEXT: UINT = 0x1;
+pub const LVIF_PARAM: UINT = 0x4;
+pub const LVCF_WIDTH: UINT = 0x2;
+pub const LVIS_FOCUSED: UINT = 0x1;
+pub const LVIS_SELECTED: UINT = 0x2;
+pub const LVIS_STATEIMAGEMASK: UINT = 0xF000;
+pub const LVS_EX_CHECKBOXES: DWORD = 0x4;
+
+const LVM_FIRST: UINT = 0x1000;
+pub const LVM_GETITEMCOUNT: UINT = LVM_FIRST + 4;
+pub const LVM_INSERTITEMW: UINT = LVM_FIRST + 77;
+pub const LVM_GETITEMW: UINT = LVM_FIRST + 75;
+pub const LVM_SETITEMSTATE: UINT = LVM_FIRST + 43;
+pub const LVM_GETITEMSTATE: UINT = LVM_FIRST + 44;
+pub const LVM_SETEXTENDEDLISTVIEWSTYLE: UINT = LVM_FIRST + 54;
+pub const LVM_INSERTCOLUMNW: UINT = LVM_FIRST + 97;
+
+fn indexToStateImageMask(i: u32) UINT {
+	return i << 12;
+}
+pub const STATEIMAGE_UNCHECKED: UINT = indexToStateImageMask(1);
+pub const STATEIMAGE_CHECKED: UINT = indexToStateImageMask(2);
+
+pub const LVCOLUMNW = extern struct {
+	mask: UINT,
+	fmt: i32,
+	cx: i32,
+	pszText: LPWSTR,
+	cchTextMax: i32,
+	iSubItem: i32,
+	iImage: i32,
+	iOrder: i32,
+	cxMin: i32,
+	cxDefault: i32,
+	cxIdeal: i32,
+};
+
+pub const LVITEMW = extern struct {
+	mask: UINT,
+	iItem: i32,
+	iSubItem: i32,
+	state: UINT,
+	stateMask: UINT,
+	pszText: LPWSTR,
+	cchTextMax: i32,
+	iImage: i32,
+	lParam: LPARAM,
+	iIndent: i32,
+	iGroupId: i32,
+	cColumns: UINT,
+	puColumns: ?*UINT,
+	piColFmt: ?*i32,
+	iGroup: i32,
+};
+
+pub extern "comctl32" fn DefSubclassProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) LRESULT;
+pub extern "comctl32" fn SetWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR) callconv(.c) BOOL;
+
+pub extern "user32" fn SetWindowLongPtrW(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) callconv(.c) LONG_PTR;
+pub extern "user32" fn GetWindowLongPtrW(hWnd: HWND, nIndex: c_int) callconv(.c) LONG_PTR;
+pub extern "user32" fn GetDlgItem(hDlg: HWND, nIDDlgItem: c_int) callconv(.c) HWND;
+pub extern "user32" fn CreateWindowExW(dwExStyle: DWORD, lpClassName: LPCWSTR, lpWindowName: LPCWSTR, dwStyle: DWORD, X: i32, Y: i32, nWidth: i32, nHeight: i32, hWndParent: HWND, hMenu: HMENU, hInstance: HINSTANCE, lpParam: ?*anyopaque) callconv(.c) HWND;
+pub extern "user32" fn DialogBoxParamW(hInstance: HINSTANCE, lpTemplateName: LPCWSTR, hWndParent: HWND, lpDialogFunc: DLGPROC, dwInitParam: LPARAM) callconv(.c) INT_PTR;
+pub extern "user32" fn EndDialog(hDlg: HWND, nResult: INT_PTR) callconv(.c) BOOL;
+pub extern "user32" fn SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, X: i32, Y: i32, cx: i32, cy: i32, uFlags: UINT) callconv(.c) BOOL;
+
+pub extern "kernel32" fn GetModuleFileNameW(hModule: HMODULE, lpFilename: [*:0]u16, nSize: DWORD) callconv(.c) DWORD;
+pub extern "kernel32" fn CreateDirectoryW(lpPathName: LPCWSTR, lpSecurityAttributes: ?*anyopaque) callconv(.c) BOOL;
+pub extern "kernel32" fn lstrcpynW(lpString1: [*:0]u16, lpString2: LPCWSTR, iMaxLength: i32) callconv(.c) ?[*:0]u16;
+pub extern "kernel32" fn GetPrivateProfileStringW(lpAppName: LPCWSTR, lpKeyName: LPCWSTR, lpDefault: LPCWSTR, lpReturnedString: [*:0]u16, nSize: DWORD, lpFileName: LPCWSTR) callconv(.c) DWORD;
+pub extern "kernel32" fn WritePrivateProfileStringW(lpAppName: LPCWSTR, lpKeyName: LPCWSTR, lpString: LPCWSTR, lpFileName: LPCWSTR) callconv(.c) BOOL;
+
+pub extern "shell32" fn SHGetFolderPathW(hwnd: HWND, csidl: c_int, hToken: HANDLE, dwFlags: DWORD, pszPath: [*:0]u16) callconv(.c) c_long;
+pub extern "shlwapi" fn PathRemoveFileSpecW(pszPath: [*:0]u16) callconv(.c) BOOL;
+pub extern "shlwapi" fn PathIsPrefixW(pszPrefix: LPCWSTR, pszPath: LPCWSTR) callconv(.c) BOOL;
+pub extern "shlwapi" fn PathAppendW(pszPath: [*:0]u16, pszMore: LPCWSTR) callconv(.c) BOOL;
+pub extern "shlwapi" fn StrCmpIW(pszStr1: LPCWSTR, pszStr2: LPCWSTR) callconv(.c) c_int;
+pub extern "shlwapi" fn StrToIntW(pszString: LPCWSTR) callconv(.c) c_int;

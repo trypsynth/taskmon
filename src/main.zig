@@ -2,6 +2,7 @@ const win32 = @import("win32.zig");
 comptime {
 	_ = @import("theme.zig");
 	_ = @import("tray.zig");
+	_ = @import("settings.zig");
 }
 
 // _fltused is required by the linker whenever floating point is used in a
