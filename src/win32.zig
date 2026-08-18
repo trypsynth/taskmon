@@ -442,6 +442,159 @@ pub extern "kernel32" fn FileTimeToLocalFileTime(lpFileTime: *const FILETIME, lp
 pub extern "kernel32" fn FileTimeToSystemTime(lpFileTime: *const FILETIME, lpSystemTime: *SYSTEMTIME) callconv(.c) BOOL;
 pub extern "kernel32" fn GetLocalTime(lpSystemTime: *SYSTEMTIME) callconv(.c) void;
 pub extern "kernel32" fn lstrcatW(lpString1: [*:0]u16, lpString2: LPCWSTR) callconv(.c) ?[*:0]u16;
+pub extern "kernel32" fn lstrlenW(lpString: LPCWSTR) callconv(.c) c_int;
+pub extern "kernel32" fn HeapReAlloc(hHeap: HANDLE, dwFlags: DWORD, lpMem: ?*anyopaque, dwBytes: usize) callconv(.c) ?*anyopaque;
+pub extern "kernel32" fn GetCurrentProcess() callconv(.c) HANDLE;
+pub extern "kernel32" fn GetProcAddress(hModule: HMODULE, lpProcName: [*:0]const u8) callconv(.c) ?*anyopaque;
+pub extern "kernel32" fn LoadLibraryW(lpLibFileName: LPCWSTR) callconv(.c) HMODULE;
+pub extern "kernel32" fn OpenProcess(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) callconv(.c) HANDLE;
+pub extern "kernel32" fn CloseHandle(hObject: HANDLE) callconv(.c) BOOL;
+pub extern "kernel32" fn TerminateProcess(hProcess: HANDLE, uExitCode: UINT) callconv(.c) BOOL;
+pub extern "kernel32" fn SetPriorityClass(hProcess: HANDLE, dwPriorityClass: DWORD) callconv(.c) BOOL;
+pub extern "kernel32" fn QueryFullProcessImageNameW(hProcess: HANDLE, dwFlags: DWORD, lpExeName: [*:0]u16, lpdwSize: *DWORD) callconv(.c) BOOL;
+pub extern "kernel32" fn GetSystemTimes(lpIdleTime: ?*FILETIME, lpKernelTime: ?*FILETIME, lpUserTime: ?*FILETIME) callconv(.c) BOOL;
+pub extern "kernel32" fn GetSystemTimeAsFileTime(lpSystemTimeAsFileTime: *FILETIME) callconv(.c) void;
+pub extern "kernel32" fn GetTickCount64() callconv(.c) u64;
+pub extern "kernel32" fn GetNativeSystemInfo(lpSystemInfo: *SYSTEM_INFO) callconv(.c) void;
+pub extern "kernel32" fn IsWow64Process(hProcess: HANDLE, Wow64Process: *BOOL) callconv(.c) BOOL;
+pub extern "kernel32" fn GetPackageFullName(hProcess: HANDLE, packageFullNameLength: *u32, packageFullName: ?[*:0]u16) callconv(.c) c_long;
+
+pub extern "advapi32" fn OpenProcessToken(ProcessHandle: HANDLE, DesiredAccess: DWORD, TokenHandle: *HANDLE) callconv(.c) BOOL;
+pub extern "advapi32" fn GetTokenInformation(TokenHandle: HANDLE, TokenInformationClass: c_int, TokenInformation: ?*anyopaque, TokenInformationLength: DWORD, ReturnLength: *DWORD) callconv(.c) BOOL;
+pub extern "advapi32" fn GetSidSubAuthority(pSid: ?*anyopaque, nSubAuthority: DWORD) callconv(.c) *DWORD;
+pub extern "advapi32" fn GetSidSubAuthorityCount(pSid: ?*anyopaque) callconv(.c) *u8;
+pub extern "advapi32" fn LookupAccountSidW(lpSystemName: ?LPCWSTR, Sid: ?*anyopaque, Name: [*:0]u16, cchName: *DWORD, ReferencedDomainName: [*:0]u16, cchReferencedDomainName: *DWORD, peUse: *c_int) callconv(.c) BOOL;
+pub extern "advapi32" fn LocalFree(hMem: ?*anyopaque) callconv(.c) ?*anyopaque;
+pub extern "advapi32" fn OpenSCManagerW(lpMachineName: ?LPCWSTR, lpDatabaseName: ?LPCWSTR, dwDesiredAccess: DWORD) callconv(.c) HANDLE;
+pub extern "advapi32" fn CloseServiceHandle(hSCObject: HANDLE) callconv(.c) BOOL;
+pub extern "advapi32" fn EnumServicesStatusExW(hSCManager: HANDLE, InfoLevel: c_int, dwServiceType: DWORD, dwServiceState: DWORD, lpServices: ?[*]u8, cbBufSize: DWORD, pcbBytesNeeded: *DWORD, lpServicesReturned: *DWORD, lpResumeHandle: *DWORD, pszGroupName: ?LPCWSTR) callconv(.c) BOOL;
+
+pub extern "shlwapi" fn ConvertSidToStringSidW(Sid: ?*anyopaque, StringSid: *LPWSTR) callconv(.c) BOOL;
+
+pub extern "user32" fn GetGuiResources(hProcess: HANDLE, uiFlags: DWORD) callconv(.c) DWORD;
+pub extern "user32" fn IsWindowVisible(hWnd: HWND) callconv(.c) BOOL;
+pub extern "user32" fn GetWindowThreadProcessId(hWnd: HWND, lpdwProcessId: *DWORD) callconv(.c) DWORD;
+pub extern "user32" fn EnumWindows(lpEnumFunc: *const fn (HWND, LPARAM) callconv(.c) BOOL, lParam: LPARAM) callconv(.c) BOOL;
+pub extern "user32" fn GetWindow(hWnd: HWND, uCmd: UINT) callconv(.c) HWND;
+pub extern "user32" fn GetWindowTextW(hWnd: HWND, lpString: [*:0]u16, nMaxCount: c_int) callconv(.c) c_int;
+
+pub extern "version" fn GetFileVersionInfoSizeW(lptstrFilename: LPCWSTR, lpdwHandle: *DWORD) callconv(.c) DWORD;
+pub extern "version" fn GetFileVersionInfoW(lptstrFilename: LPCWSTR, dwHandle: DWORD, dwLen: DWORD, lpData: ?*anyopaque) callconv(.c) BOOL;
+pub extern "version" fn VerQueryValueW(pBlock: ?*const anyopaque, lpSubBlock: LPCWSTR, lplpBuffer: *?*anyopaque, puLen: *UINT) callconv(.c) BOOL;
+
+pub extern "wtsapi32" fn WTSQuerySessionInformationW(hServer: HANDLE, SessionId: DWORD, WTSInfoClass: c_int, ppBuffer: *LPWSTR, pBytesReturned: *DWORD) callconv(.c) BOOL;
+pub extern "wtsapi32" fn WTSFreeMemory(pMemory: ?*anyopaque) callconv(.c) void;
+pub const WTS_CURRENT_SERVER_HANDLE: HANDLE = null;
+pub const WTSWinStationName: c_int = 6;
+
+pub const GR_GDIOBJECTS: DWORD = 0;
+pub const GR_USEROBJECTS: DWORD = 1;
+pub const GW_OWNER: UINT = 4;
+
+pub const TOKEN_QUERY: DWORD = 0x0008;
+pub const PROCESS_TERMINATE: DWORD = 0x0001;
+pub const PROCESS_SET_INFORMATION: DWORD = 0x0200;
+pub const PROCESS_SUSPEND_RESUME: DWORD = 0x0800;
+pub const PROCESS_QUERY_LIMITED_INFORMATION: DWORD = 0x1000;
+
+pub const TokenUser: c_int = 1;
+pub const TokenElevation: c_int = 20;
+pub const TokenVirtualizationAllowed: c_int = 23;
+pub const TokenVirtualizationEnabled: c_int = 24;
+pub const TokenIntegrityLevel: c_int = 25;
+pub const TokenIsAppContainer: c_int = 29;
+
+pub const SC_MANAGER_ENUMERATE_SERVICE: DWORD = 0x0004;
+pub const SC_ENUM_PROCESS_INFO: c_int = 0;
+pub const SERVICE_WIN32: DWORD = 0x00000030;
+pub const SERVICE_STATE_ALL: DWORD = 0x00000003;
+
+pub const SID_AND_ATTRIBUTES = extern struct {
+	Sid: ?*anyopaque,
+	Attributes: DWORD,
+};
+pub const TOKEN_MANDATORY_LABEL = extern struct {
+	Label: SID_AND_ATTRIBUTES,
+};
+pub const TOKEN_ELEVATION = extern struct {
+	TokenIsElevated: DWORD,
+};
+pub const TOKEN_USER = extern struct {
+	User: SID_AND_ATTRIBUTES,
+};
+
+pub const PROCESS_POWER_THROTTLING_STATE = extern struct {
+	Version: ULONG,
+	ControlMask: ULONG,
+	StateMask: ULONG,
+};
+pub const ProcessPowerThrottling: c_int = 4;
+pub const PROCESS_POWER_THROTTLING_CURRENT_VERSION: ULONG = 1;
+pub const PROCESS_POWER_THROTTLING_EXECUTION_SPEED: ULONG = 0x1;
+
+pub const ULONG = u32;
+
+pub const SYSTEM_INFO = extern struct {
+	wProcessorArchitecture: WORD,
+	wReserved: WORD,
+	dwPageSize: DWORD,
+	lpMinimumApplicationAddress: ?*anyopaque,
+	lpMaximumApplicationAddress: ?*anyopaque,
+	dwActiveProcessorMask: usize,
+	dwNumberOfProcessors: DWORD,
+	dwProcessorType: DWORD,
+	dwAllocationGranularity: DWORD,
+	wProcessorLevel: WORD,
+	wProcessorRevision: WORD,
+};
+
+pub const PROCESSOR_ARCHITECTURE_AMD64: WORD = 9;
+pub const PROCESSOR_ARCHITECTURE_ARM64: WORD = 12;
+pub const IMAGE_FILE_MACHINE_UNKNOWN: USHORT = 0;
+pub const USHORT = u16;
+
+pub const ENUM_SERVICE_STATUS_PROCESSW = extern struct {
+	lpServiceName: LPWSTR,
+	lpDisplayName: LPWSTR,
+	ServiceStatusProcess: SERVICE_STATUS_PROCESS,
+};
+pub const SERVICE_STATUS_PROCESS = extern struct {
+	dwServiceType: DWORD,
+	dwCurrentState: DWORD,
+	dwControlsAccepted: DWORD,
+	dwWin32ExitCode: DWORD,
+	dwServiceSpecificExitCode: DWORD,
+	dwCheckPoint: DWORD,
+	dwWaitHint: DWORD,
+	dwProcessId: DWORD,
+	dwServiceFlags: DWORD,
+};
+
+pub const PDH_HQUERY = HANDLE;
+pub const PDH_HCOUNTER = HANDLE;
+pub const PDH_STATUS = c_long;
+pub const PDH_FMT_DOUBLE: DWORD = 0x00000200;
+pub const PDH_FMT_LARGE: DWORD = 0x00000400;
+pub const PDH_MORE_DATA: PDH_STATUS = @bitCast(@as(u32, 0x800007D2));
+
+pub const PDH_FMT_COUNTERVALUE = extern struct {
+	CStatus: DWORD,
+	value: extern union {
+		longValue: i32,
+		doubleValue: f64,
+		largeValue: i64,
+	},
+};
+pub const PDH_FMT_COUNTERVALUE_ITEM_W = extern struct {
+	szName: LPWSTR,
+	FmtValue: PDH_FMT_COUNTERVALUE,
+};
+
+pub extern "pdh" fn PdhOpenQueryW(szDataSource: ?LPCWSTR, dwUserData: usize, phQuery: *PDH_HQUERY) callconv(.c) PDH_STATUS;
+pub extern "pdh" fn PdhAddEnglishCounterW(hQuery: PDH_HQUERY, szFullCounterPath: LPCWSTR, dwUserData: usize, phCounter: *PDH_HCOUNTER) callconv(.c) PDH_STATUS;
+pub extern "pdh" fn PdhCollectQueryData(hQuery: PDH_HQUERY) callconv(.c) PDH_STATUS;
+pub extern "pdh" fn PdhCloseQuery(hQuery: PDH_HQUERY) callconv(.c) PDH_STATUS;
+pub extern "pdh" fn PdhGetFormattedCounterArrayW(hCounter: PDH_HCOUNTER, dwFormat: DWORD, lpdwBufferSize: *DWORD, lpdwItemCount: *DWORD, ItemBuffer: ?[*]PDH_FMT_COUNTERVALUE_ITEM_W) callconv(.c) PDH_STATUS;
 
 pub const HBITMAP = ?*anyopaque;
 
