@@ -6,6 +6,7 @@ comptime {
 	_ = @import("run.zig");
 	_ = @import("sortbar.zig");
 	_ = @import("treeview.zig");
+	_ = @import("listview.zig");
 }
 
 // _fltused is required by the linker whenever floating point is used in a

@@ -409,6 +409,40 @@ pub const TVM_GETITEMW: UINT = TV_FIRST + 62;
 pub const TVM_HITTEST: UINT = TV_FIRST + 17;
 pub const TVM_ENSUREVISIBLE: UINT = TV_FIRST + 20;
 
+pub const FILETIME = extern struct {
+	dwLowDateTime: DWORD,
+	dwHighDateTime: DWORD,
+};
+
+pub const SYSTEMTIME = extern struct {
+	wYear: WORD,
+	wMonth: WORD,
+	wDayOfWeek: WORD,
+	wDay: WORD,
+	wHour: WORD,
+	wMinute: WORD,
+	wSecond: WORD,
+	wMilliseconds: WORD,
+};
+
+pub const WM_USER: UINT = 0x0400;
+pub const SB_SETTEXTW: UINT = WM_USER + 11;
+
+pub const LVNI_SELECTED: LPARAM = 0x2;
+pub const LVIR_BOUNDS: i32 = 0;
+pub const LVM_GETNEXTITEM: UINT = LVM_FIRST + 12;
+pub const LVM_GETTOPINDEX: UINT = LVM_FIRST + 39;
+pub const LVM_DELETEALLITEMS: UINT = LVM_FIRST + 9;
+pub const LVM_SETITEMTEXTW: UINT = LVM_FIRST + 116;
+pub const LVM_SCROLL: UINT = LVM_FIRST + 20;
+pub const LVM_GETITEMRECT: UINT = LVM_FIRST + 14;
+
+pub extern "shlwapi" fn StrFormatByteSizeW(qwSize: i64, pszBuf: [*:0]u16, cchBuf: UINT) callconv(.c) ?[*:0]u16;
+pub extern "kernel32" fn FileTimeToLocalFileTime(lpFileTime: *const FILETIME, lpLocalFileTime: *FILETIME) callconv(.c) BOOL;
+pub extern "kernel32" fn FileTimeToSystemTime(lpFileTime: *const FILETIME, lpSystemTime: *SYSTEMTIME) callconv(.c) BOOL;
+pub extern "kernel32" fn GetLocalTime(lpSystemTime: *SYSTEMTIME) callconv(.c) void;
+pub extern "kernel32" fn lstrcatW(lpString1: [*:0]u16, lpString2: LPCWSTR) callconv(.c) ?[*:0]u16;
+
 pub const HBITMAP = ?*anyopaque;
 
 pub const POINT = extern struct {
