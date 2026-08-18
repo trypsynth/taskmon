@@ -6,10 +6,6 @@ const libs = [_][]const u8{
 	"version",  "pdh",    "wtsapi32",
 };
 
-const sources = [_][]const u8{
-	"src/main.c",
-};
-
 pub fn build(b: *std.Build) void {
 	const target = b.standardTargetOptions(.{});
 	const optimize: std.builtin.OptimizeMode = .ReleaseSmall;
@@ -21,9 +17,9 @@ pub fn build(b: *std.Build) void {
 		.stack_protector = false,
 		.omit_frame_pointer = true,
 	});
-	// Zig only adds its bundled mingw-w64 Win32/CRT headers when link_libc is
-	// true, but link_libc also pulls in CRT startup objects we don't want.
-	// Add the header path by hand so windows.h etc. resolve without linking libc.
+	// The .rc file still #includes windows.h/commctrl.h for the resource
+	// compiler, even though no C source remains; point it at Zig's bundled
+	// mingw-w64 headers the same way the old C build did.
 	const win32_headers = b.graph.cwdRelativePath(b.pathJoin(&.{
 		std.fs.path.dirname(b.graph.zig_exe) orelse ".",
 		"lib",
@@ -31,15 +27,6 @@ pub fn build(b: *std.Build) void {
 		"include",
 		"any-windows-any",
 	}));
-	exe_mod.addSystemIncludePath(win32_headers);
-	exe_mod.addCMacro("UNICODE", "1");
-	exe_mod.addCMacro("_UNICODE", "1");
-	exe_mod.addCMacro("WIN32_LEAN_AND_MEAN", "1");
-	exe_mod.addCMacro("NOMINMAX", "1");
-	exe_mod.addCSourceFiles(.{
-		.files = &sources,
-		.flags = &.{ "-std=c17", "-Wall", "-Wextra" },
-	});
 	exe_mod.addWin32ResourceFile(.{
 		.file = b.path("src/taskmon.rc"),
 		.include_paths = &.{win32_headers},

@@ -124,6 +124,7 @@ pub const IMAGE_ICON: UINT = 1;
 pub const LR_DEFAULTSIZE: UINT = 0x0040;
 pub const LR_SHARED: UINT = 0x8000;
 pub const IDI_APPLICATION: usize = 32512;
+pub const IDC_ARROW: usize = 32512;
 pub const SW_SHOW: i32 = 5;
 pub const SW_HIDE: i32 = 0;
 
@@ -626,6 +627,56 @@ pub extern "shell32" fn ILFindLastID(pidl: PCUIDLIST_RELATIVE) callconv(.c) PUIT
 pub extern "shell32" fn SHOpenFolderAndSelectItems(pidlFolder: PIDLIST_ABSOLUTE, cidl: UINT, apidl: [*]const PUITEMID_CHILD, dwFlags: DWORD) callconv(.c) c_long;
 pub extern "shell32" fn ShellExecuteW(hwnd: HWND, lpOperation: ?LPCWSTR, lpFile: ?LPCWSTR, lpParameters: ?LPCWSTR, lpDirectory: ?LPCWSTR, nShowCmd: c_int) callconv(.c) HINSTANCE;
 pub extern "kernel32" fn CreateMutexW(lpMutexAttributes: ?*anyopaque, bInitialOwner: BOOL, lpName: ?LPCWSTR) callconv(.c) HANDLE;
+pub extern "kernel32" fn GetLastError() callconv(.c) DWORD;
+pub const ERROR_ALREADY_EXISTS: DWORD = 183;
+
+pub extern "ole32" fn CoInitializeEx(pvReserved: ?*anyopaque, dwCoInit: DWORD) callconv(.c) c_long;
+pub extern "ole32" fn CoUninitialize() callconv(.c) void;
+pub const COINIT_APARTMENTTHREADED: DWORD = 0x2;
+pub const COINIT_DISABLE_OLE1DDE: DWORD = 0x4;
+
+pub const HICON = ?*anyopaque;
+pub const HCURSOR = ?*anyopaque;
+pub const HACCEL = ?*anyopaque;
+pub const WNDPROC = *const fn (HWND, UINT, WPARAM, LPARAM) callconv(.c) LRESULT;
+
+pub const WNDCLASSEXW = extern struct {
+	cbSize: UINT,
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: ?LPCWSTR,
+	lpszClassName: LPCWSTR,
+	hIconSm: HICON,
+};
+
+pub const CS_HREDRAW: UINT = 0x0002;
+pub const CS_VREDRAW: UINT = 0x0001;
+pub const COLOR_WINDOW: usize = 5;
+pub const MB_ICONERROR: UINT = 0x00000010;
+pub const WS_OVERLAPPED: DWORD = 0x00000000;
+pub const WS_CAPTION: DWORD = 0x00C00000;
+pub const WS_SYSMENU: DWORD = 0x00080000;
+pub const WS_MINIMIZEBOX: DWORD = 0x00020000;
+pub const CW_USEDEFAULT: i32 = @bitCast(@as(u32, 0x80000000));
+
+pub extern "user32" fn RegisterClassExW(wc: *const WNDCLASSEXW) callconv(.c) WORD;
+pub extern "user32" fn FindWindowW(lpClassName: ?LPCWSTR, lpWindowName: ?LPCWSTR) callconv(.c) HWND;
+pub extern "user32" fn LoadIconW(hInstance: HINSTANCE, lpIconName: LPCWSTR) callconv(.c) HICON;
+pub extern "user32" fn LoadCursorW(hInstance: HINSTANCE, lpCursorName: LPCWSTR) callconv(.c) HCURSOR;
+pub extern "user32" fn AdjustWindowRect(lpRect: *RECT, dwStyle: DWORD, bMenu: BOOL) callconv(.c) BOOL;
+pub extern "user32" fn UpdateWindow(hWnd: HWND) callconv(.c) BOOL;
+pub extern "user32" fn LoadAcceleratorsW(hInstance: HINSTANCE, lpTableName: LPCWSTR) callconv(.c) HACCEL;
+pub extern "user32" fn TranslateAcceleratorW(hWnd: HWND, hAccTable: HACCEL, lpMsg: *MSG) callconv(.c) c_int;
+pub extern "user32" fn IsDialogMessageW(hDlg: HWND, lpMsg: *MSG) callconv(.c) BOOL;
+pub extern "user32" fn TranslateMessage(lpMsg: *const MSG) callconv(.c) BOOL;
+pub extern "user32" fn DispatchMessageW(lpMsg: *const MSG) callconv(.c) LRESULT;
+pub extern "user32" fn GetMessageW(lpMsg: *MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) callconv(.c) BOOL;
 pub extern "user32" fn EnumWindows(lpEnumFunc: *const fn (HWND, LPARAM) callconv(.c) BOOL, lParam: LPARAM) callconv(.c) BOOL;
 pub extern "user32" fn GetWindow(hWnd: HWND, uCmd: UINT) callconv(.c) HWND;
 pub extern "user32" fn GetWindowTextW(hWnd: HWND, lpString: [*:0]u16, nMaxCount: c_int) callconv(.c) c_int;
