@@ -1,18 +1,11 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
+// wndproc.zig itself imports theme/tray/settings/run/sortbar/treeview/
+// listview/process, so importing it here is enough to pull all of them
+// into the build - no need to reference the rest individually.
 const wndproc = @import("wndproc.zig");
 const resource = @import("resource.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
-comptime {
-	_ = @import("theme.zig");
-	_ = @import("tray.zig");
-	_ = @import("settings.zig");
-	_ = @import("run.zig");
-	_ = @import("sortbar.zig");
-	_ = @import("treeview.zig");
-	_ = @import("listview.zig");
-	_ = @import("process.zig");
-}
 
 // _fltused is required by the linker whenever floating point is used in a
 // CRT-less build; it has no runtime meaning.
