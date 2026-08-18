@@ -10,7 +10,6 @@ const sources = [_][]const u8{
 	"src/listview.c",
 	"src/main.c",
 	"src/process.c",
-	"src/sortbar.c",
 	"src/treeview.c",
 	"src/wndproc.c",
 };

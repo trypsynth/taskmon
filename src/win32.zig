@@ -136,7 +136,7 @@ pub const MEMORYSTATUSEX = extern struct {
 	ullAvailExtendedVirtual: u64,
 };
 
-pub extern "kernel32" fn lstrcpyW(lpString1: [*:0]u16, lpString2: [*:0]const u16) callconv(.c) ?[*:0]u16;
+pub extern "kernel32" fn lstrcpyW(lpString1: [*:0]u16, lpString2: LPCWSTR) callconv(.c) ?[*:0]u16;
 pub extern "kernel32" fn GlobalMemoryStatusEx(lpBuffer: *MEMORYSTATUSEX) callconv(.c) BOOL;
 pub extern "user32" fn LoadImageW(hInst: HINSTANCE, name: LPCWSTR, imgType: UINT, cx: i32, cy: i32, fuLoad: UINT) callconv(.c) HANDLE;
 pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: i32) callconv(.c) BOOL;
@@ -161,6 +161,8 @@ pub const WS_TABSTOP: DWORD = 0x00010000;
 pub const BS_AUTOCHECKBOX: DWORD = 0x00000003;
 pub const SWP_NOSIZE: UINT = 0x0001;
 pub const SWP_NOMOVE: UINT = 0x0002;
+pub const SWP_NOZORDER: UINT = 0x0004;
+pub const SWP_NOACTIVATE: UINT = 0x0010;
 
 pub const BM_GETCHECK: UINT = 0x00F0;
 pub const BM_SETCHECK: UINT = 0x00F1;
@@ -321,3 +323,69 @@ pub extern "user32" fn GetDlgItemTextW(hDlg: HWND, nIDDlgItem: c_int, lpString: 
 pub extern "user32" fn SendDlgItemMessageW(hDlg: HWND, nIDDlgItem: c_int, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) LRESULT;
 pub extern "user32" fn EnableWindow(hWnd: HWND, bEnable: BOOL) callconv(.c) BOOL;
 pub extern "user32" fn GetWindowTextLengthW(hWnd: HWND) callconv(.c) c_int;
+pub extern "user32" fn SetWindowTextW(hWnd: HWND, lpString: LPCWSTR) callconv(.c) BOOL;
+pub extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.c) BOOL;
+pub extern "user32" fn PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) BOOL;
+pub extern "user32" fn GetDlgCtrlID(hWnd: HWND) callconv(.c) c_int;
+pub extern "user32" fn SetFocus(hWnd: HWND) callconv(.c) HWND;
+
+pub const HBITMAP = ?*anyopaque;
+
+pub const POINT = extern struct {
+	x: i32,
+	y: i32,
+};
+
+pub const MSG = extern struct {
+	hwnd: HWND,
+	message: UINT,
+	wParam: WPARAM,
+	lParam: LPARAM,
+	time: DWORD,
+	pt: POINT,
+};
+
+pub const WM_APP: UINT = 0x8000;
+pub const WM_GETDLGCODE: UINT = 0x0087;
+pub const WM_KEYDOWN: UINT = 0x0100;
+pub const DLGC_WANTARROWS: LRESULT = 0x0001;
+pub const DLGC_WANTMESSAGE: LRESULT = 0x0004;
+pub const VK_RETURN: usize = 0x0D;
+pub const VK_ESCAPE: usize = 0x1B;
+pub const VK_LEFT: usize = 0x25;
+pub const VK_UP: usize = 0x26;
+pub const VK_RIGHT: usize = 0x27;
+pub const VK_DOWN: usize = 0x28;
+pub const BN_CLICKED = 0;
+pub const GWL_STYLE: c_int = -16;
+pub const BS_RADIOBUTTON: DWORD = 0x00000004;
+pub const BS_GROUPBOX: DWORD = 0x00000007;
+pub const WS_EX_CONTROLPARENT: DWORD = 0x00010000;
+
+pub const HDI_FORMAT: UINT = 0x4;
+pub const HDF_SORTDOWN: i32 = 0x200;
+pub const HDF_SORTUP: i32 = 0x400;
+pub const LVCF_TEXT: UINT = 0x4;
+pub const LVCF_SUBITEM: UINT = 0x8;
+
+const HDM_FIRST: UINT = 0x1200;
+pub const HDM_GETITEMW: UINT = HDM_FIRST + 11;
+pub const HDM_SETITEMW: UINT = HDM_FIRST + 12;
+pub const HDM_GETITEMCOUNT: UINT = HDM_FIRST + 0;
+pub const LVM_GETHEADER: UINT = LVM_FIRST + 31;
+pub const LVM_DELETECOLUMN: UINT = LVM_FIRST + 28;
+
+pub const HDITEMW = extern struct {
+	mask: UINT,
+	cxy: i32,
+	pszText: LPWSTR,
+	hbm: HBITMAP,
+	cchTextMax: i32,
+	fmt: i32,
+	lParam: LPARAM,
+	iImage: i32,
+	iOrder: i32,
+	type: UINT,
+	pvFilter: ?*anyopaque,
+	state: UINT,
+};

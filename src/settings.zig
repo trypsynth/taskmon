@@ -94,7 +94,7 @@ pub const ColumnDef = extern struct {
 pub const COL_COUNT: usize = 70;
 const REFRESH_OPTION_COUNT = 5;
 
-export const COLUMNS: [COL_COUNT]ColumnDef = columns: {
+pub export const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	@setEvalBranchQuota(100_000);
 	break :columns .{
 	.{ .label = L("Name"), .header = L("Name"), .width = 260, .field = .SORT_FIELD_NAME, .always_visible = 1, .default_visible = 1 },
@@ -170,8 +170,8 @@ export const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	};
 };
 
-export const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
-export const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
+pub export const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
+pub export const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
 
 pub const SortPrefs = extern struct {
 	field: SortField,
@@ -317,7 +317,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	return 0;
 }
 
-export fn open_settings(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) callconv(.c) win32.BOOL {
+pub export fn open_settings(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) callconv(.c) win32.BOOL {
 	var data: SettingsDlgData = undefined;
 	data.refresh_ms = current_ms;
 	var i: usize = 0;
@@ -354,7 +354,7 @@ fn getIniPath(buf: [*:0]u16) void {
 	}
 }
 
-export fn settings_load(prefs: *SortPrefs) callconv(.c) void {
+pub export fn settings_load(prefs: *SortPrefs) callconv(.c) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	prefs.field = .SORT_FIELD_NAME;
@@ -418,7 +418,7 @@ export fn settings_load(prefs: *SortPrefs) callconv(.c) void {
 	}
 }
 
-export fn settings_save(prefs: *const SortPrefs) callconv(.c) void {
+pub export fn settings_save(prefs: *const SortPrefs) callconv(.c) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	var i: usize = 0;

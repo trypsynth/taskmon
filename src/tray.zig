@@ -6,7 +6,7 @@ var s_hwnd: win32.HWND = null;
 var s_msg: win32.UINT = 0;
 var s_name: [64]u16 = std.mem.zeroes([64]u16);
 
-export fn tray_add(hwnd: win32.HWND, callback_msg: win32.UINT, app_name: [*:0]const u16) callconv(.c) void {
+pub export fn tray_add(hwnd: win32.HWND, callback_msg: win32.UINT, app_name: [*:0]const u16) callconv(.c) void {
 	s_hwnd = hwnd;
 	s_msg = callback_msg;
 	_ = win32.lstrcpyW(@ptrCast(&s_name), app_name);
@@ -21,7 +21,7 @@ export fn tray_add(hwnd: win32.HWND, callback_msg: win32.UINT, app_name: [*:0]co
 	_ = win32.Shell_NotifyIconW(win32.NIM_ADD, &nid);
 }
 
-export fn tray_remove() callconv(.c) void {
+pub export fn tray_remove() callconv(.c) void {
 	var nid: win32.NOTIFYICONDATAW = std.mem.zeroes(win32.NOTIFYICONDATAW);
 	nid.cbSize = @sizeOf(win32.NOTIFYICONDATAW);
 	nid.hWnd = s_hwnd;
@@ -29,7 +29,7 @@ export fn tray_remove() callconv(.c) void {
 	_ = win32.Shell_NotifyIconW(win32.NIM_DELETE, &nid);
 }
 
-export fn tray_update_tip(cpu_pct: f64) callconv(.c) void {
+pub export fn tray_update_tip(cpu_pct: f64) callconv(.c) void {
 	var nid: win32.NOTIFYICONDATAW = std.mem.zeroes(win32.NOTIFYICONDATAW);
 	nid.cbSize = @sizeOf(win32.NOTIFYICONDATAW);
 	nid.hWnd = s_hwnd;
@@ -55,7 +55,7 @@ export fn tray_update_tip(cpu_pct: f64) callconv(.c) void {
 	_ = win32.Shell_NotifyIconW(win32.NIM_MODIFY, &nid);
 }
 
-export fn tray_restore() callconv(.c) void {
+pub export fn tray_restore() callconv(.c) void {
 	_ = win32.ShowWindow(s_hwnd, win32.SW_SHOW);
 	_ = win32.SetForegroundWindow(s_hwnd);
 }
