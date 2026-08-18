@@ -115,4 +115,4 @@ pub const SnapshotEntry = extern struct {
 
 pub const SNAPSHOT_CAPACITY: usize = 1024;
 
-pub extern fn terminate_process(pid: win32.DWORD) callconv(.c) win32.BOOL;
+pub extern fn terminateProcess(pid: win32.DWORD) callconv(.c) win32.BOOL;

@@ -1,11 +1,8 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
 const resource = @import("resource.zig");
+const theme = @import("theme.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
-
-extern fn theme_apply_titlebar(hwnd: win32.HWND) callconv(.c) void;
-extern fn theme_bg_brush() callconv(.c) win32.HBRUSH;
-extern fn theme_ctl_color(hdc: win32.HDC) callconv(.c) win32.HBRUSH;
 
 fn editSubclassProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
@@ -51,7 +48,7 @@ fn runDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPA
 	_ = lp;
 	switch (msg) {
 		win32.WM_INITDIALOG => {
-			theme_apply_titlebar(hdlg);
+			theme.applyTitlebar(hdlg);
 			_ = win32.SendDlgItemMessageW(hdlg, resource.IDC_RUN_EDIT, win32.EM_SETLIMITTEXT, @intCast(win32.MAX_PATH - 1), 0);
 			_ = win32.EnableWindow(win32.GetDlgItem(hdlg, win32.IDOK), 0);
 			_ = win32.SetWindowSubclass(win32.GetDlgItem(hdlg, resource.IDC_RUN_EDIT), editSubclassProc, 0, 0);
@@ -79,11 +76,11 @@ fn runDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPA
 			}
 		},
 		win32.WM_CTLCOLORDLG => {
-			const br = theme_bg_brush();
+			const br = theme.bgBrush();
 			if (br != null) return @bitCast(@intFromPtr(br));
 		},
 		win32.WM_CTLCOLORSTATIC, win32.WM_CTLCOLORBTN, win32.WM_CTLCOLOREDIT => {
-			const br = theme_ctl_color(@ptrFromInt(@as(usize, @bitCast(wp))));
+			const br = theme.ctlColor(@ptrFromInt(@as(usize, @bitCast(wp))));
 			if (br != null) return @bitCast(@intFromPtr(br));
 		},
 		else => {},
@@ -91,6 +88,6 @@ fn runDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPA
 	return 0;
 }
 
-pub export fn open_run_dialog(parent: win32.HWND) callconv(.c) void {
+pub export fn openDialog(parent: win32.HWND) callconv(.c) void {
 	_ = win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_RUN), parent, runDlgProc, 0);
 }

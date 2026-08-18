@@ -104,7 +104,7 @@ fn initGpuCounters() void {
 	g_pdh_ready = true;
 }
 
-pub export fn gpu_cleanup() callconv(.c) void {
+pub export fn gpuCleanup() callconv(.c) void {
 	if (g_pdh_query != null) {
 		_ = win32.PdhCloseQuery(g_pdh_query);
 		g_pdh_query = null;
@@ -864,7 +864,7 @@ fn getProcessHandleInfo(pid: win32.DWORD, hi: *HandleInfo) void {
 	_ = win32.CloseHandle(h);
 }
 
-pub export fn snapshot_processes(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: win32.BOOL) callconv(.c) ?[*]pt.ProcessEntry {
+pub export fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: win32.BOOL) callconv(.c) ?[*]pt.ProcessEntry {
 	buildServiceMap();
 	buildWindowMap();
 	refreshGpuStats();
@@ -921,7 +921,7 @@ pub export fn snapshot_processes(snapshots: [*]pt.SnapshotEntry, out_count: *i32
 		e.start_time = if (pid == 0) 0 else @bitCast(spi.CreateTime);
 		e.elapsed_time = if (e.start_time != 0 and now_ticks > e.start_time) now_ticks - e.start_time else 0;
 		e.base_priority = spi.BasePriority;
-		e.suspended = is_process_suspended(pid);
+		e.suspended = isProcessSuspended(pid);
 		e.private_bytes = spi.PagefileUsage;
 		e.disk_io_rate = 0.0;
 		e.io_read_rate = 0.0;
@@ -1070,11 +1070,11 @@ pub export fn snapshot_processes(snapshots: [*]pt.SnapshotEntry, out_count: *i32
 	return entries;
 }
 
-pub export fn free_process_entries(entries: ?[*]pt.ProcessEntry) callconv(.c) void {
+pub export fn freeProcessEntries(entries: ?[*]pt.ProcessEntry) callconv(.c) void {
 	heapFree(@ptrCast(entries));
 }
 
-pub export fn get_process_path(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) callconv(.c) void {
+pub export fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) callconv(.c) void {
 	var size = size_in;
 	const h = win32.OpenProcess(win32.PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
 	if (h == null) {
@@ -1085,7 +1085,7 @@ pub export fn get_process_path(pid: win32.DWORD, path: [*:0]u16, size_in: win32.
 	_ = win32.CloseHandle(h);
 }
 
-pub export fn terminate_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub export fn terminateProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	const h = win32.OpenProcess(win32.PROCESS_TERMINATE, 0, pid);
 	if (h == null) return 0;
 	const success = win32.TerminateProcess(h, 1);
@@ -1093,7 +1093,7 @@ pub export fn terminate_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	return success;
 }
 
-pub export fn is_process_suspended(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub export fn isProcessSuspended(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	var i: i32 = 0;
 	while (i < g_suspended_count) : (i += 1) {
 		if (g_suspended_pids[@intCast(i)] == pid) return 1;
@@ -1103,7 +1103,7 @@ pub export fn is_process_suspended(pid: win32.DWORD) callconv(.c) win32.BOOL {
 
 var g_nt_suspend_fn: ?FnNtProc = null;
 
-pub export fn suspend_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub export fn suspendProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	if (g_nt_suspend_fn == null) {
 		g_nt_suspend_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtSuspendProcess"));
 	}
@@ -1121,7 +1121,7 @@ pub export fn suspend_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
 
 var g_nt_resume_fn: ?FnNtProc = null;
 
-pub export fn resume_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
+pub export fn resumeProcess(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	if (g_nt_resume_fn == null) {
 		g_nt_resume_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtResumeProcess"));
 	}
@@ -1143,7 +1143,7 @@ pub export fn resume_process(pid: win32.DWORD) callconv(.c) win32.BOOL {
 	return if (ok) 1 else 0;
 }
 
-pub export fn set_process_priority(pid: win32.DWORD, priority_class: win32.DWORD) callconv(.c) win32.BOOL {
+pub export fn setProcessPriority(pid: win32.DWORD, priority_class: win32.DWORD) callconv(.c) win32.BOOL {
 	const h = win32.OpenProcess(win32.PROCESS_SET_INFORMATION, 0, pid);
 	if (h == null) return 0;
 	const success = win32.SetPriorityClass(h, priority_class);

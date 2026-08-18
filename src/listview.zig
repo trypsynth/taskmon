@@ -4,6 +4,7 @@ const pt = @import("process_types.zig");
 const settings = @import("settings.zig");
 const tray = @import("tray.zig");
 const treeview = @import("treeview.zig");
+const process = @import("process.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
@@ -14,9 +15,6 @@ extern var g_sort_btn_cols: [settings.COL_COUNT]i32;
 extern var g_sort_btn_count: i32;
 extern var g_prefs: settings.SortPrefs;
 extern var g_snapshots: [pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry;
-
-extern fn snapshot_processes(snapshots: [*]pt.SnapshotEntry, count: *i32, field: settings.SortField, descending: win32.BOOL) callconv(.c) ?[*]pt.ProcessEntry;
-extern fn free_process_entries(entries: ?[*]pt.ProcessEntry) callconv(.c) void;
 
 /// 100-nanosecond FILETIME ticks to h:mm:ss.
 fn formatDuration(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
@@ -385,18 +383,18 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	}
 	_ = win32.SendMessageW(g_hwnd_list, win32.WM_SETREDRAW, 1, 0);
 	_ = win32.InvalidateRect(g_hwnd_list, null, 0);
-	tray.tray_update_tip(total_cpu);
+	tray.updateTip(total_cpu);
 	return total_cpu;
 }
 
-pub export fn do_refresh() callconv(.c) void {
+pub export fn doRefresh() callconv(.c) void {
 	var count: i32 = 0;
 	const field: settings.SortField = if (g_prefs.tree_mode != 0) .name else g_prefs.field;
 	const desc: win32.BOOL = if (g_prefs.tree_mode != 0) 0 else g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))];
-	const entries = snapshot_processes(&g_snapshots, &count, field, desc);
+	const entries = process.snapshotProcesses(&g_snapshots, &count, field, desc);
 	if (entries) |es| {
-		const total_cpu = if (g_prefs.tree_mode != 0) treeview.populate_tree_view(es, count) else populateList(es, count);
-		free_process_entries(es);
+		const total_cpu = if (g_prefs.tree_mode != 0) treeview.populate(es, count) else populateList(es, count);
+		process.freeProcessEntries(es);
 		if (g_hwnd_status != null) {
 			var cpu_w: i32 = @intFromFloat(total_cpu);
 			var cpu_f: i32 = @intFromFloat((total_cpu - @as(f64, @floatFromInt(cpu_w))) * 100 + 0.5);
@@ -421,7 +419,7 @@ pub export fn do_refresh() callconv(.c) void {
 	}
 }
 
-pub export fn list_key_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
+pub export fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_KEYDOWN and wp == win32.VK_ESCAPE) {

@@ -86,7 +86,7 @@ fn winMain(instance: win32.HINSTANCE, show: c_int) c_int {
 	var wc: win32.WNDCLASSEXW = std.mem.zeroes(win32.WNDCLASSEXW);
 	wc.cbSize = @sizeOf(win32.WNDCLASSEXW);
 	wc.style = win32.CS_HREDRAW | win32.CS_VREDRAW;
-	wc.lpfnWndProc = wndproc.wnd_proc;
+	wc.lpfnWndProc = wndproc.wndProc;
 	wc.hInstance = instance;
 	wc.hIcon = win32.LoadIconW(null, @ptrFromInt(win32.IDI_APPLICATION));
 	wc.hCursor = win32.LoadCursorW(null, @ptrFromInt(win32.IDC_ARROW));

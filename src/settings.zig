@@ -1,13 +1,8 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
 const resource = @import("resource.zig");
+const theme = @import("theme.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
-
-extern fn theme_apply_titlebar(hwnd: win32.HWND) callconv(.c) void;
-extern fn theme_is_dark() callconv(.c) win32.BOOL;
-extern fn theme_apply_listview(hwnd_list: win32.HWND) callconv(.c) void;
-extern fn theme_bg_brush() callconv(.c) win32.HBRUSH;
-extern fn theme_ctl_color(hdc: win32.HDC) callconv(.c) win32.HBRUSH;
 
 pub const SortField = enum(i32) {
 	name,
@@ -222,10 +217,10 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	switch (msg) {
 		win32.WM_INITDIALOG => {
 			_ = win32.SetWindowLongPtrW(hdlg, win32.DWLP_USER, lp);
-			theme_apply_titlebar(hdlg);
+			theme.applyTitlebar(hdlg);
 			const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(lp)));
 			const combo = win32.GetDlgItem(hdlg, resource.IDC_REFRESH_COMBO);
-			_ = win32.SetWindowTheme(combo, if (theme_is_dark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+			_ = win32.SetWindowTheme(combo, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 			var sel: i32 = 0;
 			var i: i32 = 0;
 			while (i < REFRESH_OPTION_COUNT) : (i += 1) {
@@ -261,7 +256,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 				lvi2.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
 				_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&lvi2)));
 			}
-			theme_apply_listview(lv);
+			theme.applyListview(lv);
 			_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
 			const skip_chk = win32.CreateWindowExW(0, L("BUTTON"), L("Disable end task confirmation (not recommended)"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, @ptrFromInt(@as(usize, resource.IDC_SKIP_CONFIRM)), win32.GetModuleHandleW(null), null);
 			_ = win32.SendMessageW(skip_chk, win32.WM_SETFONT, @bitCast(font), 0);
@@ -305,11 +300,11 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 			}
 		},
 		win32.WM_CTLCOLORDLG => {
-			const br = theme_bg_brush();
+			const br = theme.bgBrush();
 			if (br != null) return @bitCast(@intFromPtr(br));
 		},
 		win32.WM_CTLCOLORSTATIC, win32.WM_CTLCOLORBTN, win32.WM_CTLCOLORLISTBOX, win32.WM_CTLCOLOREDIT => {
-			const br = theme_ctl_color(@ptrFromInt(@as(usize, @bitCast(wp))));
+			const br = theme.ctlColor(@ptrFromInt(@as(usize, @bitCast(wp))));
 			if (br != null) return @bitCast(@intFromPtr(br));
 		},
 		else => {},
@@ -317,7 +312,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	return 0;
 }
 
-pub export fn open_settings(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) callconv(.c) win32.BOOL {
+pub export fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) callconv(.c) win32.BOOL {
 	var data: SettingsDlgData = undefined;
 	data.refresh_ms = current_ms;
 	var i: usize = 0;
@@ -354,7 +349,7 @@ fn getIniPath(buf: [*:0]u16) void {
 	}
 }
 
-pub export fn settings_load(prefs: *SortPrefs) callconv(.c) void {
+pub export fn load(prefs: *SortPrefs) callconv(.c) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	prefs.field = .name;
@@ -418,7 +413,7 @@ pub export fn settings_load(prefs: *SortPrefs) callconv(.c) void {
 	}
 }
 
-pub export fn settings_save(prefs: *const SortPrefs) callconv(.c) void {
+pub export fn save(prefs: *const SortPrefs) callconv(.c) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	var i: usize = 0;

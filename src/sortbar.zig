@@ -3,6 +3,7 @@ const win32 = @import("win32.zig");
 const resource = @import("resource.zig");
 const settings = @import("settings.zig");
 const theme = @import("theme.zig");
+const listview = @import("listview.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
@@ -14,8 +15,6 @@ extern var g_sort_btns: [settings.COL_COUNT]win32.HWND;
 extern var g_sort_btn_cols: [settings.COL_COUNT]i32;
 extern var g_sort_btn_count: i32;
 extern var g_prefs: settings.SortPrefs;
-
-extern fn do_refresh() callconv(.c) void;
 
 fn sortGroupProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
@@ -69,11 +68,11 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (g_prefs.desc[fi] != 0) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
 				_ = win32.SetWindowTextW(g_sort_btns[@intCast(next)], &buf);
 				_ = win32.SendMessageW(g_sort_btns[@intCast(next)], win32.BM_SETCHECK, win32.BST_CHECKED, 0);
-				update_tab_stop();
+				updateTabStop();
 				_ = win32.SetFocus(g_sort_btns[@intCast(next)]);
-				update_sort_ui();
-				do_refresh();
-				settings.settings_save(&g_prefs);
+				updateSortUi();
+				listview.doRefresh();
+				settings.save(&g_prefs);
 				return 0;
 			}
 		}
@@ -82,7 +81,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
 }
 
-pub export fn update_tab_stop() callconv(.c) void {
+pub export fn updateTabStop() callconv(.c) void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -96,7 +95,7 @@ pub export fn update_tab_stop() callconv(.c) void {
 	}
 }
 
-pub export fn update_sort_ui() callconv(.c) void {
+pub export fn updateSortUi() callconv(.c) void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -130,7 +129,7 @@ pub export fn update_sort_ui() callconv(.c) void {
 	}
 }
 
-pub export fn apply_columns() callconv(.c) void {
+pub export fn applyColumns() callconv(.c) void {
 	var i: i32 = 0;
 	while (i < g_sort_btn_count) : (i += 1) {
 		const idx: usize = @intCast(i);
@@ -169,18 +168,18 @@ pub export fn apply_columns() callconv(.c) void {
 		lv_col += 1;
 	}
 	_ = win32.SetWindowPos(g_hwnd_sort_group, null, 0, 0, btn_x, 1, win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
-	update_sort_ui();
-	update_tab_stop();
-	sortbar_apply_theme();
+	updateSortUi();
+	updateTabStop();
+	applyTheme();
 }
 
-pub export fn sortbar_apply_theme() callconv(.c) void {
-	theme.theme_apply_button(g_hwnd_sort_group);
+pub export fn applyTheme() callconv(.c) void {
+	theme.applyButton(g_hwnd_sort_group);
 	var i: i32 = 0;
-	while (i < g_sort_btn_count) : (i += 1) theme.theme_apply_button(g_sort_btns[@intCast(i)]);
+	while (i < g_sort_btn_count) : (i += 1) theme.applyButton(g_sort_btns[@intCast(i)]);
 }
 
-pub export fn sortbar_create(parent: win32.HWND) callconv(.c) win32.HWND {
+pub export fn create(parent: win32.HWND) callconv(.c) win32.HWND {
 	const group = win32.CreateWindowExW(win32.WS_EX_CONTROLPARENT, L("BUTTON"), L("Sort by"), win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_GROUPBOX, 0, 0, 0, 1, parent, null, win32.GetModuleHandleW(null), null);
 	_ = win32.SetWindowSubclass(group, sortGroupProc, 0, 0);
 	return group;

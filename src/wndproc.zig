@@ -73,7 +73,7 @@ fn setRefreshInterval(hwnd: win32.HWND, ms_in: win32.UINT) void {
 	g_prefs.refresh_ms = ms;
 	_ = win32.KillTimer(hwnd, ID_REFRESH_TIMER);
 	if (ms > 0) _ = win32.SetTimer(hwnd, ID_REFRESH_TIMER, ms, null);
-	settings.settings_save(&g_prefs);
+	settings.save(&g_prefs);
 }
 
 fn isElevated() bool {
@@ -158,7 +158,7 @@ fn getSelectedListPid() win32.DWORD {
 }
 
 fn getSelectedPid() win32.DWORD {
-	if (g_prefs.tree_mode != 0) return treeview.tree_get_selected_pid();
+	if (g_prefs.tree_mode != 0) return treeview.getSelectedPid();
 	return getSelectedListPid();
 }
 
@@ -182,9 +182,9 @@ fn buildPriorityMenu(pid: win32.DWORD) win32.HMENU {
 fn showProcessContextMenu(hwnd: win32.HWND, pid: win32.DWORD, point: win32.POINT, include_end_tree: bool) void {
 	const menu = win32.CreatePopupMenu();
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
-	process.get_process_path(pid, &path, @intCast(win32.MAX_PATH));
+	process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
 	if (path[0] != 0) _ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_OPEN_LOCATION, L("Open file location"));
-	if (process.is_process_suspended(pid) != 0)
+	if (process.isProcessSuspended(pid) != 0)
 		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_RESUME, L("Resume"))
 	else
 		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_SUSPEND, L("Suspend"));
@@ -199,7 +199,7 @@ fn showProcessContextMenu(hwnd: win32.HWND, pid: win32.DWORD, point: win32.POINT
 fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	const id: u16 = @truncate(wp);
 	if (id == ID_TRAY_RESTORE) {
-		tray.tray_restore();
+		tray.restore();
 		return 0;
 	}
 	if (id == ID_TRAY_EXIT) {
@@ -213,25 +213,25 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	if (id == ID_CTX_SUSPEND or id == ID_CTX_RESUME) {
 		const pid = getSelectedPid();
 		if (pid != 0) {
-			if (id == ID_CTX_SUSPEND) _ = process.suspend_process(pid) else _ = process.resume_process(pid);
-			listview.do_refresh();
+			if (id == ID_CTX_SUSPEND) _ = process.suspendProcess(pid) else _ = process.resumeProcess(pid);
+			listview.doRefresh();
 		}
 		return 0;
 	}
 	if (id == ID_CTX_OPEN_LOCATION or id == resource.ID_CTX_END_TASK) {
 		if (g_prefs.tree_mode != 0) {
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
-			treeview.tree_get_selected_name(&name, 260);
-			const pid = treeview.tree_get_selected_pid();
+			treeview.getSelectedName(&name, 260);
+			const pid = treeview.getSelectedPid();
 			if (pid != 0) {
 				if (id == ID_CTX_OPEN_LOCATION) {
 					var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
-					process.get_process_path(pid, &path, @intCast(win32.MAX_PATH));
+					process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
 					if (path[0] != 0) _ = openItemLocation(&path);
 				} else {
 					if (confirmEndTask(hwnd, &name, pid)) {
-						_ = process.terminate_process(pid);
-						listview.do_refresh();
+						_ = process.terminateProcess(pid);
+						listview.doRefresh();
 					}
 				}
 			}
@@ -252,12 +252,12 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			const pid: win32.DWORD = @intCast(lvi.lParam);
 			if (id == ID_CTX_OPEN_LOCATION) {
 				var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
-				process.get_process_path(pid, &path, @intCast(win32.MAX_PATH));
+				process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
 				if (path[0] != 0) _ = openItemLocation(&path);
 			} else if (id == resource.ID_CTX_END_TASK) {
 				if (confirmEndTask(hwnd, &name, pid)) {
-					_ = process.terminate_process(pid);
-					listview.do_refresh();
+					_ = process.terminateProcess(pid);
+					listview.doRefresh();
 					const count: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
 					var pid_still_present = false;
 					var i: i32 = 0;
@@ -282,14 +282,14 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_CTX_END_PROCESS_TREE) {
-		const sel = treeview.tree_get_selection();
+		const sel = treeview.getSelection();
 		if (sel != null) {
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
-			treeview.tree_get_selected_name(&name, 260);
-			const pid = treeview.tree_get_selected_pid();
+			treeview.getSelectedName(&name, 260);
+			const pid = treeview.getSelectedPid();
 			if (confirmEndTree(hwnd, &name, pid)) {
-				treeview.terminate_tree_from_item(sel);
-				listview.do_refresh();
+				treeview.terminateFromItem(sel);
+				listview.doRefresh();
 			}
 		}
 		return 0;
@@ -307,20 +307,20 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			_ = win32.ShowWindow(g_hwnd_list, win32.SW_SHOW);
 			_ = win32.SetFocus(g_hwnd_list);
 		}
-		listview.do_refresh();
-		settings.settings_save(&g_prefs);
+		listview.doRefresh();
+		settings.save(&g_prefs);
 		return 0;
 	}
 	if (id >= ID_CTX_PRIORITY_BASE and id < ID_CTX_PRIORITY_BASE + PRIORITY_CLASS_COUNT) {
 		const pid = getSelectedPid();
 		if (pid != 0) {
-			_ = process.set_process_priority(pid, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
-			listview.do_refresh();
+			_ = process.setProcessPriority(pid, PRIORITY_CLASSES[id - ID_CTX_PRIORITY_BASE].cls);
+			listview.doRefresh();
 		}
 		return 0;
 	}
 	if (id == resource.ID_FILE_NEW_TASK) {
-		run.open_run_dialog(hwnd);
+		run.openDialog(hwnd);
 		return 0;
 	}
 	if (id == resource.ID_FILE_RESTART_AS_ADMIN) {
@@ -345,11 +345,11 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
 		_ = win32.CheckMenuItem(view, resource.ID_VIEW_ALWAYS_ON_TOP, if (g_prefs.always_on_top != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
 		_ = win32.SetWindowPos(hwnd, if (g_prefs.always_on_top != 0) win32.HWND_TOPMOST else win32.HWND_NOTOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
-		settings.settings_save(&g_prefs);
+		settings.save(&g_prefs);
 		return 0;
 	}
 	if (id == resource.ID_VIEW_REFRESH) {
-		listview.do_refresh();
+		listview.doRefresh();
 		return 0;
 	}
 	if (id == resource.ID_VIEW_SETTINGS) {
@@ -357,7 +357,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		var new_visible: [settings.COL_COUNT]win32.BOOL = undefined;
 		var new_skip_confirm: win32.BOOL = undefined;
 		var new_start_minimized: win32.BOOL = undefined;
-		if (settings.open_settings(hwnd, g_prefs.refresh_ms, &g_prefs.visible, g_prefs.skip_kill_confirm, g_prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized) != 0) {
+		if (settings.open(hwnd, g_prefs.refresh_ms, &g_prefs.visible, g_prefs.skip_kill_confirm, g_prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized) != 0) {
 			var cols_changed = false;
 			var i: i32 = 0;
 			while (i < settings.COL_COUNT) : (i += 1) {
@@ -372,10 +372,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			g_prefs.start_minimized_to_tray = new_start_minimized;
 			if (new_ms != g_prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
 			if (cols_changed) {
-				sortbar.apply_columns();
-				listview.do_refresh();
+				sortbar.applyColumns();
+				listview.doRefresh();
 			}
-			settings.settings_save(&g_prefs);
+			settings.save(&g_prefs);
 		}
 		return 0;
 	}
@@ -392,10 +392,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				} else {
 					g_prefs.field = settings.COLUMNS[cid].field;
 				}
-				sortbar.update_sort_ui();
-				sortbar.update_tab_stop();
-				listview.do_refresh();
-				settings.settings_save(&g_prefs);
+				sortbar.updateSortUi();
+				sortbar.updateTabStop();
+				listview.doRefresh();
+				settings.save(&g_prefs);
 				break;
 			}
 		}
@@ -410,7 +410,7 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 		var sel: win32.HTREEITEM = null;
 		if (point.x == -1 and point.y == -1) {
 			// Keyboard-triggered: use current selection
-			sel = treeview.tree_get_selection();
+			sel = treeview.getSelection();
 			if (sel != null) {
 				var rc: win32.RECT align(8) = std.mem.zeroes(win32.RECT);
 				@as(*win32.HTREEITEM, @ptrCast(@alignCast(&rc))).* = sel;
@@ -429,10 +429,10 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 			const hit: win32.HTREEITEM = @ptrFromInt(@as(usize, @bitCast(win32.SendMessageW(g_hwnd_tree, win32.TVM_HITTEST, 0, @bitCast(@intFromPtr(&tvht))))));
 			if (hit != null and (tvht.flags & win32.TVHT_ONITEM) != 0)
 				_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_SELECTITEM, win32.TVGN_CARET, @bitCast(@intFromPtr(hit)));
-			sel = treeview.tree_get_selection();
+			sel = treeview.getSelection();
 		}
 		if (sel != null) {
-			const pid = treeview.tree_get_selected_pid();
+			const pid = treeview.getSelectedPid();
 			showProcessContextMenu(hwnd, pid, point, true);
 		}
 		return 0;
@@ -460,7 +460,7 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 	return 0;
 }
 
-pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.LRESULT {
+pub export fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.LRESULT {
 	switch (msg) {
 		win32.WM_ACTIVATE => {
 			const low: u16 = @truncate(wp);
@@ -476,30 +476,30 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 			_ = win32.RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, win32.MOD_CONTROL | win32.MOD_SHIFT | win32.MOD_NOREPEAT, @intCast(win32.VK_OEM_3));
 			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
-			g_hwnd_sort_group = sortbar.sortbar_create(hwnd);
+			g_hwnd_sort_group = sortbar.create(hwnd);
 			// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
 			// use "Processes" as the list's accessible name instead of the group box.
 			_ = win32.CreateWindowExW(0, L("STATIC"), L("Processes"), win32.WS_CHILD | win32.SS_LEFT, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
 			g_hwnd_list = win32.CreateWindowExW(0, win32.WC_LISTVIEWW, L("Processes"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.LVS_REPORT | win32.LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_LISTVIEW)), win32.GetModuleHandleW(null), null);
-			_ = win32.SetWindowSubclass(g_hwnd_list, listview.list_key_proc, 0, 0);
+			_ = win32.SetWindowSubclass(g_hwnd_list, listview.listKeyProc, 0, 0);
 			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_FULLROWSELECT | win32.LVS_EX_GRIDLINES | win32.LVS_EX_HEADERDRAGDROP);
 			g_hwnd_tree = win32.CreateWindowExW(0, win32.WC_TREEVIEWW, null, win32.WS_CHILD | win32.WS_TABSTOP | win32.TVS_HASLINES | win32.TVS_HASBUTTONS | win32.TVS_LINESATROOT | win32.TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_TREEVIEW)), win32.GetModuleHandleW(null), null);
-			_ = win32.SetWindowSubclass(g_hwnd_tree, treeview.tree_key_proc, 0, 0);
+			_ = win32.SetWindowSubclass(g_hwnd_tree, treeview.keyProc, 0, 0);
 			_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_SETEXTENDEDSTYLE, win32.TVS_EX_DOUBLEBUFFER, win32.TVS_EX_DOUBLEBUFFER);
 			g_hwnd_status = win32.CreateWindowExW(0, win32.STATUSCLASSNAMEW, null, win32.WS_CHILD | win32.WS_VISIBLE, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
-			settings.settings_load(&g_prefs);
-			theme.theme_update();
-			sortbar.apply_columns();
-			theme.theme_apply_titlebar(hwnd);
-			theme.theme_apply_listview(g_hwnd_list);
-			theme.theme_apply_treeview(g_hwnd_tree);
-			_ = win32.SetWindowTheme(g_hwnd_status, if (theme.theme_is_dark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+			settings.load(&g_prefs);
+			theme.update();
+			sortbar.applyColumns();
+			theme.applyTitlebar(hwnd);
+			theme.applyListview(g_hwnd_list);
+			theme.applyTreeview(g_hwnd_tree);
+			_ = win32.SetWindowTheme(g_hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 			if (g_prefs.tree_mode != 0) {
 				_ = win32.ShowWindow(g_hwnd_list, win32.SW_HIDE);
 				_ = win32.ShowWindow(g_hwnd_tree, win32.SW_SHOW);
 			}
 			createMenuBar(hwnd);
-			tray.tray_add(hwnd, WM_TRAYICON, &WINDOW_TITLE);
+			tray.add(hwnd, WM_TRAYICON, &WINDOW_TITLE);
 			if (g_prefs.always_on_top != 0)
 				_ = win32.SetWindowPos(hwnd, win32.HWND_TOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
 			if (g_prefs.window_width > 0) {
@@ -511,15 +511,15 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 			// Discard results — the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
 			{
 				var count: i32 = 0;
-				const primed = process.snapshot_processes(&g_snapshots, &count, g_prefs.field, g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))]);
-				if (primed) |pr| process.free_process_entries(pr);
+				const primed = process.snapshotProcesses(&g_snapshots, &count, g_prefs.field, g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))]);
+				if (primed) |pr| process.freeProcessEntries(pr);
 			}
 			_ = win32.SetTimer(hwnd, ID_PRIME_TIMER, 250, null);
 			setRefreshInterval(hwnd, g_prefs.refresh_ms);
 			// Skip when starting minimized: SetFocus on a hidden window can still activate
 			// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
 			// assigns focus (falling back to g_hwnd_list/g_hwnd_tree) once the window is
-			// actually shown via tray_restore().
+			// actually shown via tray.restore().
 			if (g_prefs.start_minimized_to_tray == 0)
 				_ = win32.SetFocus(g_hwnd_list);
 			return 0;
@@ -545,7 +545,7 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 		},
 		WM_TRAYICON => {
 			if (lp == win32.WM_LBUTTONUP) {
-				tray.tray_restore();
+				tray.restore();
 			} else if (lp == win32.WM_RBUTTONUP) {
 				const menu = win32.CreatePopupMenu();
 				_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_TRAY_RESTORE, L("Restore"));
@@ -574,10 +574,10 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 					} else {
 						g_prefs.field = settings.COLUMNS[cid].field;
 					}
-					sortbar.update_sort_ui();
-					sortbar.update_tab_stop();
-					listview.do_refresh();
-					settings.settings_save(&g_prefs);
+					sortbar.updateSortUi();
+					sortbar.updateTabStop();
+					listview.doRefresh();
+					settings.save(&g_prefs);
 				}
 			}
 			return win32.DefWindowProcW(hwnd, msg, wp, lp);
@@ -585,18 +585,18 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 		win32.WM_TIMER => {
 			if (wp == ID_PRIME_TIMER) {
 				_ = win32.KillTimer(hwnd, ID_PRIME_TIMER);
-				listview.do_refresh();
+				listview.doRefresh();
 				return 0;
 			}
 			if (wp == ID_REFRESH_TIMER) {
-				listview.do_refresh();
+				listview.doRefresh();
 				return 0;
 			}
 		},
 		win32.WM_HOTKEY => {
 			if (wp == ID_HOTKEY_TOGGLE) {
 				if (win32.IsWindowVisible(hwnd) == 0) {
-					tray.tray_restore();
+					tray.restore();
 				} else if (win32.GetForegroundWindow() != hwnd) {
 					_ = win32.SetForegroundWindow(hwnd);
 				} else {
@@ -609,19 +609,19 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 			if (lp != 0) {
 				const s: win32.LPCWSTR = @ptrFromInt(@as(usize, @bitCast(lp)));
 				if (win32.lstrcmpW(s, L("ImmersiveColorSet")) == 0) {
-					theme.theme_update();
-					theme.theme_apply_titlebar(hwnd);
-					theme.theme_apply_listview(g_hwnd_list);
-					theme.theme_apply_treeview(g_hwnd_tree);
-					_ = win32.SetWindowTheme(g_hwnd_status, if (theme.theme_is_dark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
-					sortbar.sortbar_apply_theme();
+					theme.update();
+					theme.applyTitlebar(hwnd);
+					theme.applyListview(g_hwnd_list);
+					theme.applyTreeview(g_hwnd_tree);
+					_ = win32.SetWindowTheme(g_hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+					sortbar.applyTheme();
 					_ = win32.RedrawWindow(hwnd, null, null, win32.RDW_INVALIDATE | win32.RDW_ERASE | win32.RDW_ALLCHILDREN);
 				}
 			}
 			return 0;
 		},
 		win32.WM_ERASEBKGND => {
-			const br = theme.theme_bg_brush();
+			const br = theme.bgBrush();
 			if (br != null) {
 				var rc: win32.RECT = undefined;
 				_ = win32.GetClientRect(hwnd, &rc);
@@ -630,7 +630,7 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 			}
 		},
 		win32.WM_CTLCOLORSTATIC, win32.WM_CTLCOLORBTN => {
-			const br = theme.theme_ctl_color(@ptrFromInt(@as(usize, @bitCast(wp))));
+			const br = theme.ctlColor(@ptrFromInt(@as(usize, @bitCast(wp))));
 			if (br != null) return @bitCast(@intFromPtr(br));
 		},
 		win32.WM_DESTROY => {
@@ -641,11 +641,11 @@ pub export fn wnd_proc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: 
 			g_prefs.window_top = wpl.rcNormalPosition.top;
 			g_prefs.window_width = wpl.rcNormalPosition.right - wpl.rcNormalPosition.left;
 			g_prefs.window_height = wpl.rcNormalPosition.bottom - wpl.rcNormalPosition.top;
-			settings.settings_save(&g_prefs);
+			settings.save(&g_prefs);
 			_ = win32.UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 			_ = win32.KillTimer(hwnd, ID_REFRESH_TIMER);
-			tray.tray_remove();
-			process.gpu_cleanup();
+			tray.remove();
+			process.gpuCleanup();
 			win32.PostQuitMessage(0);
 			return 0;
 		},
