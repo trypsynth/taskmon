@@ -256,3 +256,68 @@ pub extern "shlwapi" fn PathIsPrefixW(pszPrefix: LPCWSTR, pszPath: LPCWSTR) call
 pub extern "shlwapi" fn PathAppendW(pszPath: [*:0]u16, pszMore: LPCWSTR) callconv(.c) BOOL;
 pub extern "shlwapi" fn StrCmpIW(pszStr1: LPCWSTR, pszStr2: LPCWSTR) callconv(.c) c_int;
 pub extern "shlwapi" fn StrToIntW(pszString: LPCWSTR) callconv(.c) c_int;
+pub extern "shlwapi" fn PathRemoveBlanksW(pszPath: [*:0]u16) callconv(.c) void;
+
+pub const SW_SHOWNORMAL: i32 = 1;
+pub const EN_CHANGE: UINT = 0x0300;
+pub const EM_SETSEL: UINT = 0x00B1;
+pub const EM_SETLIMITTEXT: UINT = 0x00C5;
+pub const SEE_MASK_DOENVSUBST: c_ulong = 0x200;
+pub const OFN_FILEMUSTEXIST: DWORD = 0x1000;
+pub const OFN_HIDEREADONLY: DWORD = 0x4;
+
+pub const OPENFILENAMEW = extern struct {
+	lStructSize: DWORD,
+	hwndOwner: HWND,
+	hInstance: HINSTANCE,
+	lpstrFilter: LPCWSTR,
+	lpstrCustomFilter: LPWSTR,
+	nMaxCustFilter: DWORD,
+	nFilterIndex: DWORD,
+	lpstrFile: [*:0]u16,
+	nMaxFile: DWORD,
+	lpstrFileTitle: LPWSTR,
+	nMaxFileTitle: DWORD,
+	lpstrInitialDir: ?LPCWSTR,
+	lpstrTitle: ?LPCWSTR,
+	Flags: DWORD,
+	nFileOffset: WORD,
+	nFileExtension: WORD,
+	lpstrDefExt: ?LPCWSTR,
+	lCustData: LPARAM,
+	lpfnHook: ?*anyopaque,
+	lpTemplateName: ?LPCWSTR,
+	pvReserved: ?*anyopaque,
+	dwReserved: DWORD,
+	FlagsEx: DWORD,
+};
+
+pub const SHELLEXECUTEINFOW = extern struct {
+	cbSize: DWORD,
+	fMask: c_ulong,
+	hwnd: HWND,
+	lpVerb: ?LPCWSTR,
+	lpFile: ?LPCWSTR,
+	lpParameters: ?LPCWSTR,
+	lpDirectory: ?LPCWSTR,
+	nShow: i32,
+	hInstApp: HINSTANCE,
+	lpIDList: ?*anyopaque,
+	lpClass: ?LPCWSTR,
+	hkeyClass: HKEY,
+	dwHotKey: DWORD,
+	anon: extern union {
+		hIcon: HANDLE,
+		hMonitor: HANDLE,
+	},
+	hProcess: HANDLE,
+};
+
+pub extern "comdlg32" fn GetOpenFileNameW(lpofn: *OPENFILENAMEW) callconv(.c) BOOL;
+pub extern "shell32" fn ShellExecuteExW(pExecInfo: *SHELLEXECUTEINFOW) callconv(.c) BOOL;
+
+pub extern "user32" fn SetDlgItemTextW(hDlg: HWND, nIDDlgItem: c_int, lpString: LPCWSTR) callconv(.c) BOOL;
+pub extern "user32" fn GetDlgItemTextW(hDlg: HWND, nIDDlgItem: c_int, lpString: [*:0]u16, cchMax: c_int) callconv(.c) UINT;
+pub extern "user32" fn SendDlgItemMessageW(hDlg: HWND, nIDDlgItem: c_int, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) LRESULT;
+pub extern "user32" fn EnableWindow(hWnd: HWND, bEnable: BOOL) callconv(.c) BOOL;
+pub extern "user32" fn GetWindowTextLengthW(hWnd: HWND) callconv(.c) c_int;
