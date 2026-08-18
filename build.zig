@@ -23,6 +23,7 @@ pub fn build(b: *std.Build) void {
 	const target = b.standardTargetOptions(.{});
 	const optimize: std.builtin.OptimizeMode = .ReleaseSmall;
 	const exe_mod = b.createModule(.{
+		.root_source_file = b.path("src/main.zig"),
 		.target = target,
 		.optimize = optimize,
 		.link_libc = false,
@@ -48,12 +49,6 @@ pub fn build(b: *std.Build) void {
 		.files = &sources,
 		.flags = &.{ "-std=c17", "-Wall", "-Wextra" },
 	});
-	// entry.c defines its own memset/memcpy/memmove; without -fno-builtin, LLVM's
-	// idiom recognizer can rewrite their copy loops into calls to themselves.
-	exe_mod.addCSourceFile(.{
-		.file = b.path("src/entry.c"),
-		.flags = &.{ "-std=c17", "-Wall", "-Wextra", "-fno-builtin" },
-	});
 	exe_mod.addWin32ResourceFile(.{
 		.file = b.path("src/taskmon.rc"),
 		.include_paths = &.{win32_headers},
@@ -64,7 +59,6 @@ pub fn build(b: *std.Build) void {
 		.root_module = exe_mod,
 	});
 	exe.subsystem = .windows;
-	exe.entry = .{ .symbol_name = "WinMainCRTStartup" };
 	exe.link_gc_sections = true;
 	b.installArtifact(exe);
 	if (b.findProgram(.{ .names = &.{"pandoc"} })) |pandoc| {
