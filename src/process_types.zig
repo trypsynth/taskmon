@@ -1,6 +1,7 @@
-// Hand mirrored from process.h's process_entry/cpu_snapshot/snapshot_entry.
-// process.h stays the source of truth until process.c itself is ported;
-// this must be kept byte-for-byte layout compatible with it until then.
+// Mirrors the old process.h's process_entry/cpu_snapshot/snapshot_entry
+// layout (from the pre-Zig C version of this codebase); kept byte-for-byte
+// compatible since ProcessEntry is read back via NtQuerySystemInformation-
+// derived field-by-field assignment in process.zig.
 const win32 = @import("win32.zig");
 
 pub const SIZE_T = usize;
@@ -10,9 +11,9 @@ pub const ULONG = u32;
 pub const USHORT = u16;
 
 pub const TmDpiAwareness = enum(i32) {
-	TM_DPI_UNAWARE = 0,
-	TM_DPI_SYSTEM_AWARE = 1,
-	TM_DPI_PER_MONITOR_AWARE = 2,
+	unaware = 0,
+	system_aware = 1,
+	per_monitor_aware = 2,
 };
 
 pub const ProcessEntry = extern struct {

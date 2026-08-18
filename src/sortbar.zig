@@ -146,7 +146,7 @@ pub export fn apply_columns() callconv(.c) void {
 	while (i >= 0) : (i -= 1) _ = win32.SendMessageW(g_hwnd_list, win32.LVM_DELETECOLUMN, @intCast(i), 0);
 
 	const field_idx: usize = @intCast(@intFromEnum(g_prefs.field));
-	if (g_prefs.visible[field_idx] == 0) g_prefs.field = .SORT_FIELD_NAME;
+	if (g_prefs.visible[field_idx] == 0) g_prefs.field = .name;
 
 	var btn_x: i32 = 0;
 	var lv_col: i32 = 0;

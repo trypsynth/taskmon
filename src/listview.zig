@@ -102,8 +102,8 @@ fn formatCycleRate(rate: f64, buf: [*:0]u16, len: i32) void {
 fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) void {
 	@setEvalBranchQuota(100_000);
 	switch (@as(settings.SortField, @enumFromInt(cid))) {
-		.SORT_FIELD_PID => _ = win32.wnsprintfW(buf, len, L("%u"), e.pid),
-		.SORT_FIELD_CPU => {
+		.pid => _ = win32.wnsprintfW(buf, len, L("%u"), e.pid),
+		.cpu => {
 			var whole: i32 = @intFromFloat(e.cpu_percent);
 			var frac: i32 = @intFromFloat((e.cpu_percent - @as(f64, @floatFromInt(whole))) * 100 + 0.5);
 			if (frac >= 100) {
@@ -112,10 +112,10 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			}
 			_ = win32.wnsprintfW(buf, len, L("%d.%02d"), whole, frac);
 		},
-		.SORT_FIELD_MEMORY => _ = win32.StrFormatByteSizeW(@intCast(e.working_set), buf, @intCast(len)),
-		.SORT_FIELD_THREADS => _ = win32.wnsprintfW(buf, len, L("%u"), e.threads),
-		.SORT_FIELD_HANDLES => _ = win32.wnsprintfW(buf, len, L("%u"), e.handles),
-		.SORT_FIELD_PRIORITY => {
+		.memory => _ = win32.StrFormatByteSizeW(@intCast(e.working_set), buf, @intCast(len)),
+		.threads => _ = win32.wnsprintfW(buf, len, L("%u"), e.threads),
+		.handles => _ = win32.wnsprintfW(buf, len, L("%u"), e.handles),
+		.priority => {
 			const label: win32.LPCWSTR = switch (e.base_priority) {
 				4 => L("Idle"),
 				6 => L("Below Normal"),
@@ -130,7 +130,7 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			};
 			_ = win32.lstrcpynW(buf, label, len);
 		},
-		.SORT_FIELD_STARTTIME => {
+		.starttime => {
 			if (e.start_time == 0) {
 				buf[0] = 0;
 				return;
@@ -151,20 +151,20 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			else
 				_ = win32.wnsprintfW(buf, len, L("%02d/%02d/%04d %02d:%02d"), st.wMonth, st.wDay, st.wYear, st.wHour, st.wMinute);
 		},
-		.SORT_FIELD_DISK_IO => {
+		.disk_io => {
 			if (e.disk_io_rate > 0) {
 				_ = win32.StrFormatByteSizeW(@intFromFloat(e.disk_io_rate), buf, @intCast(len));
 				_ = win32.lstrcatW(buf, L("/s"));
 			} else buf[0] = 0;
 		},
-		.SORT_FIELD_PRIVATE_BYTES => _ = win32.StrFormatByteSizeW(@intCast(e.private_bytes), buf, @intCast(len)),
-		.SORT_FIELD_PAGE_FAULTS => {
+		.private_bytes => _ = win32.StrFormatByteSizeW(@intCast(e.private_bytes), buf, @intCast(len)),
+		.page_faults => {
 			const pf: win32.UINT = @intFromFloat(e.page_faults_per_sec + 0.5);
 			if (pf > 0) _ = win32.wnsprintfW(buf, len, L("%u /s"), pf) else buf[0] = 0;
 		},
-		.SORT_FIELD_USER => _ = win32.lstrcpynW(buf, @ptrCast(&e.user), len),
-		.SORT_FIELD_CMDLINE => _ = win32.lstrcpynW(buf, @ptrCast(&e.cmdline), len),
-		.SORT_FIELD_ARCH => {
+		.user => _ = win32.lstrcpynW(buf, @ptrCast(&e.user), len),
+		.cmdline => _ = win32.lstrcpynW(buf, @ptrCast(&e.cmdline), len),
+		.arch => {
 			const label: win32.LPCWSTR = switch (e.arch_machine) {
 				0x014c => L("x86"),
 				0x8664 => L("x64"),
@@ -176,16 +176,16 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			};
 			_ = win32.lstrcpynW(buf, label, len);
 		},
-		.SORT_FIELD_SESSION => _ = win32.wnsprintfW(buf, len, L("%u"), e.session_id),
-		.SORT_FIELD_PEAK_WORKING_SET => _ = win32.StrFormatByteSizeW(@intCast(e.peak_working_set), buf, @intCast(len)),
-		.SORT_FIELD_VIRTUAL_MEM => _ = win32.StrFormatByteSizeW(@intCast(e.virtual_size), buf, @intCast(len)),
-		.SORT_FIELD_GDI_OBJECTS => {
+		.session => _ = win32.wnsprintfW(buf, len, L("%u"), e.session_id),
+		.peak_working_set => _ = win32.StrFormatByteSizeW(@intCast(e.peak_working_set), buf, @intCast(len)),
+		.virtual_mem => _ = win32.StrFormatByteSizeW(@intCast(e.virtual_size), buf, @intCast(len)),
+		.gdi_objects => {
 			if (e.gdi_objects != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.gdi_objects) else buf[0] = 0;
 		},
-		.SORT_FIELD_USER_OBJECTS => {
+		.user_objects => {
 			if (e.user_objects != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.user_objects) else buf[0] = 0;
 		},
-		.SORT_FIELD_INTEGRITY => {
+		.integrity => {
 			const label: ?win32.LPCWSTR = switch (e.integrity_level) {
 				0x0000 => L("Untrusted"),
 				0x1000 => L("Low"),
@@ -198,42 +198,42 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			};
 			if (label) |l| _ = win32.lstrcpynW(buf, l, len) else _ = win32.wnsprintfW(buf, len, L("0x%04X"), e.integrity_level);
 		},
-		.SORT_FIELD_PPID => {
+		.ppid => {
 			if (e.parent_pid != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.parent_pid) else buf[0] = 0;
 		},
-		.SORT_FIELD_PRIVATE_WS => _ = win32.StrFormatByteSizeW(@intCast(e.private_working_set), buf, @intCast(len)),
-		.SORT_FIELD_PAGED_POOL => _ = win32.StrFormatByteSizeW(@intCast(e.paged_pool), buf, @intCast(len)),
-		.SORT_FIELD_NONPAGED_POOL => _ = win32.StrFormatByteSizeW(@intCast(e.non_paged_pool), buf, @intCast(len)),
-		.SORT_FIELD_IO_READ => {
+		.private_ws => _ = win32.StrFormatByteSizeW(@intCast(e.private_working_set), buf, @intCast(len)),
+		.paged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.paged_pool), buf, @intCast(len)),
+		.nonpaged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.non_paged_pool), buf, @intCast(len)),
+		.io_read => {
 			if (e.io_read_rate > 0) {
 				_ = win32.StrFormatByteSizeW(@intFromFloat(e.io_read_rate), buf, @intCast(len));
 				_ = win32.lstrcatW(buf, L("/s"));
 			} else buf[0] = 0;
 		},
-		.SORT_FIELD_IO_WRITE => {
+		.io_write => {
 			if (e.io_write_rate > 0) {
 				_ = win32.StrFormatByteSizeW(@intFromFloat(e.io_write_rate), buf, @intCast(len));
 				_ = win32.lstrcatW(buf, L("/s"));
 			} else buf[0] = 0;
 		},
-		.SORT_FIELD_IO_OTHER => {
+		.io_other => {
 			if (e.io_other_rate > 0) {
 				_ = win32.StrFormatByteSizeW(@intFromFloat(e.io_other_rate), buf, @intCast(len));
 				_ = win32.lstrcatW(buf, L("/s"));
 			} else buf[0] = 0;
 		},
-		.SORT_FIELD_DESCRIPTION => _ = win32.lstrcpynW(buf, @ptrCast(&e.description), len),
-		.SORT_FIELD_COMPANY => _ = win32.lstrcpynW(buf, @ptrCast(&e.company), len),
-		.SORT_FIELD_DPI => {
+		.description => _ = win32.lstrcpynW(buf, @ptrCast(&e.description), len),
+		.company => _ = win32.lstrcpynW(buf, @ptrCast(&e.company), len),
+		.dpi => {
 			const label: win32.LPCWSTR = switch (e.dpi_awareness) {
-				.TM_DPI_UNAWARE => L("Unaware"),
-				.TM_DPI_SYSTEM_AWARE => L("System"),
-				.TM_DPI_PER_MONITOR_AWARE => L("Per-Monitor"),
+				.unaware => L("Unaware"),
+				.system_aware => L("System"),
+				.per_monitor_aware => L("Per-Monitor"),
 			};
 			_ = win32.lstrcpynW(buf, label, len);
 		},
-		.SORT_FIELD_SERVICE => _ = win32.lstrcpynW(buf, @ptrCast(&e.services), len),
-		.SORT_FIELD_GPU => {
+		.service => _ = win32.lstrcpynW(buf, @ptrCast(&e.services), len),
+		.gpu => {
 			var whole: i32 = @intFromFloat(e.gpu_percent);
 			var frac: i32 = @intFromFloat((e.gpu_percent - @as(f64, @floatFromInt(whole))) * 100 + 0.5);
 			if (frac >= 100) {
@@ -242,42 +242,42 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			}
 			_ = win32.wnsprintfW(buf, len, L("%d.%02d"), whole, frac);
 		},
-		.SORT_FIELD_GPU_MEMORY => _ = win32.StrFormatByteSizeW(@intCast(e.gpu_memory), buf, @intCast(len)),
-		.SORT_FIELD_CPU_TIME => formatDuration(e.cpu_time, buf, len),
-		.SORT_FIELD_ELEVATED => {
+		.gpu_memory => _ = win32.StrFormatByteSizeW(@intCast(e.gpu_memory), buf, @intCast(len)),
+		.cpu_time => formatDuration(e.cpu_time, buf, len),
+		.elevated => {
 			if (e.elevated < 0) buf[0] = 0 else _ = win32.lstrcpynW(buf, if (e.elevated != 0) L("Yes") else L("No"), len);
 		},
-		.SORT_FIELD_PATH => _ = win32.lstrcpynW(buf, @ptrCast(&e.path), len),
-		.SORT_FIELD_WINDOW_TITLE => _ = win32.lstrcpynW(buf, @ptrCast(&e.window_title), len),
-		.SORT_FIELD_FILE_VERSION => _ = win32.lstrcpynW(buf, @ptrCast(&e.file_version), len),
-		.SORT_FIELD_PRODUCT_VERSION => _ = win32.lstrcpynW(buf, @ptrCast(&e.product_version), len),
-		.SORT_FIELD_SESSION_NAME => _ = win32.lstrcpynW(buf, @ptrCast(&e.session_name), len),
-		.SORT_FIELD_PACKAGE_NAME => _ = win32.lstrcpynW(buf, @ptrCast(&e.package_name), len),
-		.SORT_FIELD_PEAK_VIRTUAL_MEM => _ = win32.StrFormatByteSizeW(@intCast(e.peak_virtual_size), buf, @intCast(len)),
-		.SORT_FIELD_PEAK_PRIVATE_BYTES => _ = win32.StrFormatByteSizeW(@intCast(e.peak_private_bytes), buf, @intCast(len)),
-		.SORT_FIELD_PEAK_PAGED_POOL => _ = win32.StrFormatByteSizeW(@intCast(e.peak_paged_pool), buf, @intCast(len)),
-		.SORT_FIELD_PEAK_NONPAGED_POOL => _ = win32.StrFormatByteSizeW(@intCast(e.peak_non_paged_pool), buf, @intCast(len)),
-		.SORT_FIELD_PEAK_THREADS => _ = win32.wnsprintfW(buf, len, L("%u"), e.peak_threads),
-		.SORT_FIELD_HARD_FAULTS => {
+		.path => _ = win32.lstrcpynW(buf, @ptrCast(&e.path), len),
+		.window_title => _ = win32.lstrcpynW(buf, @ptrCast(&e.window_title), len),
+		.file_version => _ = win32.lstrcpynW(buf, @ptrCast(&e.file_version), len),
+		.product_version => _ = win32.lstrcpynW(buf, @ptrCast(&e.product_version), len),
+		.session_name => _ = win32.lstrcpynW(buf, @ptrCast(&e.session_name), len),
+		.package_name => _ = win32.lstrcpynW(buf, @ptrCast(&e.package_name), len),
+		.peak_virtual_mem => _ = win32.StrFormatByteSizeW(@intCast(e.peak_virtual_size), buf, @intCast(len)),
+		.peak_private_bytes => _ = win32.StrFormatByteSizeW(@intCast(e.peak_private_bytes), buf, @intCast(len)),
+		.peak_paged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.peak_paged_pool), buf, @intCast(len)),
+		.peak_nonpaged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.peak_non_paged_pool), buf, @intCast(len)),
+		.peak_threads => _ = win32.wnsprintfW(buf, len, L("%u"), e.peak_threads),
+		.hard_faults => {
 			const hf: win32.UINT = @intFromFloat(e.hard_faults_per_sec + 0.5);
 			if (hf > 0) _ = win32.wnsprintfW(buf, len, L("%u /s"), hf) else buf[0] = 0;
 		},
-		.SORT_FIELD_CYCLES => formatCycleRate(e.cycles_per_sec, buf, len),
-		.SORT_FIELD_KERNEL_TIME => formatDuration(e.kernel_time, buf, len),
-		.SORT_FIELD_USER_TIME => formatDuration(e.user_time, buf, len),
-		.SORT_FIELD_TOTAL_PAGE_FAULTS => _ = win32.wnsprintfW(buf, len, L("%u"), e.total_page_faults),
-		.SORT_FIELD_IO_READ_OPS => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_read_ops),
-		.SORT_FIELD_IO_WRITE_OPS => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_write_ops),
-		.SORT_FIELD_IO_OTHER_OPS => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_other_ops),
-		.SORT_FIELD_TOTAL_IO => _ = win32.StrFormatByteSizeW(@intCast(e.total_io_bytes), buf, @intCast(len)),
-		.SORT_FIELD_ELAPSED => formatElapsed(e.elapsed_time, buf, len),
-		.SORT_FIELD_SHARED_WS => _ = win32.StrFormatByteSizeW(@intCast(e.shared_working_set), buf, @intCast(len)),
-		.SORT_FIELD_PARENT_NAME => _ = win32.lstrcpynW(buf, @ptrCast(&e.parent_name), len),
-		.SORT_FIELD_PRIVATE_BYTES_DELTA => formatByteDelta(e.private_bytes_delta, buf, len),
-		.SORT_FIELD_WORKING_SET_DELTA => formatByteDelta(e.working_set_delta, buf, len),
-		.SORT_FIELD_HANDLE_DELTA => formatCountDelta(e.handle_delta, buf, len),
-		.SORT_FIELD_THREAD_DELTA => formatCountDelta(e.thread_delta, buf, len),
-		.SORT_FIELD_VIRTUALIZATION => {
+		.cycles => formatCycleRate(e.cycles_per_sec, buf, len),
+		.kernel_time => formatDuration(e.kernel_time, buf, len),
+		.user_time => formatDuration(e.user_time, buf, len),
+		.total_page_faults => _ = win32.wnsprintfW(buf, len, L("%u"), e.total_page_faults),
+		.io_read_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_read_ops),
+		.io_write_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_write_ops),
+		.io_other_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_other_ops),
+		.total_io => _ = win32.StrFormatByteSizeW(@intCast(e.total_io_bytes), buf, @intCast(len)),
+		.elapsed => formatElapsed(e.elapsed_time, buf, len),
+		.shared_ws => _ = win32.StrFormatByteSizeW(@intCast(e.shared_working_set), buf, @intCast(len)),
+		.parent_name => _ = win32.lstrcpynW(buf, @ptrCast(&e.parent_name), len),
+		.private_bytes_delta => formatByteDelta(e.private_bytes_delta, buf, len),
+		.working_set_delta => formatByteDelta(e.working_set_delta, buf, len),
+		.handle_delta => formatCountDelta(e.handle_delta, buf, len),
+		.thread_delta => formatCountDelta(e.thread_delta, buf, len),
+		.virtualization => {
 			const label: win32.LPCWSTR = switch (e.virtualization) {
 				0 => L("Not allowed"),
 				1 => L("Disabled"),
@@ -286,23 +286,23 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			};
 			_ = win32.lstrcpynW(buf, label, len);
 		},
-		.SORT_FIELD_APP_CONTAINER => {
+		.app_container => {
 			if (e.app_container < 0) buf[0] = 0 else _ = win32.lstrcpynW(buf, if (e.app_container != 0) L("Yes") else L("No"), len);
 		},
-		.SORT_FIELD_DOMAIN => _ = win32.lstrcpynW(buf, @ptrCast(&e.domain), len),
-		.SORT_FIELD_USER_SID => _ = win32.lstrcpynW(buf, @ptrCast(&e.user_sid), len),
-		.SORT_FIELD_EFFICIENCY => {
+		.domain => _ = win32.lstrcpynW(buf, @ptrCast(&e.domain), len),
+		.user_sid => _ = win32.lstrcpynW(buf, @ptrCast(&e.user_sid), len),
+		.efficiency => {
 			if (e.efficiency_mode < 0) buf[0] = 0 else _ = win32.lstrcpynW(buf, if (e.efficiency_mode != 0) L("On") else L("Off"), len);
 		},
-		.SORT_FIELD_IO_PRIORITY => {
+		.io_priority => {
 			const names = [_]win32.LPCWSTR{ L("Very Low"), L("Low"), L("Normal"), L("High"), L("Critical") };
 			if (e.io_priority < 0 or e.io_priority > 4) buf[0] = 0 else _ = win32.lstrcpynW(buf, names[@intCast(e.io_priority)], len);
 		},
-		.SORT_FIELD_PAGE_PRIORITY => {
+		.page_priority => {
 			const names = [_]win32.LPCWSTR{ L("Idle"), L("Very Low"), L("Low"), L("Medium"), L("Below Normal"), L("Normal") };
 			if (e.page_priority < 0 or e.page_priority > 5) buf[0] = 0 else _ = win32.lstrcpynW(buf, names[@intCast(e.page_priority)], len);
 		},
-		.SORT_FIELD_PROTECTION => {
+		.protection => {
 			// PS_PROTECTION: type in bits 0-2, signer in bits 4-7. Type 0 means the
 			// process is not protected at all, which is the common case.
 			const signers = [_]win32.LPCWSTR{ L("None"), L("Authenticode"), L("CodeGen"), L("Antimalware"), L("Lsa"), L("Windows"), L("WinTcb"), L("WinSystem"), L("App") };
@@ -391,7 +391,7 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 
 pub export fn do_refresh() callconv(.c) void {
 	var count: i32 = 0;
-	const field: settings.SortField = if (g_prefs.tree_mode != 0) .SORT_FIELD_NAME else g_prefs.field;
+	const field: settings.SortField = if (g_prefs.tree_mode != 0) .name else g_prefs.field;
 	const desc: win32.BOOL = if (g_prefs.tree_mode != 0) 0 else g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))];
 	const entries = snapshot_processes(&g_snapshots, &count, field, desc);
 	if (entries) |es| {
