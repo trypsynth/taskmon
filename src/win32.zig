@@ -328,6 +328,86 @@ pub extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.c) BOOL;
 pub extern "user32" fn PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) BOOL;
 pub extern "user32" fn GetDlgCtrlID(hWnd: HWND) callconv(.c) c_int;
 pub extern "user32" fn SetFocus(hWnd: HWND) callconv(.c) HWND;
+pub extern "user32" fn GetParent(hWnd: HWND) callconv(.c) HWND;
+
+pub extern "kernel32" fn GetProcessHeap() callconv(.c) HANDLE;
+pub extern "kernel32" fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: usize) callconv(.c) ?*anyopaque;
+pub extern "kernel32" fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: ?*anyopaque) callconv(.c) BOOL;
+pub const HEAP_ZERO_MEMORY: DWORD = 0x00000008;
+
+pub const WM_SETREDRAW: UINT = 0x000B;
+
+pub const HTREEITEM = ?*anyopaque;
+
+pub const TVITEMW = extern struct {
+	mask: UINT,
+	hItem: HTREEITEM,
+	state: UINT,
+	stateMask: UINT,
+	pszText: LPWSTR,
+	cchTextMax: i32,
+	iImage: i32,
+	iSelectedImage: i32,
+	cChildren: i32,
+	lParam: LPARAM,
+};
+
+pub const TVITEMEXW = extern struct {
+	mask: UINT,
+	hItem: HTREEITEM,
+	state: UINT,
+	stateMask: UINT,
+	pszText: LPWSTR,
+	cchTextMax: i32,
+	iImage: i32,
+	iSelectedImage: i32,
+	cChildren: i32,
+	lParam: LPARAM,
+	iIntegral: i32,
+	uStateEx: UINT,
+	hwnd: HWND,
+	iExpandedImage: i32,
+	iReserved: i32,
+};
+
+pub const TVINSERTSTRUCTW = extern struct {
+	hParent: HTREEITEM,
+	hInsertAfter: HTREEITEM,
+	anon: extern union {
+		itemex: TVITEMEXW,
+		item: TVITEMW,
+	},
+};
+
+pub const TVHITTESTINFO = extern struct {
+	pt: POINT,
+	flags: UINT,
+	hItem: HTREEITEM,
+};
+
+pub const TVI_ROOT: HTREEITEM = @ptrFromInt(@as(usize, @bitCast(@as(isize, -0x10000))));
+pub const TVI_SORT: HTREEITEM = @ptrFromInt(@as(usize, @bitCast(@as(isize, -0xfffd))));
+
+pub const TVIF_TEXT: UINT = 0x1;
+pub const TVIF_PARAM: UINT = 0x4;
+pub const TVIF_STATE: UINT = 0x8;
+pub const TVIS_EXPANDED: UINT = 0x20;
+pub const TVE_EXPAND: WPARAM = 0x2;
+pub const TVGN_ROOT: WPARAM = 0x0;
+pub const TVGN_NEXT: WPARAM = 0x1;
+pub const TVGN_CHILD: WPARAM = 0x4;
+pub const TVGN_CARET: WPARAM = 0x9;
+
+const TV_FIRST: UINT = 0x1100;
+pub const TVM_INSERTITEMW: UINT = TV_FIRST + 50;
+pub const TVM_DELETEITEM: UINT = TV_FIRST + 1;
+pub const TVM_EXPAND: UINT = TV_FIRST + 2;
+pub const TVM_GETITEMRECT: UINT = TV_FIRST + 4;
+pub const TVM_GETNEXTITEM: UINT = TV_FIRST + 10;
+pub const TVM_SELECTITEM: UINT = TV_FIRST + 11;
+pub const TVM_GETITEMW: UINT = TV_FIRST + 62;
+pub const TVM_HITTEST: UINT = TV_FIRST + 17;
+pub const TVM_ENSUREVISIBLE: UINT = TV_FIRST + 20;
 
 pub const HBITMAP = ?*anyopaque;
 
