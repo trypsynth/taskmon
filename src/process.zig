@@ -399,7 +399,7 @@ fn cmp(a: anytype, b: @TypeOf(a)) i32 {
 	return 0;
 }
 
-fn compareEntries(a: *const pt.ProcessEntry, b: *const pt.ProcessEntry, field: settings.SortField, descending: win32.BOOL) i32 {
+fn compareEntries(a: *const pt.ProcessEntry, b: *const pt.ProcessEntry, field: settings.SortField, descending: bool) i32 {
 	const res: i32 = switch (field) {
 		.name => win32.StrCmpIW(@ptrCast(&a.name), @ptrCast(&b.name)),
 		.pid => cmp(a.pid, b.pid),
@@ -472,12 +472,12 @@ fn compareEntries(a: *const pt.ProcessEntry, b: *const pt.ProcessEntry, field: s
 		.page_priority => cmp(a.page_priority, b.page_priority),
 		.protection => cmp(a.protection, b.protection),
 	};
-	return if (descending != 0) -res else res;
+	return if (descending) -res else res;
 }
 
 const StackEntry = struct { low: i32, high: i32 };
 
-fn quicksort(entries: [*]pt.ProcessEntry, low: i32, high: i32, field: settings.SortField, descending: win32.BOOL) void {
+fn quicksort(entries: [*]pt.ProcessEntry, low: i32, high: i32, field: settings.SortField, descending: bool) void {
 	if (low >= high) return;
 	var stack: [64]StackEntry = undefined;
 	const pivot_raw = heapAlloc(@sizeOf(pt.ProcessEntry));
@@ -864,7 +864,7 @@ fn getProcessHandleInfo(pid: win32.DWORD, hi: *HandleInfo) void {
 	_ = win32.CloseHandle(h);
 }
 
-pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: win32.BOOL) ?[*]pt.ProcessEntry {
+pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field: settings.SortField, descending: bool) ?[*]pt.ProcessEntry {
 	buildServiceMap();
 	buildWindowMap();
 	refreshGpuStats();

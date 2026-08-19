@@ -99,7 +99,7 @@ fn winMain(instance: win32.HINSTANCE, show: c_int) c_int {
 	}
 	// WM_CREATE (fired synchronously above) loads state.prefs, so it already reflects
 	// the user's "start minimized to tray" choice by the time we get here.
-	if (state.prefs.start_minimized_to_tray == 0) {
+	if (!state.prefs.start_minimized_to_tray) {
 		_ = win32.ShowWindow(hwnd, show);
 		_ = win32.UpdateWindow(hwnd);
 	}

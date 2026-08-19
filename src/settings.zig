@@ -77,13 +77,13 @@ pub const SortField = enum(i32) {
 	protection,
 };
 
-pub const ColumnDef = extern struct {
+pub const ColumnDef = struct {
 	label: win32.LPCWSTR,
 	header: win32.LPCWSTR,
 	width: i32,
 	field: SortField,
-	always_visible: win32.BOOL,
-	default_visible: win32.BOOL,
+	always_visible: bool,
+	default_visible: bool,
 };
 
 pub const COL_COUNT: usize = 70;
@@ -92,91 +92,91 @@ const REFRESH_OPTION_COUNT = 5;
 pub const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	@setEvalBranchQuota(100_000);
 	break :columns .{
-	.{ .label = L("Name"), .header = L("Name"), .width = 260, .field = .name, .always_visible = 1, .default_visible = 1 },
-	.{ .label = L("PID"), .header = L("PID"), .width = 80, .field = .pid, .always_visible = 0, .default_visible = 1 },
-	.{ .label = L("CPU"), .header = L("CPU %"), .width = 90, .field = .cpu, .always_visible = 0, .default_visible = 1 },
-	.{ .label = L("Memory"), .header = L("Memory"), .width = 120, .field = .memory, .always_visible = 0, .default_visible = 1 },
-	.{ .label = L("Threads"), .header = L("Threads"), .width = 70, .field = .threads, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Handles"), .header = L("Handles"), .width = 70, .field = .handles, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Started"), .header = L("Started"), .width = 100, .field = .starttime, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Priority"), .header = L("Priority"), .width = 100, .field = .priority, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Disk I/O"), .header = L("Disk I/O"), .width = 100, .field = .disk_io, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Private Bytes"), .header = L("Private Bytes"), .width = 120, .field = .private_bytes, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Page Faults"), .header = L("Page Faults"), .width = 100, .field = .page_faults, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("User"), .header = L("User"), .width = 120, .field = .user, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Command Line"), .header = L("Command Line"), .width = 500, .field = .cmdline, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Architecture"), .header = L("Architecture"), .width = 70, .field = .arch, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Session"), .header = L("Session"), .width = 60, .field = .session, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Memory"), .header = L("Peak Memory"), .width = 120, .field = .peak_working_set, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Virtual Memory"), .header = L("Virtual Memory"), .width = 120, .field = .virtual_mem, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("GDI Objects"), .header = L("GDI Objects"), .width = 70, .field = .gdi_objects, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("USER Objects"), .header = L("USER Objects"), .width = 70, .field = .user_objects, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Integrity"), .header = L("Integrity"), .width = 80, .field = .integrity, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Parent PID"), .header = L("Parent PID"), .width = 80, .field = .ppid, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Private Working Set"), .header = L("Private Working Set"), .width = 100, .field = .private_ws, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Paged Pool"), .header = L("Paged Pool"), .width = 100, .field = .paged_pool, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Non-paged Pool"), .header = L("Non-paged Pool"), .width = 100, .field = .nonpaged_pool, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Read"), .header = L("I/O Read"), .width = 100, .field = .io_read, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Write"), .header = L("I/O Write"), .width = 100, .field = .io_write, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Other"), .header = L("I/O Other"), .width = 100, .field = .io_other, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Description"), .header = L("Description"), .width = 200, .field = .description, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Company"), .header = L("Company"), .width = 150, .field = .company, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("DPI Awareness"), .header = L("DPI Awareness"), .width = 90, .field = .dpi, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Service"), .header = L("Service"), .width = 200, .field = .service, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("GPU"), .header = L("GPU"), .width = 70, .field = .gpu, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("GPU Memory"), .header = L("GPU Memory"), .width = 100, .field = .gpu_memory, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("CPU Time"), .header = L("CPU Time"), .width = 90, .field = .cpu_time, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Elevated"), .header = L("Elevated"), .width = 70, .field = .elevated, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Path"), .header = L("Path"), .width = 300, .field = .path, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Window Title"), .header = L("Window Title"), .width = 200, .field = .window_title, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("File Version"), .header = L("File Version"), .width = 100, .field = .file_version, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Product Version"), .header = L("Product Version"), .width = 100, .field = .product_version, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Session Name"), .header = L("Session Name"), .width = 120, .field = .session_name, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Package Name"), .header = L("Package Name"), .width = 300, .field = .package_name, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Virtual Memory"), .header = L("Peak Virtual Memory"), .width = 120, .field = .peak_virtual_mem, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Private Bytes"), .header = L("Peak Private Bytes"), .width = 120, .field = .peak_private_bytes, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Paged Pool"), .header = L("Peak Paged Pool"), .width = 100, .field = .peak_paged_pool, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Non-paged Pool"), .header = L("Peak Non-paged Pool"), .width = 100, .field = .peak_nonpaged_pool, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Peak Threads"), .header = L("Peak Threads"), .width = 70, .field = .peak_threads, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Hard Faults"), .header = L("Hard Faults"), .width = 100, .field = .hard_faults, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("CPU Cycles"), .header = L("CPU Cycles"), .width = 110, .field = .cycles, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Kernel Time"), .header = L("Kernel Time"), .width = 90, .field = .kernel_time, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("User Time"), .header = L("User Time"), .width = 90, .field = .user_time, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Total Page Faults"), .header = L("Total Page Faults"), .width = 110, .field = .total_page_faults, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Read Ops"), .header = L("I/O Read Ops"), .width = 100, .field = .io_read_ops, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Write Ops"), .header = L("I/O Write Ops"), .width = 100, .field = .io_write_ops, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Other Ops"), .header = L("I/O Other Ops"), .width = 100, .field = .io_other_ops, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Total I/O"), .header = L("Total I/O"), .width = 110, .field = .total_io, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Elapsed Time"), .header = L("Elapsed Time"), .width = 110, .field = .elapsed, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Shared Working Set"), .header = L("Shared Working Set"), .width = 120, .field = .shared_ws, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Parent Name"), .header = L("Parent Name"), .width = 150, .field = .parent_name, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Private Bytes Delta"), .header = L("Private Bytes Delta"), .width = 120, .field = .private_bytes_delta, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Working Set Delta"), .header = L("Working Set Delta"), .width = 120, .field = .working_set_delta, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Handle Delta"), .header = L("Handle Delta"), .width = 90, .field = .handle_delta, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Thread Delta"), .header = L("Thread Delta"), .width = 90, .field = .thread_delta, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Virtualization"), .header = L("Virtualization"), .width = 100, .field = .virtualization, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("AppContainer"), .header = L("AppContainer"), .width = 90, .field = .app_container, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Domain"), .header = L("Domain"), .width = 120, .field = .domain, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("User SID"), .header = L("User SID"), .width = 220, .field = .user_sid, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Efficiency Mode"), .header = L("Efficiency Mode"), .width = 100, .field = .efficiency, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("I/O Priority"), .header = L("I/O Priority"), .width = 90, .field = .io_priority, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Memory Priority"), .header = L("Memory Priority"), .width = 100, .field = .page_priority, .always_visible = 0, .default_visible = 0 },
-	.{ .label = L("Protection"), .header = L("Protection"), .width = 130, .field = .protection, .always_visible = 0, .default_visible = 0 },
+	.{ .label = L("Name"), .header = L("Name"), .width = 260, .field = .name, .always_visible = true, .default_visible = true },
+	.{ .label = L("PID"), .header = L("PID"), .width = 80, .field = .pid, .always_visible = false, .default_visible = true },
+	.{ .label = L("CPU"), .header = L("CPU %"), .width = 90, .field = .cpu, .always_visible = false, .default_visible = true },
+	.{ .label = L("Memory"), .header = L("Memory"), .width = 120, .field = .memory, .always_visible = false, .default_visible = true },
+	.{ .label = L("Threads"), .header = L("Threads"), .width = 70, .field = .threads, .always_visible = false, .default_visible = false },
+	.{ .label = L("Handles"), .header = L("Handles"), .width = 70, .field = .handles, .always_visible = false, .default_visible = false },
+	.{ .label = L("Started"), .header = L("Started"), .width = 100, .field = .starttime, .always_visible = false, .default_visible = false },
+	.{ .label = L("Priority"), .header = L("Priority"), .width = 100, .field = .priority, .always_visible = false, .default_visible = false },
+	.{ .label = L("Disk I/O"), .header = L("Disk I/O"), .width = 100, .field = .disk_io, .always_visible = false, .default_visible = false },
+	.{ .label = L("Private Bytes"), .header = L("Private Bytes"), .width = 120, .field = .private_bytes, .always_visible = false, .default_visible = false },
+	.{ .label = L("Page Faults"), .header = L("Page Faults"), .width = 100, .field = .page_faults, .always_visible = false, .default_visible = false },
+	.{ .label = L("User"), .header = L("User"), .width = 120, .field = .user, .always_visible = false, .default_visible = false },
+	.{ .label = L("Command Line"), .header = L("Command Line"), .width = 500, .field = .cmdline, .always_visible = false, .default_visible = false },
+	.{ .label = L("Architecture"), .header = L("Architecture"), .width = 70, .field = .arch, .always_visible = false, .default_visible = false },
+	.{ .label = L("Session"), .header = L("Session"), .width = 60, .field = .session, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Memory"), .header = L("Peak Memory"), .width = 120, .field = .peak_working_set, .always_visible = false, .default_visible = false },
+	.{ .label = L("Virtual Memory"), .header = L("Virtual Memory"), .width = 120, .field = .virtual_mem, .always_visible = false, .default_visible = false },
+	.{ .label = L("GDI Objects"), .header = L("GDI Objects"), .width = 70, .field = .gdi_objects, .always_visible = false, .default_visible = false },
+	.{ .label = L("USER Objects"), .header = L("USER Objects"), .width = 70, .field = .user_objects, .always_visible = false, .default_visible = false },
+	.{ .label = L("Integrity"), .header = L("Integrity"), .width = 80, .field = .integrity, .always_visible = false, .default_visible = false },
+	.{ .label = L("Parent PID"), .header = L("Parent PID"), .width = 80, .field = .ppid, .always_visible = false, .default_visible = false },
+	.{ .label = L("Private Working Set"), .header = L("Private Working Set"), .width = 100, .field = .private_ws, .always_visible = false, .default_visible = false },
+	.{ .label = L("Paged Pool"), .header = L("Paged Pool"), .width = 100, .field = .paged_pool, .always_visible = false, .default_visible = false },
+	.{ .label = L("Non-paged Pool"), .header = L("Non-paged Pool"), .width = 100, .field = .nonpaged_pool, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Read"), .header = L("I/O Read"), .width = 100, .field = .io_read, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Write"), .header = L("I/O Write"), .width = 100, .field = .io_write, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Other"), .header = L("I/O Other"), .width = 100, .field = .io_other, .always_visible = false, .default_visible = false },
+	.{ .label = L("Description"), .header = L("Description"), .width = 200, .field = .description, .always_visible = false, .default_visible = false },
+	.{ .label = L("Company"), .header = L("Company"), .width = 150, .field = .company, .always_visible = false, .default_visible = false },
+	.{ .label = L("DPI Awareness"), .header = L("DPI Awareness"), .width = 90, .field = .dpi, .always_visible = false, .default_visible = false },
+	.{ .label = L("Service"), .header = L("Service"), .width = 200, .field = .service, .always_visible = false, .default_visible = false },
+	.{ .label = L("GPU"), .header = L("GPU"), .width = 70, .field = .gpu, .always_visible = false, .default_visible = false },
+	.{ .label = L("GPU Memory"), .header = L("GPU Memory"), .width = 100, .field = .gpu_memory, .always_visible = false, .default_visible = false },
+	.{ .label = L("CPU Time"), .header = L("CPU Time"), .width = 90, .field = .cpu_time, .always_visible = false, .default_visible = false },
+	.{ .label = L("Elevated"), .header = L("Elevated"), .width = 70, .field = .elevated, .always_visible = false, .default_visible = false },
+	.{ .label = L("Path"), .header = L("Path"), .width = 300, .field = .path, .always_visible = false, .default_visible = false },
+	.{ .label = L("Window Title"), .header = L("Window Title"), .width = 200, .field = .window_title, .always_visible = false, .default_visible = false },
+	.{ .label = L("File Version"), .header = L("File Version"), .width = 100, .field = .file_version, .always_visible = false, .default_visible = false },
+	.{ .label = L("Product Version"), .header = L("Product Version"), .width = 100, .field = .product_version, .always_visible = false, .default_visible = false },
+	.{ .label = L("Session Name"), .header = L("Session Name"), .width = 120, .field = .session_name, .always_visible = false, .default_visible = false },
+	.{ .label = L("Package Name"), .header = L("Package Name"), .width = 300, .field = .package_name, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Virtual Memory"), .header = L("Peak Virtual Memory"), .width = 120, .field = .peak_virtual_mem, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Private Bytes"), .header = L("Peak Private Bytes"), .width = 120, .field = .peak_private_bytes, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Paged Pool"), .header = L("Peak Paged Pool"), .width = 100, .field = .peak_paged_pool, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Non-paged Pool"), .header = L("Peak Non-paged Pool"), .width = 100, .field = .peak_nonpaged_pool, .always_visible = false, .default_visible = false },
+	.{ .label = L("Peak Threads"), .header = L("Peak Threads"), .width = 70, .field = .peak_threads, .always_visible = false, .default_visible = false },
+	.{ .label = L("Hard Faults"), .header = L("Hard Faults"), .width = 100, .field = .hard_faults, .always_visible = false, .default_visible = false },
+	.{ .label = L("CPU Cycles"), .header = L("CPU Cycles"), .width = 110, .field = .cycles, .always_visible = false, .default_visible = false },
+	.{ .label = L("Kernel Time"), .header = L("Kernel Time"), .width = 90, .field = .kernel_time, .always_visible = false, .default_visible = false },
+	.{ .label = L("User Time"), .header = L("User Time"), .width = 90, .field = .user_time, .always_visible = false, .default_visible = false },
+	.{ .label = L("Total Page Faults"), .header = L("Total Page Faults"), .width = 110, .field = .total_page_faults, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Read Ops"), .header = L("I/O Read Ops"), .width = 100, .field = .io_read_ops, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Write Ops"), .header = L("I/O Write Ops"), .width = 100, .field = .io_write_ops, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Other Ops"), .header = L("I/O Other Ops"), .width = 100, .field = .io_other_ops, .always_visible = false, .default_visible = false },
+	.{ .label = L("Total I/O"), .header = L("Total I/O"), .width = 110, .field = .total_io, .always_visible = false, .default_visible = false },
+	.{ .label = L("Elapsed Time"), .header = L("Elapsed Time"), .width = 110, .field = .elapsed, .always_visible = false, .default_visible = false },
+	.{ .label = L("Shared Working Set"), .header = L("Shared Working Set"), .width = 120, .field = .shared_ws, .always_visible = false, .default_visible = false },
+	.{ .label = L("Parent Name"), .header = L("Parent Name"), .width = 150, .field = .parent_name, .always_visible = false, .default_visible = false },
+	.{ .label = L("Private Bytes Delta"), .header = L("Private Bytes Delta"), .width = 120, .field = .private_bytes_delta, .always_visible = false, .default_visible = false },
+	.{ .label = L("Working Set Delta"), .header = L("Working Set Delta"), .width = 120, .field = .working_set_delta, .always_visible = false, .default_visible = false },
+	.{ .label = L("Handle Delta"), .header = L("Handle Delta"), .width = 90, .field = .handle_delta, .always_visible = false, .default_visible = false },
+	.{ .label = L("Thread Delta"), .header = L("Thread Delta"), .width = 90, .field = .thread_delta, .always_visible = false, .default_visible = false },
+	.{ .label = L("Virtualization"), .header = L("Virtualization"), .width = 100, .field = .virtualization, .always_visible = false, .default_visible = false },
+	.{ .label = L("AppContainer"), .header = L("AppContainer"), .width = 90, .field = .app_container, .always_visible = false, .default_visible = false },
+	.{ .label = L("Domain"), .header = L("Domain"), .width = 120, .field = .domain, .always_visible = false, .default_visible = false },
+	.{ .label = L("User SID"), .header = L("User SID"), .width = 220, .field = .user_sid, .always_visible = false, .default_visible = false },
+	.{ .label = L("Efficiency Mode"), .header = L("Efficiency Mode"), .width = 100, .field = .efficiency, .always_visible = false, .default_visible = false },
+	.{ .label = L("I/O Priority"), .header = L("I/O Priority"), .width = 90, .field = .io_priority, .always_visible = false, .default_visible = false },
+	.{ .label = L("Memory Priority"), .header = L("Memory Priority"), .width = 100, .field = .page_priority, .always_visible = false, .default_visible = false },
+	.{ .label = L("Protection"), .header = L("Protection"), .width = 130, .field = .protection, .always_visible = false, .default_visible = false },
 	};
 };
 
 pub const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
 pub const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
 
-pub const SortPrefs = extern struct {
+pub const SortPrefs = struct {
 	field: SortField,
-	desc: [COL_COUNT]win32.BOOL,
+	desc: [COL_COUNT]bool,
 	refresh_ms: win32.UINT,
-	visible: [COL_COUNT]win32.BOOL,
-	skip_kill_confirm: win32.BOOL,
-	always_on_top: win32.BOOL,
-	tree_mode: win32.BOOL,
-	start_minimized_to_tray: win32.BOOL,
+	visible: [COL_COUNT]bool,
+	skip_kill_confirm: bool,
+	always_on_top: bool,
+	tree_mode: bool,
+	start_minimized_to_tray: bool,
 	window_left: i32,
 	window_top: i32,
 	window_width: i32,
@@ -185,9 +185,9 @@ pub const SortPrefs = extern struct {
 
 const SettingsDlgData = struct {
 	refresh_ms: win32.UINT,
-	visible: [COL_COUNT]win32.BOOL,
-	skip_kill_confirm: win32.BOOL,
-	start_minimized_to_tray: win32.BOOL,
+	visible: [COL_COUNT]bool,
+	skip_kill_confirm: bool,
+	start_minimized_to_tray: bool,
 };
 
 fn setCheckState(lv: win32.HWND, item: i32, check: bool) void {
@@ -240,14 +240,14 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 			i = 0;
 			while (i < COL_COUNT) : (i += 1) {
 				const ci: usize = @intCast(i);
-				if (COLUMNS[ci].always_visible != 0) continue;
+				if (COLUMNS[ci].always_visible) continue;
 				var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 				lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
 				lvi.iItem = j;
 				lvi.pszText = @constCast(COLUMNS[ci].label);
 				lvi.lParam = i;
 				_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-				setCheckState(lv, lvi.iItem, data.visible[ci] != 0);
+				setCheckState(lv, lvi.iItem, data.visible[ci]);
 				j += 1;
 			}
 			if (j > 0) {
@@ -260,10 +260,10 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 			_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
 			const skip_chk = win32.CreateWindowExW(0, L("BUTTON"), L("Disable end task confirmation (not recommended)"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, @ptrFromInt(@as(usize, resource.IDC_SKIP_CONFIRM)), win32.GetModuleHandleW(null), null);
 			_ = win32.SendMessageW(skip_chk, win32.WM_SETFONT, @bitCast(font), 0);
-			_ = win32.SendMessageW(skip_chk, win32.BM_SETCHECK, if (data.skip_kill_confirm != 0) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
+			_ = win32.SendMessageW(skip_chk, win32.BM_SETCHECK, if (data.skip_kill_confirm) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
 			const min_chk = win32.CreateWindowExW(0, L("BUTTON"), L("Start minimized to tray"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.BS_AUTOCHECKBOX, 7, 131, 176, 10, hdlg, @ptrFromInt(@as(usize, resource.IDC_START_MINIMIZED)), win32.GetModuleHandleW(null), null);
 			_ = win32.SendMessageW(min_chk, win32.WM_SETFONT, @bitCast(font), 0);
-			_ = win32.SendMessageW(min_chk, win32.BM_SETCHECK, if (data.start_minimized_to_tray != 0) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
+			_ = win32.SendMessageW(min_chk, win32.BM_SETCHECK, if (data.start_minimized_to_tray) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
 			// Tab order: combo -> listview -> skip_chk -> min_chk -> OK -> Cancel
 			_ = win32.SetWindowPos(skip_chk, lv, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
 			_ = win32.SetWindowPos(min_chk, skip_chk, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
@@ -287,10 +287,10 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 					lvi2.iItem = j;
 					_ = win32.SendMessageW(lv, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
 					const idx: usize = @intCast(lvi2.lParam);
-					data.visible[idx] = if (getCheckState(lv, j)) 1 else 0;
+					data.visible[idx] = getCheckState(lv, j);
 				}
-				data.skip_kill_confirm = if (win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED) 1 else 0;
-				data.start_minimized_to_tray = if (win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED) 1 else 0;
+				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
+				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
 				_ = win32.EndDialog(hdlg, 1);
 				return 1;
 			}
@@ -312,7 +312,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	return 0;
 }
 
-pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const win32.BOOL, current_skip_confirm: win32.BOOL, current_start_minimized: win32.BOOL, out_ms: *win32.UINT, out_visible: [*]win32.BOOL, out_skip_confirm: *win32.BOOL, out_start_minimized: *win32.BOOL) win32.BOOL {
+pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const bool, current_skip_confirm: bool, current_start_minimized: bool, out_ms: *win32.UINT, out_visible: [*]bool, out_skip_confirm: *bool, out_start_minimized: *bool) bool {
 	var data: SettingsDlgData = undefined;
 	data.refresh_ms = current_ms;
 	var i: usize = 0;
@@ -320,13 +320,13 @@ pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]cons
 	data.skip_kill_confirm = current_skip_confirm;
 	data.start_minimized_to_tray = current_start_minimized;
 	const result = win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_SETTINGS), parent, settingsDlgProc, @bitCast(@intFromPtr(&data)));
-	if (result == 0) return 0;
+	if (result == 0) return false;
 	out_ms.* = data.refresh_ms;
 	i = 0;
 	while (i < COL_COUNT) : (i += 1) out_visible[i] = data.visible[i];
 	out_skip_confirm.* = data.skip_kill_confirm;
 	out_start_minimized.* = data.start_minimized_to_tray;
-	return 1;
+	return true;
 }
 
 // Installed copies (under Program Files) can't write next to the exe, so they
@@ -356,7 +356,7 @@ pub fn load(prefs: *SortPrefs) void {
 	prefs.refresh_ms = 0;
 	var i: usize = 0;
 	while (i < COL_COUNT) : (i += 1) {
-		prefs.desc[i] = 0;
+		prefs.desc[i] = false;
 		prefs.visible[i] = COLUMNS[i].always_visible;
 	}
 	var field_buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
@@ -374,23 +374,23 @@ pub fn load(prefs: *SortPrefs) void {
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
 		_ = win32.wnsprintfW(&key, 64, L("%s_desc"), COLUMNS[i].label);
 		_ = win32.GetPrivateProfileStringW(L("sort"), &key, L("0"), &val, 4, &path);
-		prefs.desc[i] = if (val[0] == '1') 1 else 0;
+		prefs.desc[i] = val[0] == '1';
 	}
 	var ms_buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("refresh"), L("interval_ms"), L("2000"), &ms_buf, 16, &path);
 	prefs.refresh_ms = @intCast(win32.StrToIntW(&ms_buf));
 	var skip_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("confirm"), L("skip_kill"), L("0"), &skip_buf, 4, &path);
-	prefs.skip_kill_confirm = if (skip_buf[0] == '1') 1 else 0;
+	prefs.skip_kill_confirm = skip_buf[0] == '1';
 	var aot_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("window"), L("always_on_top"), L("0"), &aot_buf, 4, &path);
-	prefs.always_on_top = if (aot_buf[0] == '1') 1 else 0;
+	prefs.always_on_top = aot_buf[0] == '1';
 	var tree_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("view"), L("tree_mode"), L("0"), &tree_buf, 4, &path);
-	prefs.tree_mode = if (tree_buf[0] == '1') 1 else 0;
+	prefs.tree_mode = tree_buf[0] == '1';
 	var startmin_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("window"), L("start_minimized_to_tray"), L("0"), &startmin_buf, 4, &path);
-	prefs.start_minimized_to_tray = if (startmin_buf[0] == '1') 1 else 0;
+	prefs.start_minimized_to_tray = startmin_buf[0] == '1';
 	var pos_buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("window"), L("width"), L("0"), &pos_buf, 16, &path);
 	prefs.window_width = win32.StrToIntW(&pos_buf);
@@ -407,9 +407,9 @@ pub fn load(prefs: *SortPrefs) void {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
 		_ = win32.wnsprintfW(&key, 64, L("%s_visible"), COLUMNS[i].label);
-		var def: [2:0]u16 = .{ if (COLUMNS[i].default_visible != 0) '1' else '0', 0 };
+		var def: [2:0]u16 = .{ if (COLUMNS[i].default_visible) '1' else '0', 0 };
 		_ = win32.GetPrivateProfileStringW(L("columns"), &key, &def, &val, 4, &path);
-		prefs.visible[i] = if (COLUMNS[i].always_visible != 0 or val[0] == '1') 1 else 0;
+		prefs.visible[i] = COLUMNS[i].always_visible or val[0] == '1';
 	}
 }
 
@@ -422,15 +422,15 @@ pub fn save(prefs: *const SortPrefs) void {
 			_ = win32.WritePrivateProfileStringW(L("sort"), L("field"), COLUMNS[i].label, &path);
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		_ = win32.wnsprintfW(&key, 64, L("%s_desc"), COLUMNS[i].label);
-		_ = win32.WritePrivateProfileStringW(L("sort"), &key, if (prefs.desc[i] != 0) L("1") else L("0"), &path);
+		_ = win32.WritePrivateProfileStringW(L("sort"), &key, if (prefs.desc[i]) L("1") else L("0"), &path);
 	}
 	var ms_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
 	_ = win32.wnsprintfW(&ms_str, 16, L("%u"), prefs.refresh_ms);
 	_ = win32.WritePrivateProfileStringW(L("refresh"), L("interval_ms"), &ms_str, &path);
-	_ = win32.WritePrivateProfileStringW(L("confirm"), L("skip_kill"), if (prefs.skip_kill_confirm != 0) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("window"), L("always_on_top"), if (prefs.always_on_top != 0) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("view"), L("tree_mode"), if (prefs.tree_mode != 0) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("window"), L("start_minimized_to_tray"), if (prefs.start_minimized_to_tray != 0) L("1") else L("0"), &path);
+	_ = win32.WritePrivateProfileStringW(L("confirm"), L("skip_kill"), if (prefs.skip_kill_confirm) L("1") else L("0"), &path);
+	_ = win32.WritePrivateProfileStringW(L("window"), L("always_on_top"), if (prefs.always_on_top) L("1") else L("0"), &path);
+	_ = win32.WritePrivateProfileStringW(L("view"), L("tree_mode"), if (prefs.tree_mode) L("1") else L("0"), &path);
+	_ = win32.WritePrivateProfileStringW(L("window"), L("start_minimized_to_tray"), if (prefs.start_minimized_to_tray) L("1") else L("0"), &path);
 	if (prefs.window_width > 0) {
 		var pos_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
 		_ = win32.wnsprintfW(&pos_str, 16, L("%d"), prefs.window_left);
@@ -444,9 +444,9 @@ pub fn save(prefs: *const SortPrefs) void {
 	}
 	i = 0;
 	while (i < COL_COUNT) : (i += 1) {
-		if (COLUMNS[i].always_visible != 0) continue;
+		if (COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		_ = win32.wnsprintfW(&key, 64, L("%s_visible"), COLUMNS[i].label);
-		_ = win32.WritePrivateProfileStringW(L("columns"), &key, if (prefs.visible[i] != 0) L("1") else L("0"), &path);
+		_ = win32.WritePrivateProfileStringW(L("columns"), &key, if (prefs.visible[i]) L("1") else L("0"), &path);
 	}
 }

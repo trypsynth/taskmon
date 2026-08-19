@@ -58,7 +58,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				state.prefs.field = settings.COLUMNS[cid].field;
 				var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 				const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-				_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi] != 0) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
+				_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
 				_ = win32.SetWindowTextW(state.sort_btns[@intCast(next)], &buf);
 				_ = win32.SendMessageW(state.sort_btns[@intCast(next)], win32.BM_SETCHECK, win32.BST_CHECKED, 0);
 				updateTabStop();
@@ -97,7 +97,7 @@ pub fn updateSortUi() void {
 		var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		if (active) {
 			const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-			_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi] != 0) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
+			_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
 		} else {
 			_ = win32.lstrcpyW(&buf, settings.COLUMNS[cid].label);
 		}
@@ -116,7 +116,7 @@ pub fn updateSortUi() void {
 		hdi.fmt &= ~(win32.HDF_SORTUP | win32.HDF_SORTDOWN);
 		if (settings.COLUMNS[cid].field == state.prefs.field) {
 			const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-			hdi.fmt |= if (state.prefs.desc[fi] != 0) win32.HDF_SORTDOWN else win32.HDF_SORTUP;
+			hdi.fmt |= if (state.prefs.desc[fi]) win32.HDF_SORTDOWN else win32.HDF_SORTUP;
 		}
 		_ = win32.SendMessageW(header_hwnd, win32.HDM_SETITEMW, @intCast(i), @bitCast(@intFromPtr(&hdi)));
 	}
@@ -138,14 +138,14 @@ pub fn applyColumns() void {
 	while (i >= 0) : (i -= 1) _ = win32.SendMessageW(state.hwnd_list, win32.LVM_DELETECOLUMN, @intCast(i), 0);
 
 	const field_idx: usize = @intCast(@intFromEnum(state.prefs.field));
-	if (state.prefs.visible[field_idx] == 0) state.prefs.field = .name;
+	if (!state.prefs.visible[field_idx]) state.prefs.field = .name;
 
 	var btn_x: i32 = 0;
 	var lv_col: i32 = 0;
 	i = 0;
 	while (i < settings.COL_COUNT) : (i += 1) {
 		const ci: usize = @intCast(i);
-		if (state.prefs.visible[ci] == 0) continue;
+		if (!state.prefs.visible[ci]) continue;
 		const bi: usize = @intCast(state.sort_btn_count);
 		state.sort_btns[bi] = win32.CreateWindowExW(0, L("BUTTON"), settings.COLUMNS[ci].label, win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_RADIOBUTTON, btn_x, 0, settings.COLUMNS[ci].width, 1, state.hwnd_sort_group, @ptrFromInt(@as(usize, @intCast(resource.ID_SORT_BASE + i))), win32.GetModuleHandleW(null), null);
 		_ = win32.SetWindowSubclass(state.sort_btns[bi], sortBtnProc, @intCast(state.sort_btn_count), 0);

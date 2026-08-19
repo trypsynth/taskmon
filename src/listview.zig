@@ -383,11 +383,11 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 
 pub fn doRefresh() void {
 	var count: i32 = 0;
-	const field: settings.SortField = if (state.prefs.tree_mode != 0) .name else state.prefs.field;
-	const desc: win32.BOOL = if (state.prefs.tree_mode != 0) 0 else state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))];
+	const field: settings.SortField = if (state.prefs.tree_mode) .name else state.prefs.field;
+	const desc: bool = if (state.prefs.tree_mode) false else state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))];
 	const entries = process.snapshotProcesses(&state.snapshots, &count, field, desc);
 	if (entries) |es| {
-		const total_cpu = if (state.prefs.tree_mode != 0) treeview.populate(es, count) else populateList(es, count);
+		const total_cpu = if (state.prefs.tree_mode) treeview.populate(es, count) else populateList(es, count);
 		process.freeProcessEntries(es);
 		if (state.hwnd_status != null) {
 			var cpu_w: i32 = @intFromFloat(total_cpu);

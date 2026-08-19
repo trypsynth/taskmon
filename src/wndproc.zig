@@ -74,14 +74,14 @@ fn isElevated() bool {
 }
 
 fn confirmEndTask(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
-	if (state.prefs.skip_kill_confirm != 0) return true;
+	if (state.prefs.skip_kill_confirm) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
 	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u)?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Task"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
 }
 
 fn confirmEndTree(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
-	if (state.prefs.skip_kill_confirm != 0) return true;
+	if (state.prefs.skip_kill_confirm) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
 	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u) and all its descendant processes?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Process Tree"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
@@ -119,8 +119,8 @@ fn createMenuBar(hwnd: win32.HWND) void {
 	const view = win32.CreatePopupMenu();
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("Refresh\tF5"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_SETTINGS, L("Settings...\tCtrl+,"));
 	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(view), L("View"));
@@ -145,7 +145,7 @@ fn getSelectedListPid() win32.DWORD {
 }
 
 fn getSelectedPid() win32.DWORD {
-	if (state.prefs.tree_mode != 0) return treeview.getSelectedPid();
+	if (state.prefs.tree_mode) return treeview.getSelectedPid();
 	return getSelectedListPid();
 }
 
@@ -206,7 +206,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == ID_CTX_OPEN_LOCATION or id == resource.ID_CTX_END_TASK) {
-		if (state.prefs.tree_mode != 0) {
+		if (state.prefs.tree_mode) {
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
 			treeview.getSelectedName(&name, 260);
 			const pid = treeview.getSelectedPid();
@@ -282,10 +282,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_TREE_MODE) {
-		state.prefs.tree_mode = if (state.prefs.tree_mode != 0) 0 else 1;
+		state.prefs.tree_mode = !state.prefs.tree_mode;
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
-		_ = win32.CheckMenuItem(view, resource.ID_VIEW_TREE_MODE, if (state.prefs.tree_mode != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
-		if (state.prefs.tree_mode != 0) {
+		_ = win32.CheckMenuItem(view, resource.ID_VIEW_TREE_MODE, if (state.prefs.tree_mode) win32.MF_CHECKED else win32.MF_UNCHECKED);
+		if (state.prefs.tree_mode) {
 			_ = win32.ShowWindow(state.hwnd_list, win32.SW_HIDE);
 			_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
 			_ = win32.SetFocus(state.hwnd_tree);
@@ -328,10 +328,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_ALWAYS_ON_TOP) {
-		state.prefs.always_on_top = if (state.prefs.always_on_top != 0) 0 else 1;
+		state.prefs.always_on_top = !state.prefs.always_on_top;
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
-		_ = win32.CheckMenuItem(view, resource.ID_VIEW_ALWAYS_ON_TOP, if (state.prefs.always_on_top != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
-		_ = win32.SetWindowPos(hwnd, if (state.prefs.always_on_top != 0) win32.HWND_TOPMOST else win32.HWND_NOTOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
+		_ = win32.CheckMenuItem(view, resource.ID_VIEW_ALWAYS_ON_TOP, if (state.prefs.always_on_top) win32.MF_CHECKED else win32.MF_UNCHECKED);
+		_ = win32.SetWindowPos(hwnd, if (state.prefs.always_on_top) win32.HWND_TOPMOST else win32.HWND_NOTOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
 		settings.save(&state.prefs);
 		return 0;
 	}
@@ -341,10 +341,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	}
 	if (id == resource.ID_VIEW_SETTINGS) {
 		var new_ms: win32.UINT = undefined;
-		var new_visible: [settings.COL_COUNT]win32.BOOL = undefined;
-		var new_skip_confirm: win32.BOOL = undefined;
-		var new_start_minimized: win32.BOOL = undefined;
-		if (settings.open(hwnd, state.prefs.refresh_ms, &state.prefs.visible, state.prefs.skip_kill_confirm, state.prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized) != 0) {
+		var new_visible: [settings.COL_COUNT]bool = undefined;
+		var new_skip_confirm: bool = undefined;
+		var new_start_minimized: bool = undefined;
+		if (settings.open(hwnd, state.prefs.refresh_ms, &state.prefs.visible, state.prefs.skip_kill_confirm, state.prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized)) {
 			var cols_changed = false;
 			var i: i32 = 0;
 			while (i < settings.COL_COUNT) : (i += 1) {
@@ -375,7 +375,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				const cid: usize = @intCast(state.sort_btn_cols[idx]);
 				if (settings.COLUMNS[cid].field == state.prefs.field) {
 					const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-					state.prefs.desc[fi] = if (state.prefs.desc[fi] != 0) 0 else 1;
+					state.prefs.desc[fi] = !state.prefs.desc[fi];
 				} else {
 					state.prefs.field = settings.COLUMNS[cid].field;
 				}
@@ -454,7 +454,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			if (low == win32.WA_INACTIVE) {
 				last_focus = win32.GetFocus();
 			} else {
-				_ = win32.SetFocus(if (last_focus != null) last_focus else if (state.prefs.tree_mode != 0) state.hwnd_tree else state.hwnd_list);
+				_ = win32.SetFocus(if (last_focus != null) last_focus else if (state.prefs.tree_mode) state.hwnd_tree else state.hwnd_list);
 			}
 			return 0;
 		},
@@ -481,13 +481,13 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			theme.applyListview(state.hwnd_list);
 			theme.applyTreeview(state.hwnd_tree);
 			_ = win32.SetWindowTheme(state.hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
-			if (state.prefs.tree_mode != 0) {
+			if (state.prefs.tree_mode) {
 				_ = win32.ShowWindow(state.hwnd_list, win32.SW_HIDE);
 				_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
 			}
 			createMenuBar(hwnd);
 			tray.add(hwnd, WM_TRAYICON, &WINDOW_TITLE);
-			if (state.prefs.always_on_top != 0)
+			if (state.prefs.always_on_top)
 				_ = win32.SetWindowPos(hwnd, win32.HWND_TOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
 			if (state.prefs.window_width > 0) {
 				const point = win32.POINT{ .x = state.prefs.window_left + 50, .y = state.prefs.window_top + 50 };
@@ -507,7 +507,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
 			// assigns focus (falling back to state.hwnd_list/state.hwnd_tree) once the window is
 			// actually shown via tray.restore().
-			if (state.prefs.start_minimized_to_tray == 0)
+			if (!state.prefs.start_minimized_to_tray)
 				_ = win32.SetFocus(state.hwnd_list);
 			return 0;
 		},
@@ -557,7 +557,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 					const cid: usize = @intCast(state.sort_btn_cols[@intCast(col)]);
 					if (settings.COLUMNS[cid].field == state.prefs.field) {
 						const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-						state.prefs.desc[fi] = if (state.prefs.desc[fi] != 0) 0 else 1;
+						state.prefs.desc[fi] = !state.prefs.desc[fi];
 					} else {
 						state.prefs.field = settings.COLUMNS[cid].field;
 					}
