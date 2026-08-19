@@ -295,7 +295,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			_ = win32.ShowWindow(state.hwnd_list, win32.SW_SHOW);
 			_ = win32.SetFocus(state.hwnd_list);
 		}
-		listview.doRefresh();
+		listview.resort();
 		settings.save(&state.prefs);
 		return 0;
 	}
@@ -361,7 +361,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			if (new_ms != state.prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
 			if (cols_changed) {
 				sortbar.applyColumns();
-				listview.doRefresh();
+				listview.resort();
 			}
 			settings.save(&state.prefs);
 		}
@@ -382,8 +382,15 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				}
 				sortbar.updateSortUi();
 				sortbar.updateTabStop();
-				listview.doRefresh();
-				settings.save(&state.prefs);
+				// Tree order is always by name (see listview.doRefresh/resort), so a
+				// field/direction change here has no visible effect on it - skip the
+				// rebuild rather than pay for one that changes nothing on screen.
+				if (!state.prefs.tree_mode) listview.resort();
+				// No settings.save() here: this fires on every arrow-key repeat or
+				// click, and save() rewrites every column's desc/visible bit to the
+				// INI unconditionally (~230ms, measured - by far the largest single
+				// cost in this handler). WM_DESTROY saves the final state on exit,
+				// same as every other transient UI interaction in this file.
 				break;
 			}
 		}
@@ -564,8 +571,11 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 					}
 					sortbar.updateSortUi();
 					sortbar.updateTabStop();
-					listview.doRefresh();
-					settings.save(&state.prefs);
+					// A column header is only clickable while the listview itself is
+					// visible, i.e. never in tree mode, so no tree_mode guard is needed
+					// here the way there is at the sort-button handler above. No
+					// settings.save() either, for the same reason as that handler.
+					listview.resort();
 				}
 			}
 			return win32.DefWindowProcW(hwnd, msg, wp, lp);

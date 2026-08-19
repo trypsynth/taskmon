@@ -65,8 +65,10 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				updateTabStop();
 				_ = win32.SetFocus(state.sort_btns[@intCast(next)]);
 				updateSortUi();
-				listview.doRefresh();
-				settings.save(&state.prefs);
+				// Tree order is always by name, so this has no visible effect while
+				// the tree is showing - skip the rebuild (see the identical guard on
+				// the sort-button click handler in wndproc.zig).
+				if (!state.prefs.tree_mode) listview.resort();
 				return 0;
 			}
 		}

@@ -382,36 +382,60 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	return total_cpu;
 }
 
+// The last snapshot doRefresh fetched, kept alive (instead of freed right
+// after populating) so resort() below can redisplay it - re-sorted, in the
+// other view mode, or against a different visible-column set - without
+// paying for another full process enumeration.
+var cached_entries: ?[*]pt.ProcessEntry = null;
+var cached_count: i32 = 0;
+
+fn updateStatusBar(total_cpu: f64, count: i32) void {
+	if (state.hwnd_status == null) return;
+	var cpu_w: i32 = @intFromFloat(total_cpu);
+	var cpu_f: i32 = @intFromFloat((total_cpu - @as(f64, @floatFromInt(cpu_w))) * 100 + 0.5);
+	if (cpu_f >= 100) {
+		cpu_w += 1;
+		cpu_f = 0;
+	}
+	var ms: win32.MEMORYSTATUSEX = std.mem.zeroes(win32.MEMORYSTATUSEX);
+	ms.dwLength = @sizeOf(win32.MEMORYSTATUSEX);
+	_ = win32.GlobalMemoryStatusEx(&ms);
+	const in_use = ms.ullTotalPhys - ms.ullAvailPhys;
+	const total = ms.ullTotalPhys;
+	const gib: u64 = 1024 * 1024 * 1024;
+	const iu_w: i32 = @intCast(in_use / gib);
+	const iu_f: i32 = @intCast((in_use % gib) * 10 / gib);
+	const t_w: i32 = @intCast(total / gib);
+	const t_f: i32 = @intCast((total % gib) * 10 / gib);
+	var status: [128:0]u16 = std.mem.zeroes([128:0]u16);
+	wfmt.format(&status, 128, "  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB", .{ count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f });
+	_ = win32.SendMessageW(state.hwnd_status, win32.SB_SETTEXTW, 0, @bitCast(@intFromPtr(&status)));
+}
+
 pub fn doRefresh() void {
 	var count: i32 = 0;
 	const field: settings.SortField = if (state.prefs.tree_mode) .name else state.prefs.field;
 	const desc: bool = if (state.prefs.tree_mode) false else state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))];
 	const entries = process.snapshotProcesses(&state.snapshots, &count, field, desc);
 	if (entries) |es| {
+		if (cached_entries) |old| process.freeProcessEntries(old);
+		cached_entries = es;
+		cached_count = count;
 		const total_cpu = if (state.prefs.tree_mode) treeview.populate(es, count) else populateList(es, count);
-		process.freeProcessEntries(es);
-		if (state.hwnd_status != null) {
-			var cpu_w: i32 = @intFromFloat(total_cpu);
-			var cpu_f: i32 = @intFromFloat((total_cpu - @as(f64, @floatFromInt(cpu_w))) * 100 + 0.5);
-			if (cpu_f >= 100) {
-				cpu_w += 1;
-				cpu_f = 0;
-			}
-			var ms: win32.MEMORYSTATUSEX = std.mem.zeroes(win32.MEMORYSTATUSEX);
-			ms.dwLength = @sizeOf(win32.MEMORYSTATUSEX);
-			_ = win32.GlobalMemoryStatusEx(&ms);
-			const in_use = ms.ullTotalPhys - ms.ullAvailPhys;
-			const total = ms.ullTotalPhys;
-			const gib: u64 = 1024 * 1024 * 1024;
-			const iu_w: i32 = @intCast(in_use / gib);
-			const iu_f: i32 = @intCast((in_use % gib) * 10 / gib);
-			const t_w: i32 = @intCast(total / gib);
-			const t_f: i32 = @intCast((total % gib) * 10 / gib);
-			var status: [128:0]u16 = std.mem.zeroes([128:0]u16);
-			wfmt.format(&status, 128, "  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB", .{ count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f });
-			_ = win32.SendMessageW(state.hwnd_status, win32.SB_SETTEXTW, 0, @bitCast(@intFromPtr(&status)));
-		}
+		updateStatusBar(total_cpu, count);
 	}
+}
+
+// Redisplays the last fetched snapshot - re-sorted, in the other view mode,
+// or against a newly-changed visible-column set - without re-querying the
+// OS. Falls back to a full doRefresh() if nothing has been fetched yet.
+pub fn resort() void {
+	const es = cached_entries orelse return doRefresh();
+	const field: settings.SortField = if (state.prefs.tree_mode) .name else state.prefs.field;
+	const desc: bool = if (state.prefs.tree_mode) false else state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))];
+	process.sortEntries(es, cached_count, field, desc);
+	const total_cpu = if (state.prefs.tree_mode) treeview.populate(es, cached_count) else populateList(es, cached_count);
+	updateStatusBar(total_cpu, cached_count);
 }
 
 pub fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {

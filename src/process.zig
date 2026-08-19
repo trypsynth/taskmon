@@ -1075,6 +1075,13 @@ pub fn freeProcessEntries(entries: ?[*]pt.ProcessEntry) void {
 	heapFree(@ptrCast(entries));
 }
 
+// Re-sorts an already-fetched snapshot in place. Sort/tree-mode/column
+// changes need this, not a full snapshotProcesses call - the process data
+// itself hasn't changed, only how it should be ordered.
+pub fn sortEntries(entries: [*]pt.ProcessEntry, count: i32, field: settings.SortField, descending: bool) void {
+	quicksort(entries, 0, count - 1, field, descending);
+}
+
 pub fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) void {
 	var size = size_in;
 	const h = win32.OpenProcess(win32.PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
