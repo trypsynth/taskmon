@@ -10,6 +10,7 @@ const sortbar = @import("sortbar.zig");
 const treeview = @import("treeview.zig");
 const listview = @import("listview.zig");
 const process = @import("process.zig");
+const state = @import("state.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const ID_LISTVIEW = 105;
@@ -40,24 +41,10 @@ const PRIORITY_CLASSES = [PRIORITY_CLASS_COUNT]PriorityEntry{
 	.{ .cls = win32.REALTIME_PRIORITY_CLASS, .label = L("Realtime") },
 };
 
-// Exported as the actual array data (not a pointer to it) to match the C
-// side's `extern const wchar_t CLASS_NAME[];` declaration in wndproc.h.
-pub export const CLASS_NAME = L("TaskmonWndClass").*;
-pub export const WINDOW_TITLE = L("Taskmon").*;
+pub const CLASS_NAME = L("TaskmonWndClass").*;
+pub const WINDOW_TITLE = L("Taskmon").*;
 
-pub export var g_hwnd: win32.HWND = null;
-pub export var g_hwnd_list: win32.HWND = null;
-pub export var g_hwnd_tree: win32.HWND = null;
-pub export var g_hwnd_sort_group: win32.HWND = null;
-pub export var g_hwnd_status: win32.HWND = null;
-pub export var g_sort_btns: [settings.COL_COUNT]win32.HWND = std.mem.zeroes([settings.COL_COUNT]win32.HWND);
-pub export var g_sort_btn_cols: [settings.COL_COUNT]i32 = std.mem.zeroes([settings.COL_COUNT]i32);
-pub export var g_sort_btn_count: i32 = 0;
-var g_last_focus: win32.HWND = null;
-pub export var g_prefs: settings.SortPrefs = undefined;
-pub export var g_snapshots: [pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry = std.mem.zeroes([pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry);
-
-extern var g_mutex: win32.HANDLE;
+var last_focus: win32.HWND = null;
 
 fn setRefreshInterval(hwnd: win32.HWND, ms_in: win32.UINT) void {
 	var ms = ms_in;
@@ -70,10 +57,10 @@ fn setRefreshInterval(hwnd: win32.HWND, ms_in: win32.UINT) void {
 		}
 	}
 	if (!found) ms = 0;
-	g_prefs.refresh_ms = ms;
+	state.prefs.refresh_ms = ms;
 	_ = win32.KillTimer(hwnd, ID_REFRESH_TIMER);
 	if (ms > 0) _ = win32.SetTimer(hwnd, ID_REFRESH_TIMER, ms, null);
-	settings.save(&g_prefs);
+	settings.save(&state.prefs);
 }
 
 fn isElevated() bool {
@@ -87,14 +74,14 @@ fn isElevated() bool {
 }
 
 fn confirmEndTask(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
-	if (g_prefs.skip_kill_confirm != 0) return true;
+	if (state.prefs.skip_kill_confirm != 0) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
 	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u)?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Task"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
 }
 
 fn confirmEndTree(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
-	if (g_prefs.skip_kill_confirm != 0) return true;
+	if (state.prefs.skip_kill_confirm != 0) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
 	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u) and all its descendant processes?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Process Tree"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
@@ -132,8 +119,8 @@ fn createMenuBar(hwnd: win32.HWND) void {
 	const view = win32.CreatePopupMenu();
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("Refresh\tF5"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (g_prefs.always_on_top != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (g_prefs.tree_mode != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode != 0) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_SETTINGS, L("Settings...\tCtrl+,"));
 	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(view), L("View"));
@@ -148,17 +135,17 @@ fn pointFromLparam(lp: win32.LPARAM) win32.POINT {
 }
 
 fn getSelectedListPid() win32.DWORD {
-	const selected: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+	const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
 	if (selected == -1) return 0;
 	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 	lvi.iItem = selected;
 	lvi.mask = win32.LVIF_PARAM;
-	_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+	_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 	return @intCast(lvi.lParam);
 }
 
 fn getSelectedPid() win32.DWORD {
-	if (g_prefs.tree_mode != 0) return treeview.getSelectedPid();
+	if (state.prefs.tree_mode != 0) return treeview.getSelectedPid();
 	return getSelectedListPid();
 }
 
@@ -219,7 +206,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == ID_CTX_OPEN_LOCATION or id == resource.ID_CTX_END_TASK) {
-		if (g_prefs.tree_mode != 0) {
+		if (state.prefs.tree_mode != 0) {
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
 			treeview.getSelectedName(&name, 260);
 			const pid = treeview.getSelectedPid();
@@ -237,18 +224,18 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			}
 			return 0;
 		}
-		const selected: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+		const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
 		if (selected != -1) {
 			var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			lvi.iItem = selected;
 			lvi.mask = win32.LVIF_PARAM;
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
 			var get_text_lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			get_text_lvi.iSubItem = 0;
 			get_text_lvi.cchTextMax = 260;
 			get_text_lvi.pszText = &name;
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMTEXTW, @intCast(selected), @bitCast(@intFromPtr(&get_text_lvi)));
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMTEXTW, @intCast(selected), @bitCast(@intFromPtr(&get_text_lvi)));
 			const pid: win32.DWORD = @intCast(lvi.lParam);
 			if (id == ID_CTX_OPEN_LOCATION) {
 				var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
@@ -258,14 +245,14 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				if (confirmEndTask(hwnd, &name, pid)) {
 					_ = process.terminateProcess(pid);
 					listview.doRefresh();
-					const count: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
+					const count: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
 					var pid_still_present = false;
 					var i: i32 = 0;
 					while (i < count and !pid_still_present) : (i += 1) {
 						var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 						lvi2.mask = win32.LVIF_PARAM;
 						lvi2.iItem = i;
-						_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
+						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
 						if (@as(win32.DWORD, @intCast(lvi2.lParam)) == pid) pid_still_present = true;
 					}
 					if (!pid_still_present and count > 0) {
@@ -273,8 +260,8 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 						var lvi3: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 						lvi3.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
 						lvi3.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-						_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_sel), @bitCast(@intFromPtr(&lvi3)));
-						_ = win32.SendMessageW(g_hwnd_list, win32.LVM_ENSUREVISIBLE, @intCast(new_sel), 0);
+						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_sel), @bitCast(@intFromPtr(&lvi3)));
+						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_ENSUREVISIBLE, @intCast(new_sel), 0);
 					}
 				}
 			}
@@ -295,20 +282,20 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_TREE_MODE) {
-		g_prefs.tree_mode = if (g_prefs.tree_mode != 0) 0 else 1;
+		state.prefs.tree_mode = if (state.prefs.tree_mode != 0) 0 else 1;
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
-		_ = win32.CheckMenuItem(view, resource.ID_VIEW_TREE_MODE, if (g_prefs.tree_mode != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
-		if (g_prefs.tree_mode != 0) {
-			_ = win32.ShowWindow(g_hwnd_list, win32.SW_HIDE);
-			_ = win32.ShowWindow(g_hwnd_tree, win32.SW_SHOW);
-			_ = win32.SetFocus(g_hwnd_tree);
+		_ = win32.CheckMenuItem(view, resource.ID_VIEW_TREE_MODE, if (state.prefs.tree_mode != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
+		if (state.prefs.tree_mode != 0) {
+			_ = win32.ShowWindow(state.hwnd_list, win32.SW_HIDE);
+			_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
+			_ = win32.SetFocus(state.hwnd_tree);
 		} else {
-			_ = win32.ShowWindow(g_hwnd_tree, win32.SW_HIDE);
-			_ = win32.ShowWindow(g_hwnd_list, win32.SW_SHOW);
-			_ = win32.SetFocus(g_hwnd_list);
+			_ = win32.ShowWindow(state.hwnd_tree, win32.SW_HIDE);
+			_ = win32.ShowWindow(state.hwnd_list, win32.SW_SHOW);
+			_ = win32.SetFocus(state.hwnd_list);
 		}
 		listview.doRefresh();
-		settings.save(&g_prefs);
+		settings.save(&state.prefs);
 		return 0;
 	}
 	if (id >= ID_CTX_PRIORITY_BASE and id < ID_CTX_PRIORITY_BASE + PRIORITY_CLASS_COUNT) {
@@ -326,14 +313,14 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	if (id == resource.ID_FILE_RESTART_AS_ADMIN) {
 		var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 		_ = win32.GetModuleFileNameW(null, &path, @intCast(win32.MAX_PATH));
-		if (g_mutex != null) {
-			_ = win32.CloseHandle(g_mutex);
-			g_mutex = null;
+		if (state.mutex != null) {
+			_ = win32.CloseHandle(state.mutex);
+			state.mutex = null;
 		}
 		if (@intFromPtr(win32.ShellExecuteW(null, L("runas"), &path, null, null, win32.SW_SHOW)) > 32)
 			_ = win32.DestroyWindow(hwnd)
-		else if (g_mutex == null)
-			g_mutex = win32.CreateMutexW(null, 1, L("Local\\TaskmonSingleInstance"));
+		else if (state.mutex == null)
+			state.mutex = win32.CreateMutexW(null, 1, L("Local\\TaskmonSingleInstance"));
 		return 0;
 	}
 	if (id == resource.ID_FILE_EXIT) {
@@ -341,11 +328,11 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_ALWAYS_ON_TOP) {
-		g_prefs.always_on_top = if (g_prefs.always_on_top != 0) 0 else 1;
+		state.prefs.always_on_top = if (state.prefs.always_on_top != 0) 0 else 1;
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
-		_ = win32.CheckMenuItem(view, resource.ID_VIEW_ALWAYS_ON_TOP, if (g_prefs.always_on_top != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
-		_ = win32.SetWindowPos(hwnd, if (g_prefs.always_on_top != 0) win32.HWND_TOPMOST else win32.HWND_NOTOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
-		settings.save(&g_prefs);
+		_ = win32.CheckMenuItem(view, resource.ID_VIEW_ALWAYS_ON_TOP, if (state.prefs.always_on_top != 0) win32.MF_CHECKED else win32.MF_UNCHECKED);
+		_ = win32.SetWindowPos(hwnd, if (state.prefs.always_on_top != 0) win32.HWND_TOPMOST else win32.HWND_NOTOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
+		settings.save(&state.prefs);
 		return 0;
 	}
 	if (id == resource.ID_VIEW_REFRESH) {
@@ -357,45 +344,45 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		var new_visible: [settings.COL_COUNT]win32.BOOL = undefined;
 		var new_skip_confirm: win32.BOOL = undefined;
 		var new_start_minimized: win32.BOOL = undefined;
-		if (settings.open(hwnd, g_prefs.refresh_ms, &g_prefs.visible, g_prefs.skip_kill_confirm, g_prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized) != 0) {
+		if (settings.open(hwnd, state.prefs.refresh_ms, &state.prefs.visible, state.prefs.skip_kill_confirm, state.prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized) != 0) {
 			var cols_changed = false;
 			var i: i32 = 0;
 			while (i < settings.COL_COUNT) : (i += 1) {
-				if (new_visible[@intCast(i)] != g_prefs.visible[@intCast(i)]) {
+				if (new_visible[@intCast(i)] != state.prefs.visible[@intCast(i)]) {
 					cols_changed = true;
 					break;
 				}
 			}
 			i = 0;
-			while (i < settings.COL_COUNT) : (i += 1) g_prefs.visible[@intCast(i)] = new_visible[@intCast(i)];
-			g_prefs.skip_kill_confirm = new_skip_confirm;
-			g_prefs.start_minimized_to_tray = new_start_minimized;
-			if (new_ms != g_prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
+			while (i < settings.COL_COUNT) : (i += 1) state.prefs.visible[@intCast(i)] = new_visible[@intCast(i)];
+			state.prefs.skip_kill_confirm = new_skip_confirm;
+			state.prefs.start_minimized_to_tray = new_start_minimized;
+			if (new_ms != state.prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
 			if (cols_changed) {
 				sortbar.applyColumns();
 				listview.doRefresh();
 			}
-			settings.save(&g_prefs);
+			settings.save(&state.prefs);
 		}
 		return 0;
 	}
 	const hiword: u16 = @truncate(wp >> 16);
 	if (hiword == win32.BN_CLICKED) {
 		var i: i32 = 0;
-		while (i < g_sort_btn_count) : (i += 1) {
+		while (i < state.sort_btn_count) : (i += 1) {
 			const idx: usize = @intCast(i);
-			if (resource.ID_SORT_BASE + g_sort_btn_cols[idx] == @as(i32, id)) {
-				const cid: usize = @intCast(g_sort_btn_cols[idx]);
-				if (settings.COLUMNS[cid].field == g_prefs.field) {
-					const fi: usize = @intCast(@intFromEnum(g_prefs.field));
-					g_prefs.desc[fi] = if (g_prefs.desc[fi] != 0) 0 else 1;
+			if (resource.ID_SORT_BASE + state.sort_btn_cols[idx] == @as(i32, id)) {
+				const cid: usize = @intCast(state.sort_btn_cols[idx]);
+				if (settings.COLUMNS[cid].field == state.prefs.field) {
+					const fi: usize = @intCast(@intFromEnum(state.prefs.field));
+					state.prefs.desc[fi] = if (state.prefs.desc[fi] != 0) 0 else 1;
 				} else {
-					g_prefs.field = settings.COLUMNS[cid].field;
+					state.prefs.field = settings.COLUMNS[cid].field;
 				}
 				sortbar.updateSortUi();
 				sortbar.updateTabStop();
 				listview.doRefresh();
-				settings.save(&g_prefs);
+				settings.save(&state.prefs);
 				break;
 			}
 		}
@@ -405,7 +392,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 
 fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32.LRESULT {
 	const src_hwnd: win32.HWND = @ptrFromInt(@as(usize, @bitCast(wp)));
-	if (src_hwnd == g_hwnd_tree) {
+	if (src_hwnd == state.hwnd_tree) {
 		var point = pointFromLparam(lp);
 		var sel: win32.HTREEITEM = null;
 		if (point.x == -1 and point.y == -1) {
@@ -414,8 +401,8 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 			if (sel != null) {
 				var rc: win32.RECT align(8) = std.mem.zeroes(win32.RECT);
 				@as(*win32.HTREEITEM, @ptrCast(@alignCast(&rc))).* = sel;
-				if (win32.SendMessageW(g_hwnd_tree, win32.TVM_GETITEMRECT, 1, @bitCast(@intFromPtr(&rc))) != 0) {
-					_ = win32.MapWindowPoints(g_hwnd_tree, win32.HWND_DESKTOP, @ptrCast(&rc), 2);
+				if (win32.SendMessageW(state.hwnd_tree, win32.TVM_GETITEMRECT, 1, @bitCast(@intFromPtr(&rc))) != 0) {
+					_ = win32.MapWindowPoints(state.hwnd_tree, win32.HWND_DESKTOP, @ptrCast(&rc), 2);
 					point.x = rc.left;
 					point.y = rc.bottom;
 				}
@@ -423,12 +410,12 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 		} else {
 			// Mouse-triggered: select item under cursor first
 			var local = point;
-			_ = win32.ScreenToClient(g_hwnd_tree, &local);
+			_ = win32.ScreenToClient(state.hwnd_tree, &local);
 			var tvht: win32.TVHITTESTINFO = std.mem.zeroes(win32.TVHITTESTINFO);
 			tvht.pt = local;
-			const hit: win32.HTREEITEM = @ptrFromInt(@as(usize, @bitCast(win32.SendMessageW(g_hwnd_tree, win32.TVM_HITTEST, 0, @bitCast(@intFromPtr(&tvht))))));
+			const hit: win32.HTREEITEM = @ptrFromInt(@as(usize, @bitCast(win32.SendMessageW(state.hwnd_tree, win32.TVM_HITTEST, 0, @bitCast(@intFromPtr(&tvht))))));
 			if (hit != null and (tvht.flags & win32.TVHT_ONITEM) != 0)
-				_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_SELECTITEM, win32.TVGN_CARET, @bitCast(@intFromPtr(hit)));
+				_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_SELECTITEM, win32.TVGN_CARET, @bitCast(@intFromPtr(hit)));
 			sel = treeview.getSelection();
 		}
 		if (sel != null) {
@@ -437,20 +424,20 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 		}
 		return 0;
 	}
-	if (src_hwnd == g_hwnd_list) {
-		const selected: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+	if (src_hwnd == state.hwnd_list) {
+		const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
 		if (selected != -1) {
 			var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			lvi.iItem = selected;
 			lvi.mask = win32.LVIF_PARAM;
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 			const pid: win32.DWORD = @intCast(lvi.lParam);
 			var point = pointFromLparam(lp);
 			if (point.x == -1 and point.y == -1) {
 				var rc: win32.RECT = std.mem.zeroes(win32.RECT);
 				rc.left = win32.LVIR_BOUNDS;
-				_ = win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMRECT, @intCast(selected), @bitCast(@intFromPtr(&rc)));
-				_ = win32.MapWindowPoints(g_hwnd_list, win32.HWND_DESKTOP, @ptrCast(&rc), 2);
+				_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMRECT, @intCast(selected), @bitCast(@intFromPtr(&rc)));
+				_ = win32.MapWindowPoints(state.hwnd_list, win32.HWND_DESKTOP, @ptrCast(&rc), 2);
 				point.x = rc.left + @divTrunc(rc.right - rc.left, 2);
 				point.y = rc.top + @divTrunc(rc.bottom - rc.top, 2);
 			}
@@ -465,77 +452,77 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		win32.WM_ACTIVATE => {
 			const low: u16 = @truncate(wp);
 			if (low == win32.WA_INACTIVE) {
-				g_last_focus = win32.GetFocus();
+				last_focus = win32.GetFocus();
 			} else {
-				_ = win32.SetFocus(if (g_last_focus != null) g_last_focus else if (g_prefs.tree_mode != 0) g_hwnd_tree else g_hwnd_list);
+				_ = win32.SetFocus(if (last_focus != null) last_focus else if (state.prefs.tree_mode != 0) state.hwnd_tree else state.hwnd_list);
 			}
 			return 0;
 		},
 		win32.WM_CREATE => {
-			g_hwnd = hwnd;
+			state.hwnd = hwnd;
 			_ = win32.RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, win32.MOD_CONTROL | win32.MOD_SHIFT | win32.MOD_NOREPEAT, @intCast(win32.VK_OEM_3));
 			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
-			g_hwnd_sort_group = sortbar.create(hwnd);
+			state.hwnd_sort_group = sortbar.create(hwnd);
 			// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
 			// use "Processes" as the list's accessible name instead of the group box.
 			_ = win32.CreateWindowExW(0, L("STATIC"), L("Processes"), win32.WS_CHILD | win32.SS_LEFT, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
-			g_hwnd_list = win32.CreateWindowExW(0, win32.WC_LISTVIEWW, L("Processes"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.LVS_REPORT | win32.LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_LISTVIEW)), win32.GetModuleHandleW(null), null);
-			_ = win32.SetWindowSubclass(g_hwnd_list, listview.listKeyProc, 0, 0);
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_FULLROWSELECT | win32.LVS_EX_GRIDLINES | win32.LVS_EX_HEADERDRAGDROP);
-			g_hwnd_tree = win32.CreateWindowExW(0, win32.WC_TREEVIEWW, null, win32.WS_CHILD | win32.WS_TABSTOP | win32.TVS_HASLINES | win32.TVS_HASBUTTONS | win32.TVS_LINESATROOT | win32.TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_TREEVIEW)), win32.GetModuleHandleW(null), null);
-			_ = win32.SetWindowSubclass(g_hwnd_tree, treeview.keyProc, 0, 0);
-			_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_SETEXTENDEDSTYLE, win32.TVS_EX_DOUBLEBUFFER, win32.TVS_EX_DOUBLEBUFFER);
-			g_hwnd_status = win32.CreateWindowExW(0, win32.STATUSCLASSNAMEW, null, win32.WS_CHILD | win32.WS_VISIBLE, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
-			settings.load(&g_prefs);
+			state.hwnd_list = win32.CreateWindowExW(0, win32.WC_LISTVIEWW, L("Processes"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.LVS_REPORT | win32.LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_LISTVIEW)), win32.GetModuleHandleW(null), null);
+			_ = win32.SetWindowSubclass(state.hwnd_list, listview.listKeyProc, 0, 0);
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_FULLROWSELECT | win32.LVS_EX_GRIDLINES | win32.LVS_EX_HEADERDRAGDROP);
+			state.hwnd_tree = win32.CreateWindowExW(0, win32.WC_TREEVIEWW, null, win32.WS_CHILD | win32.WS_TABSTOP | win32.TVS_HASLINES | win32.TVS_HASBUTTONS | win32.TVS_LINESATROOT | win32.TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_TREEVIEW)), win32.GetModuleHandleW(null), null);
+			_ = win32.SetWindowSubclass(state.hwnd_tree, treeview.keyProc, 0, 0);
+			_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_SETEXTENDEDSTYLE, win32.TVS_EX_DOUBLEBUFFER, win32.TVS_EX_DOUBLEBUFFER);
+			state.hwnd_status = win32.CreateWindowExW(0, win32.STATUSCLASSNAMEW, null, win32.WS_CHILD | win32.WS_VISIBLE, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
+			settings.load(&state.prefs);
 			theme.update();
 			sortbar.applyColumns();
 			theme.applyTitlebar(hwnd);
-			theme.applyListview(g_hwnd_list);
-			theme.applyTreeview(g_hwnd_tree);
-			_ = win32.SetWindowTheme(g_hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
-			if (g_prefs.tree_mode != 0) {
-				_ = win32.ShowWindow(g_hwnd_list, win32.SW_HIDE);
-				_ = win32.ShowWindow(g_hwnd_tree, win32.SW_SHOW);
+			theme.applyListview(state.hwnd_list);
+			theme.applyTreeview(state.hwnd_tree);
+			_ = win32.SetWindowTheme(state.hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+			if (state.prefs.tree_mode != 0) {
+				_ = win32.ShowWindow(state.hwnd_list, win32.SW_HIDE);
+				_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
 			}
 			createMenuBar(hwnd);
 			tray.add(hwnd, WM_TRAYICON, &WINDOW_TITLE);
-			if (g_prefs.always_on_top != 0)
+			if (state.prefs.always_on_top != 0)
 				_ = win32.SetWindowPos(hwnd, win32.HWND_TOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
-			if (g_prefs.window_width > 0) {
-				const point = win32.POINT{ .x = g_prefs.window_left + 50, .y = g_prefs.window_top + 50 };
+			if (state.prefs.window_width > 0) {
+				const point = win32.POINT{ .x = state.prefs.window_left + 50, .y = state.prefs.window_top + 50 };
 				if (win32.MonitorFromPoint(point, win32.MONITOR_DEFAULTTONULL) != null)
-					_ = win32.SetWindowPos(hwnd, null, g_prefs.window_left, g_prefs.window_top, g_prefs.window_width, g_prefs.window_height, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+					_ = win32.SetWindowPos(hwnd, null, state.prefs.window_left, state.prefs.window_top, state.prefs.window_width, state.prefs.window_height, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 			}
 			// Prime the snapshot table so the first real refresh has deltas to work from.
 			// Discard results — the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
 			{
 				var count: i32 = 0;
-				const primed = process.snapshotProcesses(&g_snapshots, &count, g_prefs.field, g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))]);
+				const primed = process.snapshotProcesses(&state.snapshots, &count, state.prefs.field, state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))]);
 				if (primed) |pr| process.freeProcessEntries(pr);
 			}
 			_ = win32.SetTimer(hwnd, ID_PRIME_TIMER, 250, null);
-			setRefreshInterval(hwnd, g_prefs.refresh_ms);
+			setRefreshInterval(hwnd, state.prefs.refresh_ms);
 			// Skip when starting minimized: SetFocus on a hidden window can still activate
 			// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
-			// assigns focus (falling back to g_hwnd_list/g_hwnd_tree) once the window is
+			// assigns focus (falling back to state.hwnd_list/state.hwnd_tree) once the window is
 			// actually shown via tray.restore().
-			if (g_prefs.start_minimized_to_tray == 0)
-				_ = win32.SetFocus(g_hwnd_list);
+			if (state.prefs.start_minimized_to_tray == 0)
+				_ = win32.SetFocus(state.hwnd_list);
 			return 0;
 		},
 		win32.WM_SIZE => {
-			if (g_hwnd_list != null and g_hwnd_status != null) {
+			if (state.hwnd_list != null and state.hwnd_status != null) {
 				const ulp: usize = @bitCast(lp);
 				const w: i32 = @intCast(@as(u16, @truncate(ulp)));
 				const h: i32 = @intCast(@as(u16, @truncate(ulp >> 16)));
-				_ = win32.SendMessageW(g_hwnd_status, win32.WM_SIZE, wp, lp);
+				_ = win32.SendMessageW(state.hwnd_status, win32.WM_SIZE, wp, lp);
 				var sr: win32.RECT = undefined;
-				_ = win32.GetClientRect(g_hwnd_status, &sr);
+				_ = win32.GetClientRect(state.hwnd_status, &sr);
 				const view_h = h - 1 - (sr.bottom - sr.top);
-				_ = win32.SetWindowPos(g_hwnd_list, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
-				if (g_hwnd_tree != null)
-					_ = win32.SetWindowPos(g_hwnd_tree, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+				_ = win32.SetWindowPos(state.hwnd_list, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+				if (state.hwnd_tree != null)
+					_ = win32.SetWindowPos(state.hwnd_tree, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 			}
 			return 0;
 		},
@@ -566,18 +553,18 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			if (hdr.idFrom == ID_LISTVIEW and hdr.code == @as(win32.UINT, @bitCast(win32.LVN_COLUMNCLICK))) {
 				const nmlv: *const win32.NMLISTVIEW = @ptrFromInt(@as(usize, @bitCast(lp)));
 				const col = nmlv.iSubItem;
-				if (col >= 0 and col < g_sort_btn_count) {
-					const cid: usize = @intCast(g_sort_btn_cols[@intCast(col)]);
-					if (settings.COLUMNS[cid].field == g_prefs.field) {
-						const fi: usize = @intCast(@intFromEnum(g_prefs.field));
-						g_prefs.desc[fi] = if (g_prefs.desc[fi] != 0) 0 else 1;
+				if (col >= 0 and col < state.sort_btn_count) {
+					const cid: usize = @intCast(state.sort_btn_cols[@intCast(col)]);
+					if (settings.COLUMNS[cid].field == state.prefs.field) {
+						const fi: usize = @intCast(@intFromEnum(state.prefs.field));
+						state.prefs.desc[fi] = if (state.prefs.desc[fi] != 0) 0 else 1;
 					} else {
-						g_prefs.field = settings.COLUMNS[cid].field;
+						state.prefs.field = settings.COLUMNS[cid].field;
 					}
 					sortbar.updateSortUi();
 					sortbar.updateTabStop();
 					listview.doRefresh();
-					settings.save(&g_prefs);
+					settings.save(&state.prefs);
 				}
 			}
 			return win32.DefWindowProcW(hwnd, msg, wp, lp);
@@ -611,9 +598,9 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				if (win32.lstrcmpW(s, L("ImmersiveColorSet")) == 0) {
 					theme.update();
 					theme.applyTitlebar(hwnd);
-					theme.applyListview(g_hwnd_list);
-					theme.applyTreeview(g_hwnd_tree);
-					_ = win32.SetWindowTheme(g_hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+					theme.applyListview(state.hwnd_list);
+					theme.applyTreeview(state.hwnd_tree);
+					_ = win32.SetWindowTheme(state.hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 					sortbar.applyTheme();
 					_ = win32.RedrawWindow(hwnd, null, null, win32.RDW_INVALIDATE | win32.RDW_ERASE | win32.RDW_ALLCHILDREN);
 				}
@@ -637,11 +624,11 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			var wpl: win32.WINDOWPLACEMENT = std.mem.zeroes(win32.WINDOWPLACEMENT);
 			wpl.length = @sizeOf(win32.WINDOWPLACEMENT);
 			_ = win32.GetWindowPlacement(hwnd, &wpl);
-			g_prefs.window_left = wpl.rcNormalPosition.left;
-			g_prefs.window_top = wpl.rcNormalPosition.top;
-			g_prefs.window_width = wpl.rcNormalPosition.right - wpl.rcNormalPosition.left;
-			g_prefs.window_height = wpl.rcNormalPosition.bottom - wpl.rcNormalPosition.top;
-			settings.save(&g_prefs);
+			state.prefs.window_left = wpl.rcNormalPosition.left;
+			state.prefs.window_top = wpl.rcNormalPosition.top;
+			state.prefs.window_width = wpl.rcNormalPosition.right - wpl.rcNormalPosition.left;
+			state.prefs.window_height = wpl.rcNormalPosition.bottom - wpl.rcNormalPosition.top;
+			settings.save(&state.prefs);
 			_ = win32.UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 			_ = win32.KillTimer(hwnd, ID_REFRESH_TIMER);
 			tray.remove();

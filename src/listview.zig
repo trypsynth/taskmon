@@ -5,16 +5,10 @@ const settings = @import("settings.zig");
 const tray = @import("tray.zig");
 const treeview = @import("treeview.zig");
 const process = @import("process.zig");
+const state = @import("state.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
-
-extern var g_hwnd_list: win32.HWND;
-extern var g_hwnd_status: win32.HWND;
-extern var g_sort_btn_cols: [settings.COL_COUNT]i32;
-extern var g_sort_btn_count: i32;
-extern var g_prefs: settings.SortPrefs;
-extern var g_snapshots: [pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry;
 
 /// 100-nanosecond FILETIME ticks to h:mm:ss.
 fn formatDuration(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
@@ -319,24 +313,24 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 
 fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	var selected_pid: win32.DWORD = 0;
-	const selected: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+	const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
 	if (selected != -1) {
 		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 		lvi.mask = win32.LVIF_PARAM;
 		lvi.iItem = selected;
-		if (win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) selected_pid = @intCast(lvi.lParam);
+		if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) selected_pid = @intCast(lvi.lParam);
 	}
 	var top_pid: win32.DWORD = 0;
-	const top_idx: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETTOPINDEX, 0, 0));
-	const item_count: i32 = @intCast(win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
+	const top_idx: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETTOPINDEX, 0, 0));
+	const item_count: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
 	if (top_idx != -1 and item_count > 0) {
 		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 		lvi.mask = win32.LVIF_PARAM;
 		lvi.iItem = top_idx;
-		if (win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) top_pid = @intCast(lvi.lParam);
+		if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) top_pid = @intCast(lvi.lParam);
 	}
-	_ = win32.SendMessageW(g_hwnd_list, win32.WM_SETREDRAW, 0, 0);
-	_ = win32.SendMessageW(g_hwnd_list, win32.LVM_DELETEALLITEMS, 0, 0);
+	_ = win32.SendMessageW(state.hwnd_list, win32.WM_SETREDRAW, 0, 0);
+	_ = win32.SendMessageW(state.hwnd_list, win32.LVM_DELETEALLITEMS, 0, 0);
 	var total_cpu: f64 = 0;
 	var new_selected_idx: i32 = -1;
 	var new_top_idx: i32 = -1;
@@ -349,53 +343,53 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 		lvi.iItem = i;
 		lvi.pszText = @ptrCast(&e.name);
 		lvi.lParam = @intCast(e.pid);
-		_ = win32.SendMessageW(g_hwnd_list, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 		if (e.pid == selected_pid) new_selected_idx = i;
 		if (e.pid == top_pid) new_top_idx = i;
 		var buf: [300:0]u16 = std.mem.zeroes([300:0]u16);
 		var col: i32 = 1;
-		while (col < g_sort_btn_count) : (col += 1) {
-			formatColumn(e, g_sort_btn_cols[@intCast(col)], &buf, 300);
+		while (col < state.sort_btn_count) : (col += 1) {
+			formatColumn(e, state.sort_btn_cols[@intCast(col)], &buf, 300);
 			var set_lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			set_lvi.iSubItem = col;
 			set_lvi.pszText = &buf;
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETITEMTEXTW, @intCast(i), @bitCast(@intFromPtr(&set_lvi)));
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMTEXTW, @intCast(i), @bitCast(@intFromPtr(&set_lvi)));
 		}
 	}
 	if (new_selected_idx != -1) {
 		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 		lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
 		lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_selected_idx), @bitCast(@intFromPtr(&lvi)));
-	} else if (win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0) > 0) {
+		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_selected_idx), @bitCast(@intFromPtr(&lvi)));
+	} else if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0) > 0) {
 		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 		lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
 		lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&lvi)));
+		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&lvi)));
 	}
 	if (new_top_idx != -1) {
 		var rc: win32.RECT = std.mem.zeroes(win32.RECT);
 		rc.left = win32.LVIR_BOUNDS;
-		if (win32.SendMessageW(g_hwnd_list, win32.LVM_GETITEMRECT, 0, @bitCast(@intFromPtr(&rc))) != 0) {
+		if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMRECT, 0, @bitCast(@intFromPtr(&rc))) != 0) {
 			const item_height = rc.bottom - rc.top;
-			_ = win32.SendMessageW(g_hwnd_list, win32.LVM_SCROLL, 0, @intCast(new_top_idx * item_height));
+			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SCROLL, 0, @intCast(new_top_idx * item_height));
 		}
 	}
-	_ = win32.SendMessageW(g_hwnd_list, win32.WM_SETREDRAW, 1, 0);
-	_ = win32.InvalidateRect(g_hwnd_list, null, 0);
+	_ = win32.SendMessageW(state.hwnd_list, win32.WM_SETREDRAW, 1, 0);
+	_ = win32.InvalidateRect(state.hwnd_list, null, 0);
 	tray.updateTip(total_cpu);
 	return total_cpu;
 }
 
 pub fn doRefresh() void {
 	var count: i32 = 0;
-	const field: settings.SortField = if (g_prefs.tree_mode != 0) .name else g_prefs.field;
-	const desc: win32.BOOL = if (g_prefs.tree_mode != 0) 0 else g_prefs.desc[@intCast(@intFromEnum(g_prefs.field))];
-	const entries = process.snapshotProcesses(&g_snapshots, &count, field, desc);
+	const field: settings.SortField = if (state.prefs.tree_mode != 0) .name else state.prefs.field;
+	const desc: win32.BOOL = if (state.prefs.tree_mode != 0) 0 else state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))];
+	const entries = process.snapshotProcesses(&state.snapshots, &count, field, desc);
 	if (entries) |es| {
-		const total_cpu = if (g_prefs.tree_mode != 0) treeview.populate(es, count) else populateList(es, count);
+		const total_cpu = if (state.prefs.tree_mode != 0) treeview.populate(es, count) else populateList(es, count);
 		process.freeProcessEntries(es);
-		if (g_hwnd_status != null) {
+		if (state.hwnd_status != null) {
 			var cpu_w: i32 = @intFromFloat(total_cpu);
 			var cpu_f: i32 = @intFromFloat((total_cpu - @as(f64, @floatFromInt(cpu_w))) * 100 + 0.5);
 			if (cpu_f >= 100) {
@@ -414,7 +408,7 @@ pub fn doRefresh() void {
 			const t_f: i32 = @intCast((total % gib) * 10 / gib);
 			var status: [128:0]u16 = std.mem.zeroes([128:0]u16);
 			_ = win32.wnsprintfW(&status, 128, L("  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB"), count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f);
-			_ = win32.SendMessageW(g_hwnd_status, win32.SB_SETTEXTW, 0, @bitCast(@intFromPtr(&status)));
+			_ = win32.SendMessageW(state.hwnd_status, win32.SB_SETTEXTW, 0, @bitCast(@intFromPtr(&status)));
 		}
 	}
 }

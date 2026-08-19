@@ -3,55 +3,54 @@ const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
 const tray = @import("tray.zig");
 const process = @import("process.zig");
+const state = @import("state.zig");
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
 const MAX_EXPANDED = 512;
 
-extern var g_hwnd_tree: win32.HWND;
-
 fn tvGetItem(tvi: *win32.TVITEMW) void {
-	_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_GETITEMW, 0, @bitCast(@intFromPtr(tvi)));
+	_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_GETITEMW, 0, @bitCast(@intFromPtr(tvi)));
 }
 
 fn tvInsertItem(tvis: *win32.TVINSERTSTRUCTW) win32.HTREEITEM {
-	const r = win32.SendMessageW(g_hwnd_tree, win32.TVM_INSERTITEMW, 0, @bitCast(@intFromPtr(tvis)));
+	const r = win32.SendMessageW(state.hwnd_tree, win32.TVM_INSERTITEMW, 0, @bitCast(@intFromPtr(tvis)));
 	return @ptrFromInt(@as(usize, @bitCast(r)));
 }
 
 fn tvGetChild(item: win32.HTREEITEM) win32.HTREEITEM {
-	const r = win32.SendMessageW(g_hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_CHILD, @bitCast(@intFromPtr(item)));
+	const r = win32.SendMessageW(state.hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_CHILD, @bitCast(@intFromPtr(item)));
 	return @ptrFromInt(@as(usize, @bitCast(r)));
 }
 
 fn tvGetSibling(item: win32.HTREEITEM) win32.HTREEITEM {
-	const r = win32.SendMessageW(g_hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_NEXT, @bitCast(@intFromPtr(item)));
+	const r = win32.SendMessageW(state.hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_NEXT, @bitCast(@intFromPtr(item)));
 	return @ptrFromInt(@as(usize, @bitCast(r)));
 }
 
 fn tvGetRoot() win32.HTREEITEM {
-	const r = win32.SendMessageW(g_hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_ROOT, 0);
+	const r = win32.SendMessageW(state.hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_ROOT, 0);
 	return @ptrFromInt(@as(usize, @bitCast(r)));
 }
 
 fn tvGetSel() win32.HTREEITEM {
-	const r = win32.SendMessageW(g_hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_CARET, 0);
+	const r = win32.SendMessageW(state.hwnd_tree, win32.TVM_GETNEXTITEM, win32.TVGN_CARET, 0);
 	return @ptrFromInt(@as(usize, @bitCast(r)));
 }
 
 fn tvSelect(item: win32.HTREEITEM) void {
-	_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_SELECTITEM, win32.TVGN_CARET, @bitCast(@intFromPtr(item)));
+	_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_SELECTITEM, win32.TVGN_CARET, @bitCast(@intFromPtr(item)));
 }
 
 fn tvEnsureVisible(item: win32.HTREEITEM) void {
-	_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_ENSUREVISIBLE, 0, @bitCast(@intFromPtr(item)));
+	_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_ENSUREVISIBLE, 0, @bitCast(@intFromPtr(item)));
 }
 
 fn tvExpand(item: win32.HTREEITEM, flag: win32.WPARAM) void {
-	_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_EXPAND, flag, @bitCast(@intFromPtr(item)));
+	_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_EXPAND, flag, @bitCast(@intFromPtr(item)));
 }
 
 fn tvDeleteAll() void {
-	_ = win32.SendMessageW(g_hwnd_tree, win32.TVM_DELETEITEM, 0, @bitCast(@intFromPtr(win32.TVI_ROOT)));
+	_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_DELETEITEM, 0, @bitCast(@intFromPtr(win32.TVI_ROOT)));
 }
 
 var s_expanded_pids: [MAX_EXPANDED]win32.DWORD = std.mem.zeroes([MAX_EXPANDED]win32.DWORD);
@@ -166,7 +165,7 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	s_expanded_count = 0;
 	collectState(tvGetRoot());
 
-	_ = win32.SendMessageW(g_hwnd_tree, win32.WM_SETREDRAW, 0, 0);
+	_ = win32.SendMessageW(state.hwnd_tree, win32.WM_SETREDRAW, 0, 0);
 	tvDeleteAll();
 
 	const done_ptr = win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, @as(usize, @intCast(count)) * @sizeOf(win32.BOOL));
@@ -206,8 +205,8 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 		if (root != null) tvSelect(root);
 	}
 
-	_ = win32.SendMessageW(g_hwnd_tree, win32.WM_SETREDRAW, 1, 0);
-	_ = win32.InvalidateRect(g_hwnd_tree, null, 0);
+	_ = win32.SendMessageW(state.hwnd_tree, win32.WM_SETREDRAW, 1, 0);
+	_ = win32.InvalidateRect(state.hwnd_tree, null, 0);
 
 	var total: f64 = 0;
 	var i: i32 = 0;

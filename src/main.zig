@@ -5,6 +5,7 @@ const win32 = @import("win32.zig");
 // into the build - no need to reference the rest individually.
 const wndproc = @import("wndproc.zig");
 const resource = @import("resource.zig");
+const state = @import("state.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 // _fltused is required by the linker whenever floating point is used in a
@@ -47,7 +48,6 @@ export fn memmove(dest: ?*anyopaque, src: ?*const anyopaque, count: usize) callc
 	return dest;
 }
 
-pub export var g_mutex: win32.HANDLE = null;
 
 // Zig supplies its own minimal, CRT-less bootstrap before calling main() when
 // targeting windows with link_libc = false, so no hand written _start/entry
@@ -64,8 +64,8 @@ pub fn main() void {
 
 fn winMain(instance: win32.HINSTANCE, show: c_int) c_int {
 	const com_init = win32.CoInitializeEx(null, win32.COINIT_APARTMENTTHREADED | win32.COINIT_DISABLE_OLE1DDE);
-	g_mutex = win32.CreateMutexW(null, 1, L("Local\\TaskmonSingleInstance"));
-	const mutex = g_mutex;
+	state.mutex = win32.CreateMutexW(null, 1, L("Local\\TaskmonSingleInstance"));
+	const mutex = state.mutex;
 	if (win32.GetLastError() == win32.ERROR_ALREADY_EXISTS) {
 		const existing = win32.FindWindowW(&wndproc.CLASS_NAME, null);
 		if (existing != null) {
@@ -97,9 +97,9 @@ fn winMain(instance: win32.HINSTANCE, show: c_int) c_int {
 		_ = win32.MessageBoxW(null, L("Failed to create window."), L("Error"), win32.MB_ICONERROR);
 		return 1;
 	}
-	// WM_CREATE (fired synchronously above) loads g_prefs, so it already reflects
+	// WM_CREATE (fired synchronously above) loads state.prefs, so it already reflects
 	// the user's "start minimized to tray" choice by the time we get here.
-	if (wndproc.g_prefs.start_minimized_to_tray == 0) {
+	if (state.prefs.start_minimized_to_tray == 0) {
 		_ = win32.ShowWindow(hwnd, show);
 		_ = win32.UpdateWindow(hwnd);
 	}

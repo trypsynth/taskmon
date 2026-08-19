@@ -89,7 +89,7 @@ pub const ColumnDef = extern struct {
 pub const COL_COUNT: usize = 70;
 const REFRESH_OPTION_COUNT = 5;
 
-pub export const COLUMNS: [COL_COUNT]ColumnDef = columns: {
+pub const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	@setEvalBranchQuota(100_000);
 	break :columns .{
 	.{ .label = L("Name"), .header = L("Name"), .width = 260, .field = .name, .always_visible = 1, .default_visible = 1 },
@@ -165,8 +165,8 @@ pub export const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	};
 };
 
-pub export const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
-pub export const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
+pub const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
+pub const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
 
 pub const SortPrefs = extern struct {
 	field: SortField,
