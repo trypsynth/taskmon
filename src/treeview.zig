@@ -152,7 +152,6 @@ fn insertRoot(e: *pt.ProcessEntry, entries: [*]pt.ProcessEntry, count: i32, done
 }
 
 pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
-	// Save current UI state
 	const old_sel = tvGetSel();
 	s_selected_pid = 0;
 	if (old_sel != null) {
@@ -243,7 +242,6 @@ pub fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
 }
 
-// Returns the PID from the tree item currently selected, 0 if none
 pub fn getSelectedPid() win32.DWORD {
 	const sel = tvGetSel();
 	if (sel == null) return 0;
@@ -254,7 +252,6 @@ pub fn getSelectedPid() win32.DWORD {
 	return @intCast(tvi.lParam);
 }
 
-// Writes the text label of the selected tree item into buf (the process name)
 pub fn getSelectedName(buf: [*:0]u16, cch: i32) void {
 	buf[0] = 0;
 	const sel = tvGetSel();

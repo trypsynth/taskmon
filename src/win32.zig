@@ -1,5 +1,5 @@
-// Hand rolled, non zigwin32 Win32 bindings, grown incrementally as more of
-// taskmon is ported from C to Zig. Mirrors the approach used in ../sysinfo.
+// Hand rolled, non zigwin32 Win32 bindings. Mirrors the approach used in
+// ../sysinfo.
 const std = @import("std");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 

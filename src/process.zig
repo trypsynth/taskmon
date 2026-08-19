@@ -19,8 +19,8 @@ fn heapFree(ptr: ?*anyopaque) void {
 	_ = win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
-// Undocumented; hand mirrored from process.c's own local SPI struct (not from
-// any SDK header). Must stay byte-for-byte layout compatible with it.
+// Undocumented; not in any SDK header. Must stay byte-for-byte compatible
+// with what NtQuerySystemInformation(SystemProcessInformation) actually writes.
 const UNICODE_STRING = extern struct {
 	Length: u16,
 	MaximumLength: u16,
@@ -383,10 +383,10 @@ fn findSnapshot(snapshots: [*]pt.SnapshotEntry, pid: win32.DWORD) ?*pt.CpuSnapsh
 	return null;
 }
 
-// process_entry is large enough now that copying it by value risks overflowing
-// the no-CRT stack-probe-free frame budget (__chkstk isn't linkable here), so
-// swaps and the pivot copy go through explicit memcpy (never a struct-value
-// temporary) just like the original C.
+// ProcessEntry is large enough that copying it by value risks overflowing the
+// no-CRT stack-probe-free frame budget (__chkstk isn't linkable here), so
+// swaps and the pivot copy go through explicit memcpy, never a struct-value
+// temporary.
 fn swapEntries(a: *pt.ProcessEntry, b: *pt.ProcessEntry, scratch: *pt.ProcessEntry) void {
 	@memcpy(std.mem.asBytes(scratch), std.mem.asBytes(a));
 	@memcpy(std.mem.asBytes(a), std.mem.asBytes(b));

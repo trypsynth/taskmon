@@ -1,7 +1,6 @@
-// Mirrors the old process.h's process_entry/cpu_snapshot/snapshot_entry
-// layout (from the pre-Zig C version of this codebase); kept byte-for-byte
-// compatible since ProcessEntry is read back via NtQuerySystemInformation-
-// derived field-by-field assignment in process.zig.
+// These stay extern struct so process.zig's quicksort can swap/copy entries
+// with raw memcpy - a stable, declaration-order byte layout is required for
+// that, not just a convenient one.
 const win32 = @import("win32.zig");
 
 pub const SIZE_T = usize;

@@ -198,8 +198,8 @@ fn setCheckState(lv: win32.HWND, item: i32, check: bool) void {
 }
 
 // Only unchecked(1)/checked(2) state images are ever set by setCheckState
-// above, so comparing the extracted image index against 2 is equivalent to
-// the original C macro's "(state>>12)-1" trick without its underflow case.
+// above, so comparing the extracted image index against 2 (checked) is
+// sufficient - no need to handle any other state image index.
 fn getCheckState(lv: win32.HWND, item: i32) bool {
 	const state = win32.SendMessageW(lv, win32.LVM_GETITEMSTATE, @intCast(item), win32.LVIS_STATEIMAGEMASK);
 	const image_index: u32 = @as(u32, @intCast(state)) >> 12;

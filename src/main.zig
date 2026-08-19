@@ -48,10 +48,9 @@ export fn memmove(dest: ?*anyopaque, src: ?*const anyopaque, count: usize) callc
 	return dest;
 }
 
-
 // Zig supplies its own minimal, CRT-less bootstrap before calling main() when
 // targeting windows with link_libc = false, so no hand written _start/entry
-// symbol is needed here (unlike the old entry.c, which had to define one).
+// symbol is needed here.
 pub fn main() void {
 	const instance = win32.GetModuleHandleW(null);
 	var show: c_int = win32.SW_SHOWDEFAULT;
