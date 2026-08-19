@@ -5,6 +5,7 @@ const settings = @import("settings.zig");
 const theme = @import("theme.zig");
 const listview = @import("listview.zig");
 const state = @import("state.zig");
+const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
@@ -58,7 +59,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				state.prefs.field = settings.COLUMNS[cid].field;
 				var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 				const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-				_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
+				wfmt.format(&buf, 64, "%s (%s)", .{ settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
 				_ = win32.SetWindowTextW(state.sort_btns[@intCast(next)], &buf);
 				_ = win32.SendMessageW(state.sort_btns[@intCast(next)], win32.BM_SETCHECK, win32.BST_CHECKED, 0);
 				updateTabStop();
@@ -97,7 +98,7 @@ pub fn updateSortUi() void {
 		var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		if (active) {
 			const fi: usize = @intCast(@intFromEnum(state.prefs.field));
-			_ = win32.wnsprintfW(&buf, 64, L("%s (%s)"), settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")));
+			wfmt.format(&buf, 64, "%s (%s)", .{ settings.COLUMNS[cid].label, if (state.prefs.desc[fi]) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
 		} else {
 			_ = win32.lstrcpyW(&buf, settings.COLUMNS[cid].label);
 		}

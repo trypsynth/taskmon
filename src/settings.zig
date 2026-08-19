@@ -2,6 +2,7 @@ const std = @import("std");
 const win32 = @import("win32.zig");
 const resource = @import("resource.zig");
 const theme = @import("theme.zig");
+const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub const SortField = enum(i32) {
@@ -372,7 +373,7 @@ pub fn load(prefs: *SortPrefs) void {
 	while (i < COL_COUNT) : (i += 1) {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
-		_ = win32.wnsprintfW(&key, 64, L("%s_desc"), COLUMNS[i].label);
+		wfmt.format(&key, 64, "%s_desc", .{COLUMNS[i].label});
 		_ = win32.GetPrivateProfileStringW(L("sort"), &key, L("0"), &val, 4, &path);
 		prefs.desc[i] = val[0] == '1';
 	}
@@ -406,7 +407,7 @@ pub fn load(prefs: *SortPrefs) void {
 	while (i < COL_COUNT) : (i += 1) {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
-		_ = win32.wnsprintfW(&key, 64, L("%s_visible"), COLUMNS[i].label);
+		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});
 		var def: [2:0]u16 = .{ if (COLUMNS[i].default_visible) '1' else '0', 0 };
 		_ = win32.GetPrivateProfileStringW(L("columns"), &key, &def, &val, 4, &path);
 		prefs.visible[i] = COLUMNS[i].always_visible or val[0] == '1';
@@ -421,11 +422,11 @@ pub fn save(prefs: *const SortPrefs) void {
 		if (COLUMNS[i].field == prefs.field)
 			_ = win32.WritePrivateProfileStringW(L("sort"), L("field"), COLUMNS[i].label, &path);
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		_ = win32.wnsprintfW(&key, 64, L("%s_desc"), COLUMNS[i].label);
+		wfmt.format(&key, 64, "%s_desc", .{COLUMNS[i].label});
 		_ = win32.WritePrivateProfileStringW(L("sort"), &key, if (prefs.desc[i]) L("1") else L("0"), &path);
 	}
 	var ms_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	_ = win32.wnsprintfW(&ms_str, 16, L("%u"), prefs.refresh_ms);
+	wfmt.format(&ms_str, 16, "%u", .{prefs.refresh_ms});
 	_ = win32.WritePrivateProfileStringW(L("refresh"), L("interval_ms"), &ms_str, &path);
 	_ = win32.WritePrivateProfileStringW(L("confirm"), L("skip_kill"), if (prefs.skip_kill_confirm) L("1") else L("0"), &path);
 	_ = win32.WritePrivateProfileStringW(L("window"), L("always_on_top"), if (prefs.always_on_top) L("1") else L("0"), &path);
@@ -433,20 +434,20 @@ pub fn save(prefs: *const SortPrefs) void {
 	_ = win32.WritePrivateProfileStringW(L("window"), L("start_minimized_to_tray"), if (prefs.start_minimized_to_tray) L("1") else L("0"), &path);
 	if (prefs.window_width > 0) {
 		var pos_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
-		_ = win32.wnsprintfW(&pos_str, 16, L("%d"), prefs.window_left);
+		wfmt.format(&pos_str, 16, "%d", .{prefs.window_left});
 		_ = win32.WritePrivateProfileStringW(L("window"), L("left"), &pos_str, &path);
-		_ = win32.wnsprintfW(&pos_str, 16, L("%d"), prefs.window_top);
+		wfmt.format(&pos_str, 16, "%d", .{prefs.window_top});
 		_ = win32.WritePrivateProfileStringW(L("window"), L("top"), &pos_str, &path);
-		_ = win32.wnsprintfW(&pos_str, 16, L("%d"), prefs.window_width);
+		wfmt.format(&pos_str, 16, "%d", .{prefs.window_width});
 		_ = win32.WritePrivateProfileStringW(L("window"), L("width"), &pos_str, &path);
-		_ = win32.wnsprintfW(&pos_str, 16, L("%d"), prefs.window_height);
+		wfmt.format(&pos_str, 16, "%d", .{prefs.window_height});
 		_ = win32.WritePrivateProfileStringW(L("window"), L("height"), &pos_str, &path);
 	}
 	i = 0;
 	while (i < COL_COUNT) : (i += 1) {
 		if (COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		_ = win32.wnsprintfW(&key, 64, L("%s_visible"), COLUMNS[i].label);
+		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});
 		_ = win32.WritePrivateProfileStringW(L("columns"), &key, if (prefs.visible[i]) L("1") else L("0"), &path);
 	}
 }

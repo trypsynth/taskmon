@@ -2,6 +2,7 @@ const std = @import("std");
 const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
 const settings = @import("settings.zig");
+const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 fn asFn(comptime T: type, ptr: ?*anyopaque) ?T {
@@ -724,13 +725,13 @@ fn getProcessVersionInfo(path: [*:0]align(1) const u16, desc: [*:0]u16, desc_len
 				var subblock: [64:0]u16 = std.mem.zeroes([64:0]u16);
 				var value: ?*anyopaque = null;
 				var vlen: win32.UINT = 0;
-				_ = win32.wnsprintfW(&subblock, 64, L("\\StringFileInfo\\%04x%04x\\FileDescription"), lc.lang, lc.codepage);
+				wfmt.format(&subblock, 64, "\\StringFileInfo\\%04x%04x\\FileDescription", .{ lc.lang, lc.codepage });
 				if (win32.VerQueryValueW(data, &subblock, &value, &vlen) != 0) _ = win32.lstrcpynW(desc, @ptrCast(@alignCast(value.?)), desc_len);
-				_ = win32.wnsprintfW(&subblock, 64, L("\\StringFileInfo\\%04x%04x\\CompanyName"), lc.lang, lc.codepage);
+				wfmt.format(&subblock, 64, "\\StringFileInfo\\%04x%04x\\CompanyName", .{ lc.lang, lc.codepage });
 				if (win32.VerQueryValueW(data, &subblock, &value, &vlen) != 0) _ = win32.lstrcpynW(company, @ptrCast(@alignCast(value.?)), comp_len);
-				_ = win32.wnsprintfW(&subblock, 64, L("\\StringFileInfo\\%04x%04x\\FileVersion"), lc.lang, lc.codepage);
+				wfmt.format(&subblock, 64, "\\StringFileInfo\\%04x%04x\\FileVersion", .{ lc.lang, lc.codepage });
 				if (win32.VerQueryValueW(data, &subblock, &value, &vlen) != 0) _ = win32.lstrcpynW(file_ver, @ptrCast(@alignCast(value.?)), file_ver_len);
-				_ = win32.wnsprintfW(&subblock, 64, L("\\StringFileInfo\\%04x%04x\\ProductVersion"), lc.lang, lc.codepage);
+				wfmt.format(&subblock, 64, "\\StringFileInfo\\%04x%04x\\ProductVersion", .{ lc.lang, lc.codepage });
 				if (win32.VerQueryValueW(data, &subblock, &value, &vlen) != 0) _ = win32.lstrcpynW(product_ver, @ptrCast(@alignCast(value.?)), product_ver_len);
 			}
 		}

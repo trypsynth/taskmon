@@ -6,6 +6,7 @@ const tray = @import("tray.zig");
 const treeview = @import("treeview.zig");
 const process = @import("process.zig");
 const state = @import("state.zig");
+const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
@@ -16,7 +17,7 @@ fn formatDuration(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
 	const hours = total_secs / 3600;
 	const mins: win32.UINT = @intCast((total_secs % 3600) / 60);
 	const secs: win32.UINT = @intCast(total_secs % 60);
-	_ = win32.wnsprintfW(buf, len, L("%llu:%02u:%02u"), hours, mins, secs);
+	wfmt.format(buf, len, "%u:%02u:%02u", .{ hours, mins, secs });
 }
 
 // Deltas read as a change since the previous refresh, so they carry an explicit
@@ -28,14 +29,14 @@ fn formatByteDelta(delta: pt.LONGLONG, buf: [*:0]u16, len: i32) void {
 	}
 	var size: [64:0]u16 = std.mem.zeroes([64:0]u16);
 	_ = win32.StrFormatByteSizeW(if (delta < 0) -delta else delta, &size, 64);
-	_ = win32.wnsprintfW(buf, len, L("%s%s"), if (delta < 0) L("-") else L("+"), @as(win32.LPCWSTR, &size));
+	wfmt.format(buf, len, "%s%s", .{ if (delta < 0) L("-") else L("+"), @as(win32.LPCWSTR, &size) });
 }
 
 fn formatCountDelta(delta: i32, buf: [*:0]u16, len: i32) void {
 	if (delta == 0) {
 		buf[0] = 0;
 	} else {
-		_ = win32.wnsprintfW(buf, len, L("%s%d"), if (delta < 0) L("-") else L("+"), if (delta < 0) -delta else delta);
+		wfmt.format(buf, len, "%s%d", .{ if (delta < 0) L("-") else L("+"), if (delta < 0) -delta else delta });
 	}
 }
 
@@ -52,9 +53,9 @@ fn formatElapsed(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
 	const mins: win32.UINT = @intCast((total_secs % 3600) / 60);
 	const secs: win32.UINT = @intCast(total_secs % 60);
 	if (days != 0) {
-		_ = win32.wnsprintfW(buf, len, L("%llud %02u:%02u:%02u"), days, hours, mins, secs);
+		wfmt.format(buf, len, "%ud %02u:%02u:%02u", .{ days, hours, mins, secs });
 	} else {
-		_ = win32.wnsprintfW(buf, len, L("%02u:%02u:%02u"), hours, mins, secs);
+		wfmt.format(buf, len, "%02u:%02u:%02u", .{ hours, mins, secs });
 	}
 }
 
@@ -85,16 +86,16 @@ fn formatCycleRate(rate: f64, buf: [*:0]u16, len: i32) void {
 		frac = 0;
 	}
 	if (divisor == 1.0) {
-		_ = win32.wnsprintfW(buf, len, L("%u/s"), whole);
+		wfmt.format(buf, len, "%u/s", .{whole});
 	} else {
-		_ = win32.wnsprintfW(buf, len, L("%u.%02u%s/s"), whole, frac, suffix);
+		wfmt.format(buf, len, "%u.%02u%s/s", .{ whole, frac, suffix });
 	}
 }
 
 fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) void {
 	@setEvalBranchQuota(100_000);
 	switch (@as(settings.SortField, @enumFromInt(cid))) {
-		.pid => _ = win32.wnsprintfW(buf, len, L("%u"), e.pid),
+		.pid => wfmt.format(buf, len, "%u", .{e.pid}),
 		.cpu => {
 			var whole: i32 = @intFromFloat(e.cpu_percent);
 			var frac: i32 = @intFromFloat((e.cpu_percent - @as(f64, @floatFromInt(whole))) * 100 + 0.5);
@@ -102,11 +103,11 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 				whole += 1;
 				frac = 0;
 			}
-			_ = win32.wnsprintfW(buf, len, L("%d.%02d"), whole, frac);
+			wfmt.format(buf, len, "%d.%02d", .{ whole, frac });
 		},
 		.memory => _ = win32.StrFormatByteSizeW(@intCast(e.working_set), buf, @intCast(len)),
-		.threads => _ = win32.wnsprintfW(buf, len, L("%u"), e.threads),
-		.handles => _ = win32.wnsprintfW(buf, len, L("%u"), e.handles),
+		.threads => wfmt.format(buf, len, "%u", .{e.threads}),
+		.handles => wfmt.format(buf, len, "%u", .{e.handles}),
 		.priority => {
 			const label: win32.LPCWSTR = switch (e.base_priority) {
 				4 => L("Idle"),
@@ -116,7 +117,7 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 				13 => L("High"),
 				24 => L("Realtime"),
 				else => {
-					_ = win32.wnsprintfW(buf, len, L("%d"), e.base_priority);
+					wfmt.format(buf, len, "%d", .{e.base_priority});
 					return;
 				},
 			};
@@ -137,11 +138,11 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			_ = win32.FileTimeToSystemTime(&lft, &st);
 			win32.GetLocalTime(&now);
 			if (st.wYear == now.wYear and st.wMonth == now.wMonth and st.wDay == now.wDay)
-				_ = win32.wnsprintfW(buf, len, L("%02d:%02d:%02d"), st.wHour, st.wMinute, st.wSecond)
+				wfmt.format(buf, len, "%02d:%02d:%02d", .{ st.wHour, st.wMinute, st.wSecond })
 			else if (st.wYear == now.wYear)
-				_ = win32.wnsprintfW(buf, len, L("%02d/%02d %02d:%02d"), st.wMonth, st.wDay, st.wHour, st.wMinute)
+				wfmt.format(buf, len, "%02d/%02d %02d:%02d", .{ st.wMonth, st.wDay, st.wHour, st.wMinute })
 			else
-				_ = win32.wnsprintfW(buf, len, L("%02d/%02d/%04d %02d:%02d"), st.wMonth, st.wDay, st.wYear, st.wHour, st.wMinute);
+				wfmt.format(buf, len, "%02d/%02d/%04d %02d:%02d", .{ st.wMonth, st.wDay, st.wYear, st.wHour, st.wMinute });
 		},
 		.disk_io => {
 			if (e.disk_io_rate > 0) {
@@ -152,7 +153,7 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 		.private_bytes => _ = win32.StrFormatByteSizeW(@intCast(e.private_bytes), buf, @intCast(len)),
 		.page_faults => {
 			const pf: win32.UINT = @intFromFloat(e.page_faults_per_sec + 0.5);
-			if (pf > 0) _ = win32.wnsprintfW(buf, len, L("%u /s"), pf) else buf[0] = 0;
+			if (pf > 0) wfmt.format(buf, len, "%u /s", .{pf}) else buf[0] = 0;
 		},
 		.user => _ = win32.lstrcpynW(buf, @ptrCast(&e.user), len),
 		.cmdline => _ = win32.lstrcpynW(buf, @ptrCast(&e.cmdline), len),
@@ -168,14 +169,14 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			};
 			_ = win32.lstrcpynW(buf, label, len);
 		},
-		.session => _ = win32.wnsprintfW(buf, len, L("%u"), e.session_id),
+		.session => wfmt.format(buf, len, "%u", .{e.session_id}),
 		.peak_working_set => _ = win32.StrFormatByteSizeW(@intCast(e.peak_working_set), buf, @intCast(len)),
 		.virtual_mem => _ = win32.StrFormatByteSizeW(@intCast(e.virtual_size), buf, @intCast(len)),
 		.gdi_objects => {
-			if (e.gdi_objects != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.gdi_objects) else buf[0] = 0;
+			if (e.gdi_objects != 0) wfmt.format(buf, len, "%u", .{e.gdi_objects}) else buf[0] = 0;
 		},
 		.user_objects => {
-			if (e.user_objects != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.user_objects) else buf[0] = 0;
+			if (e.user_objects != 0) wfmt.format(buf, len, "%u", .{e.user_objects}) else buf[0] = 0;
 		},
 		.integrity => {
 			const label: ?win32.LPCWSTR = switch (e.integrity_level) {
@@ -188,10 +189,10 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 				0x5000 => L("Protected"),
 				else => null,
 			};
-			if (label) |l| _ = win32.lstrcpynW(buf, l, len) else _ = win32.wnsprintfW(buf, len, L("0x%04X"), e.integrity_level);
+			if (label) |l| _ = win32.lstrcpynW(buf, l, len) else wfmt.format(buf, len, "0x%04X", .{e.integrity_level});
 		},
 		.ppid => {
-			if (e.parent_pid != 0) _ = win32.wnsprintfW(buf, len, L("%u"), e.parent_pid) else buf[0] = 0;
+			if (e.parent_pid != 0) wfmt.format(buf, len, "%u", .{e.parent_pid}) else buf[0] = 0;
 		},
 		.private_ws => _ = win32.StrFormatByteSizeW(@intCast(e.private_working_set), buf, @intCast(len)),
 		.paged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.paged_pool), buf, @intCast(len)),
@@ -232,7 +233,7 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 				whole += 1;
 				frac = 0;
 			}
-			_ = win32.wnsprintfW(buf, len, L("%d.%02d"), whole, frac);
+			wfmt.format(buf, len, "%d.%02d", .{ whole, frac });
 		},
 		.gpu_memory => _ = win32.StrFormatByteSizeW(@intCast(e.gpu_memory), buf, @intCast(len)),
 		.cpu_time => formatDuration(e.cpu_time, buf, len),
@@ -249,18 +250,18 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 		.peak_private_bytes => _ = win32.StrFormatByteSizeW(@intCast(e.peak_private_bytes), buf, @intCast(len)),
 		.peak_paged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.peak_paged_pool), buf, @intCast(len)),
 		.peak_nonpaged_pool => _ = win32.StrFormatByteSizeW(@intCast(e.peak_non_paged_pool), buf, @intCast(len)),
-		.peak_threads => _ = win32.wnsprintfW(buf, len, L("%u"), e.peak_threads),
+		.peak_threads => wfmt.format(buf, len, "%u", .{e.peak_threads}),
 		.hard_faults => {
 			const hf: win32.UINT = @intFromFloat(e.hard_faults_per_sec + 0.5);
-			if (hf > 0) _ = win32.wnsprintfW(buf, len, L("%u /s"), hf) else buf[0] = 0;
+			if (hf > 0) wfmt.format(buf, len, "%u /s", .{hf}) else buf[0] = 0;
 		},
 		.cycles => formatCycleRate(e.cycles_per_sec, buf, len),
 		.kernel_time => formatDuration(e.kernel_time, buf, len),
 		.user_time => formatDuration(e.user_time, buf, len),
-		.total_page_faults => _ = win32.wnsprintfW(buf, len, L("%u"), e.total_page_faults),
-		.io_read_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_read_ops),
-		.io_write_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_write_ops),
-		.io_other_ops => _ = win32.wnsprintfW(buf, len, L("%llu"), e.io_other_ops),
+		.total_page_faults => wfmt.format(buf, len, "%u", .{e.total_page_faults}),
+		.io_read_ops => wfmt.format(buf, len, "%u", .{e.io_read_ops}),
+		.io_write_ops => wfmt.format(buf, len, "%u", .{e.io_write_ops}),
+		.io_other_ops => wfmt.format(buf, len, "%u", .{e.io_other_ops}),
 		.total_io => _ = win32.StrFormatByteSizeW(@intCast(e.total_io_bytes), buf, @intCast(len)),
 		.elapsed => formatElapsed(e.elapsed_time, buf, len),
 		.shared_ws => _ = win32.StrFormatByteSizeW(@intCast(e.shared_working_set), buf, @intCast(len)),
@@ -303,7 +304,7 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 			if (e.protection <= 0 or ptype == 0 or signer >= signers.len)
 				buf[0] = 0
 			else if (ptype == 1)
-				_ = win32.wnsprintfW(buf, len, L("%s-Light"), signers[@intCast(signer)])
+				wfmt.format(buf, len, "%s-Light", .{signers[@intCast(signer)]})
 			else
 				_ = win32.lstrcpynW(buf, signers[@intCast(signer)], len);
 		},
@@ -407,7 +408,7 @@ pub fn doRefresh() void {
 			const t_w: i32 = @intCast(total / gib);
 			const t_f: i32 = @intCast((total % gib) * 10 / gib);
 			var status: [128:0]u16 = std.mem.zeroes([128:0]u16);
-			_ = win32.wnsprintfW(&status, 128, L("  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB"), count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f);
+			wfmt.format(&status, 128, "  %d processes  |  CPU: %d.%02d%%  |  Memory: %d.%d / %d.%d GB", .{ count, cpu_w, cpu_f, iu_w, iu_f, t_w, t_f });
 			_ = win32.SendMessageW(state.hwnd_status, win32.SB_SETTEXTW, 0, @bitCast(@intFromPtr(&status)));
 		}
 	}

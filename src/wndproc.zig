@@ -11,6 +11,7 @@ const treeview = @import("treeview.zig");
 const listview = @import("listview.zig");
 const process = @import("process.zig");
 const state = @import("state.zig");
+const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 const ID_LISTVIEW = 105;
@@ -76,14 +77,14 @@ fn isElevated() bool {
 fn confirmEndTask(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
 	if (state.prefs.skip_kill_confirm) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
-	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u)?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
+	wfmt.format(&message, 512, "End \"%s\" (PID %u)?\n\nUnsaved data may be lost.", .{ if (name[0] != 0) name else L("this process"), pid });
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Task"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
 }
 
 fn confirmEndTree(hwnd: win32.HWND, name: [*:0]const u16, pid: win32.DWORD) bool {
 	if (state.prefs.skip_kill_confirm) return true;
 	var message: [512:0]u16 = std.mem.zeroes([512:0]u16);
-	_ = win32.wnsprintfW(&message, 512, L("End \"%s\" (PID %u) and all its descendant processes?\n\nUnsaved data may be lost."), if (name[0] != 0) name else L("this process"), pid);
+	wfmt.format(&message, 512, "End \"%s\" (PID %u) and all its descendant processes?\n\nUnsaved data may be lost.", .{ if (name[0] != 0) name else L("this process"), pid });
 	return win32.MessageBoxW(hwnd, &message, L("Confirm End Process Tree"), win32.MB_ICONQUESTION | win32.MB_YESNO | win32.MB_DEFBUTTON2) == win32.IDYES;
 }
 

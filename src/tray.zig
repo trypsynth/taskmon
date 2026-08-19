@@ -1,5 +1,6 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
+const wfmt = @import("wfmt.zig");
 
 var s_uid: win32.UINT = 1;
 var s_hwnd: win32.HWND = null;
@@ -48,9 +49,9 @@ pub fn updateTip(cpu_pct: f64) void {
 	if (mem_mb > 1024) {
 		const mem_gb_int: i32 = @divTrunc(mem_mb, 1024);
 		const mem_gb_frac: i32 = @divTrunc(@mod(mem_mb, 1024) * 100, 1024);
-		_ = win32.wnsprintfW(@ptrCast(&nid.szTip), 128, std.unicode.utf8ToUtf16LeStringLiteral("CPU %d.%02d%%, %d.%02d GB memory used"), cpu_whole, cpu_frac, mem_gb_int, mem_gb_frac);
+		wfmt.format(@ptrCast(&nid.szTip), 128, "CPU %d.%02d%%, %d.%02d GB memory used", .{ cpu_whole, cpu_frac, mem_gb_int, mem_gb_frac });
 	} else {
-		_ = win32.wnsprintfW(@ptrCast(&nid.szTip), 128, std.unicode.utf8ToUtf16LeStringLiteral("CPU %d.%02d%%, %d MB memory used"), cpu_whole, cpu_frac, mem_mb);
+		wfmt.format(@ptrCast(&nid.szTip), 128, "CPU %d.%02d%%, %d MB memory used", .{ cpu_whole, cpu_frac, mem_mb });
 	}
 	_ = win32.Shell_NotifyIconW(win32.NIM_MODIFY, &nid);
 }

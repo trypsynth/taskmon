@@ -146,7 +146,6 @@ pub extern "user32" fn LoadImageW(hInst: HINSTANCE, name: LPCWSTR, imgType: UINT
 pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: i32) callconv(.c) BOOL;
 pub extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.c) BOOL;
 pub extern "shell32" fn Shell_NotifyIconW(dwMessage: DWORD, lpData: *NOTIFYICONDATAW) callconv(.c) BOOL;
-pub extern "shlwapi" fn wnsprintfW(pszDest: [*:0]u16, cchDest: i32, pszFmt: LPCWSTR, ...) callconv(.c) i32;
 
 pub const WM_CHAR: UINT = 0x0102;
 pub const WM_INITDIALOG: UINT = 0x0110;
