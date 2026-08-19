@@ -1,3 +1,5 @@
+const win32 = @import("win32.zig");
+
 fn putChar(buf: [*]u16, pos: *i32, len: i32, c: u16) void {
 	if (pos.* < len - 1) {
 		buf[@intCast(pos.*)] = c;
@@ -5,7 +7,10 @@ fn putChar(buf: [*]u16, pos: *i32, len: i32, c: u16) void {
 	}
 }
 
-fn putStr(buf: [*]u16, pos: *i32, len: i32, s: anytype) void {
+// Takes the one concrete LPCWSTR type rather than anytype: every %s argument
+// coerces down to it at the call site, so this loop exists once instead of
+// once per distinct pointer type callers happened to pass.
+fn putStr(buf: [*]u16, pos: *i32, len: i32, s: win32.LPCWSTR) void {
 	var i: usize = 0;
 	while (s[i] != 0) : (i += 1) putChar(buf, pos, len, s[i]);
 }
