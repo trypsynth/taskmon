@@ -10,7 +10,7 @@ For a comprehensive user guide, including a full list of features and hotkeys, p
 
 To compile Taskmon from source, you need [Zig](https://ziglang.org/) installed and on your system path. No Visual Studio or Windows SDK install is required — Zig brings its own Windows headers and import libraries.
 
-Optionally, install [Pandoc](https://pandoc.org/) and [Inno Setup](https://jrsoftware.org/isinfo.php) to also build the HTML user manual and the Windows installer; both are auto-detected and skipped if not found.
+Optionally, install [Pandoc](https://pandoc.org/) and [NSIS](https://nsis.sourceforge.io/) to also build the HTML user manual and the Windows installer; both are auto-detected and skipped if not found.
 
 ## Building
 

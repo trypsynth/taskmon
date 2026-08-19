@@ -46,16 +46,16 @@ pub fn build(b: *std.Build) void {
 		const readme_html = doc_run.addOutputFileArg("readme.html");
 		b.getInstallStep().dependOn(&b.addInstallBinFile(readme_html, "readme.html").step);
 	}
-	if (b.findProgram(.{ .names = &.{"ISCC"} })) |iscc| {
+	if (b.findProgram(.{ .names = &.{"makensis"} })) |makensis| {
 		const arch = if (target.result.cpu.arch == .aarch64) "arm64" else "x64";
 		const version = b.graph.environ_map.get("TASKMON_VERSION") orelse "0.2.1";
-		const installer_run = b.addSystemCommand(&.{iscc});
+		const installer_run = b.addSystemCommand(&.{makensis});
 		installer_run.setCwd(b.path("installer"));
 		installer_run.addArg(b.fmt("/DMyAppArch={s}", .{arch}));
 		installer_run.addArg(b.fmt("/DMyAppVersion={s}", .{version}));
 		installer_run.addPrefixedDirectoryArg("/DSourceExeDir=", exe.getEmittedBinDirectory());
 		const installer_dir = installer_run.addPrefixedOutputDirectoryArg("/DMyOutputDir=", "installer");
-		installer_run.addFileArg(b.path("installer/taskmon.iss"));
+		installer_run.addFileArg(b.path("installer/taskmon.nsi"));
 		b.getInstallStep().dependOn(&b.addInstallDirectory(.{
 			.source_dir = installer_dir,
 			.install_dir = .bin,
