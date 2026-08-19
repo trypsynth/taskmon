@@ -3,6 +3,7 @@ const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
 const settings = @import("settings.zig");
 const wfmt = @import("wfmt.zig");
+const win32heap = @import("win32heap.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 fn asFn(comptime T: type, ptr: ?*anyopaque) ?T {
@@ -12,9 +13,6 @@ fn asFn(comptime T: type, ptr: ?*anyopaque) ?T {
 
 fn heapAlloc(size: usize) ?*anyopaque {
 	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
-}
-fn heapRealloc(ptr: ?*anyopaque, size: usize) ?*anyopaque {
-	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, size);
 }
 fn heapFree(ptr: ?*anyopaque) void {
 	_ = win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
@@ -262,13 +260,11 @@ fn getServicesForPid(pid: win32.DWORD, buf: [*:0]u16, len: i32) void {
 	}
 }
 
-const WinEntry = extern struct {
+const WinEntry = struct {
 	pid: win32.DWORD,
 	title: [128]u16,
 };
-var g_win_map: ?[*]WinEntry = null;
-var g_win_count: i32 = 0;
-var g_win_capacity: i32 = 0;
+var g_win_map: std.ArrayList(WinEntry) = .empty;
 
 fn enumWindowsProc(hwnd: win32.HWND, lparam: win32.LPARAM) callconv(.c) win32.BOOL {
 	_ = lparam;
@@ -280,49 +276,27 @@ fn enumWindowsProc(hwnd: win32.HWND, lparam: win32.LPARAM) callconv(.c) win32.BO
 	var pid: win32.DWORD = 0;
 	_ = win32.GetWindowThreadProcessId(hwnd, &pid);
 	if (pid == 0) return 1;
-	if (g_win_map) |map| {
-		for (0..@intCast(g_win_count)) |i| {
-			if (map[i].pid == pid) return 1; // keep the first (topmost z-order) window per pid
-		}
+	for (g_win_map.items) |entry| {
+		if (entry.pid == pid) return 1; // keep the first (topmost z-order) window per pid
 	}
-	if (g_win_count >= g_win_capacity) {
-		g_win_capacity = if (g_win_capacity != 0) g_win_capacity * 2 else 64;
-		if (heapRealloc(@ptrCast(g_win_map), @as(usize, @intCast(g_win_capacity)) * @sizeOf(WinEntry))) |new_map_raw| {
-			g_win_map = @ptrCast(@alignCast(new_map_raw));
-		} else {
-			g_win_capacity = 0;
-			g_win_count = 0;
-			return 0;
-		}
-	}
-	const map = g_win_map.?;
-	const idx: usize = @intCast(g_win_count);
-	map[idx].pid = pid;
-	_ = win32.lstrcpynW(@ptrCast(&map[idx].title), @ptrCast(&title), 128);
-	g_win_count += 1;
+	var entry: WinEntry = undefined;
+	entry.pid = pid;
+	_ = win32.lstrcpynW(@ptrCast(&entry.title), @ptrCast(&title), 128);
+	g_win_map.append(win32heap.allocator, entry) catch return 0;
 	return 1;
 }
 
 fn buildWindowMap() void {
-	g_win_count = 0;
-	if (g_win_map == null) {
-		// heap_realloc is HeapReAlloc, which (unlike CRT realloc) requires a
-		// real existing block, so seed one here; otherwise growth in the
-		// callback would call it with NULL.
-		g_win_capacity = 64;
-		const raw = heapAlloc(@as(usize, @intCast(g_win_capacity)) * @sizeOf(WinEntry));
-		g_win_map = if (raw) |r| @ptrCast(@alignCast(r)) else null;
-	}
+	g_win_map.clearRetainingCapacity();
 	_ = win32.EnumWindows(enumWindowsProc, 0);
 }
 
 fn getWindowTitleForPid(pid: win32.DWORD, buf: [*:0]u16, len: i32) void {
 	buf[0] = 0;
 	if (pid == 0) return;
-	const map = g_win_map orelse return;
-	for (0..@intCast(g_win_count)) |i| {
-		if (map[i].pid == pid) {
-			_ = win32.lstrcpynW(buf, @ptrCast(&map[i].title), len);
+	for (g_win_map.items) |entry| {
+		if (entry.pid == pid) {
+			_ = win32.lstrcpynW(buf, @ptrCast(&entry.title), len);
 			return;
 		}
 	}
@@ -877,18 +851,18 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 	const now_ticks: u64 = (@as(u64, now_ft.dwHighDateTime) << 32) | now_ft.dwLowDateTime;
 	var buf_size: win32.ULONG = 0;
 	const buf = queryAllProcesses(&buf_size) orelse return null;
-	var capacity: i32 = 256;
-	var count: i32 = 0;
-	const entries_raw = heapAlloc(@as(usize, @intCast(capacity)) * @sizeOf(pt.ProcessEntry));
 	const hi_raw = heapAlloc(@sizeOf(HandleInfo));
-	if (entries_raw == null or hi_raw == null) {
+	if (hi_raw == null) {
 		heapFree(buf);
-		heapFree(entries_raw);
-		heapFree(hi_raw);
 		return null;
 	}
-	var entries: [*]pt.ProcessEntry = @ptrCast(@alignCast(entries_raw.?));
 	const hi: *HandleInfo = @ptrCast(@alignCast(hi_raw.?));
+	var entries: std.ArrayList(pt.ProcessEntry) = .empty;
+	entries.ensureTotalCapacityPrecise(win32heap.allocator, 256) catch {
+		heapFree(buf);
+		heapFree(hi);
+		return null;
+	};
 	const old_snaps_raw = heapAlloc(pt.SNAPSHOT_CAPACITY * @sizeOf(pt.SnapshotEntry));
 	const old_snaps: [*]pt.SnapshotEntry = @ptrCast(@alignCast(old_snaps_raw.?));
 	@memcpy(std.mem.sliceAsBytes(old_snaps[0..pt.SNAPSHOT_CAPACITY]), std.mem.sliceAsBytes(snapshots[0..pt.SNAPSHOT_CAPACITY]));
@@ -897,13 +871,9 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 	while (true) {
 		const spi: *const SystemProcessInformation = @ptrCast(@alignCast(p));
 		const pid: win32.DWORD = @truncate(@intFromPtr(spi.UniqueProcessId));
-		if (count >= capacity) {
-			capacity *= 2;
-			const new_entries = heapRealloc(@ptrCast(entries), @as(usize, @intCast(capacity)) * @sizeOf(pt.ProcessEntry));
-			entries = @ptrCast(@alignCast(new_entries.?));
-		}
-		const e = &entries[@intCast(count)];
-		count += 1;
+		// Out of memory mid-enumeration: stop here and work with what we have
+		// rather than crash: partial process data beats no process data.
+		const e = entries.addOne(win32heap.allocator) catch break;
 		e.pid = pid;
 		e.parent_pid = @truncate(@intFromPtr(spi.InheritedFromUniqueProcessId));
 		e.cpu_percent = 0.0;
@@ -1043,22 +1013,24 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 	// Resolve parent names now that every entry is known. A recycled PID can
 	// point at a process that started after its supposed child, in which case
 	// the real parent is gone rather than whatever now holds the PID.
-	for (0..@intCast(count)) |ei| {
-		entries[ei].parent_name[0] = 0;
-		const ppid = entries[ei].parent_pid;
-		if (ppid != 0 and ppid != entries[ei].pid) {
-			for (0..@intCast(count)) |ej| {
-				if (entries[ej].pid != ppid) continue;
-				if (entries[ej].start_time <= entries[ei].start_time)
-					_ = win32.lstrcpynW(@ptrCast(&entries[ei].parent_name), @ptrCast(&entries[ej].name), 64);
+	const es = entries.items;
+	for (0..es.len) |ei| {
+		es[ei].parent_name[0] = 0;
+		const ppid = es[ei].parent_pid;
+		if (ppid != 0 and ppid != es[ei].pid) {
+			for (0..es.len) |ej| {
+				if (es[ej].pid != ppid) continue;
+				if (es[ej].start_time <= es[ei].start_time)
+					_ = win32.lstrcpynW(@ptrCast(&es[ei].parent_name), @ptrCast(&es[ej].name), 64);
 				break;
 			}
 		}
-		if (entries[ei].parent_name[0] == 0) _ = win32.lstrcpynW(@ptrCast(&entries[ei].parent_name), L("(exited)"), 64);
+		if (es[ei].parent_name[0] == 0) _ = win32.lstrcpynW(@ptrCast(&es[ei].parent_name), L("(exited)"), 64);
 	}
-	quicksort(entries, 0, count - 1, field, descending);
+	const count: i32 = @intCast(es.len);
+	quicksort(es.ptr, 0, count - 1, field, descending);
 	out_count.* = count;
-	return entries;
+	return es.ptr;
 }
 
 pub fn freeProcessEntries(entries: ?[*]pt.ProcessEntry) void {
