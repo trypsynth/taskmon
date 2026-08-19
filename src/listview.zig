@@ -21,7 +21,7 @@ fn formatDuration(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
 }
 
 // Deltas read as a change since the previous refresh, so they carry an explicit
-// sign and go blank when nothing moved. wnsprintf has no '+' flag of its own.
+// sign and go blank when nothing moved. wfmt has no '+' flag of its own.
 fn formatByteDelta(delta: pt.LONGLONG, buf: [*:0]u16, len: i32) void {
 	if (delta == 0) {
 		buf[0] = 0;
@@ -335,24 +335,22 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	var total_cpu: f64 = 0;
 	var new_selected_idx: i32 = -1;
 	var new_top_idx: i32 = -1;
-	var i: i32 = 0;
-	while (i < count) : (i += 1) {
-		const e = &entries[@intCast(i)];
+	for (0..@intCast(count)) |i| {
+		const e = &entries[i];
 		if (e.pid != 0) total_cpu += e.cpu_percent;
 		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 		lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
-		lvi.iItem = i;
+		lvi.iItem = @intCast(i);
 		lvi.pszText = @ptrCast(&e.name);
 		lvi.lParam = @intCast(e.pid);
 		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-		if (e.pid == selected_pid) new_selected_idx = i;
-		if (e.pid == top_pid) new_top_idx = i;
+		if (e.pid == selected_pid) new_selected_idx = @intCast(i);
+		if (e.pid == top_pid) new_top_idx = @intCast(i);
 		var buf: [300:0]u16 = std.mem.zeroes([300:0]u16);
-		var col: i32 = 1;
-		while (col < state.sort_btn_count) : (col += 1) {
-			formatColumn(e, state.sort_btn_cols[@intCast(col)], &buf, 300);
+		for (1..@intCast(state.sort_btn_count)) |col| {
+			formatColumn(e, state.sort_btn_cols[col], &buf, 300);
 			var set_lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-			set_lvi.iSubItem = col;
+			set_lvi.iSubItem = @intCast(col);
 			set_lvi.pszText = &buf;
 			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMTEXTW, @intCast(i), @bitCast(@intFromPtr(&set_lvi)));
 		}

@@ -1,8 +1,5 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
-// wndproc.zig itself imports theme/tray/settings/run/sortbar/treeview/
-// listview/process, so importing it here is enough to pull all of them
-// into the build - no need to reference the rest individually.
 const wndproc = @import("wndproc.zig");
 const resource = @import("resource.zig");
 const state = @import("state.zig");
@@ -19,16 +16,14 @@ export var _fltused: c_int = 0x9875;
 export fn memset(dest: ?*anyopaque, c: c_int, count: usize) callconv(.c) ?*anyopaque {
 	const d: [*]volatile u8 = @ptrCast(dest.?);
 	const byte: u8 = @truncate(@as(c_uint, @bitCast(c)));
-	var i: usize = 0;
-	while (i < count) : (i += 1) d[i] = byte;
+	for (0..count) |i| d[i] = byte;
 	return dest;
 }
 
 export fn memcpy(dest: ?*anyopaque, src: ?*const anyopaque, count: usize) callconv(.c) ?*anyopaque {
 	const d: [*]volatile u8 = @ptrCast(dest.?);
 	const s: [*]const volatile u8 = @ptrCast(src.?);
-	var i: usize = 0;
-	while (i < count) : (i += 1) d[i] = s[i];
+	for (0..count) |i| d[i] = s[i];
 	return dest;
 }
 
@@ -36,8 +31,7 @@ export fn memmove(dest: ?*anyopaque, src: ?*const anyopaque, count: usize) callc
 	const d: [*]volatile u8 = @ptrCast(dest.?);
 	const s: [*]const volatile u8 = @ptrCast(src.?);
 	if (@intFromPtr(d) < @intFromPtr(s)) {
-		var i: usize = 0;
-		while (i < count) : (i += 1) d[i] = s[i];
+		for (0..count) |i| d[i] = s[i];
 	} else {
 		var i: usize = count;
 		while (i > 0) {

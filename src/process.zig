@@ -170,8 +170,7 @@ fn accumulateCounterArray(counter: win32.PDH_HCOUNTER, format: win32.DWORD, is_p
 	const items: [*]win32.PDH_FMT_COUNTERVALUE_ITEM_W = @ptrCast(@alignCast(items_raw));
 	st = win32.PdhGetFormattedCounterArrayW(counter, format, &buf_size, &item_count, items);
 	if (st == 0) {
-		var i: win32.DWORD = 0;
-		while (i < item_count) : (i += 1) {
+		for (0..item_count) |i| {
 			const name = items[i].szName orelse continue;
 			const pid = parsePidFromInstance(name);
 			if (pid == 0) continue;
@@ -223,8 +222,7 @@ fn buildServiceMap() void {
 			const map: [*]SvcEntry = @ptrCast(@alignCast(map_raw));
 			g_svc_map = map;
 			const sv: [*]win32.ENUM_SERVICE_STATUS_PROCESSW = @ptrCast(@alignCast(buf));
-			var i: win32.DWORD = 0;
-			while (i < count) : (i += 1) {
+			for (0..count) |i| {
 				const pid = sv[i].ServiceStatusProcess.dwProcessId;
 				if (pid == 0) continue;
 				const idx: usize = @intCast(g_svc_count);
@@ -243,19 +241,19 @@ fn getServicesForPid(pid: win32.DWORD, buf: [*:0]u16, len: i32) void {
 	const map = g_svc_map orelse return;
 	if (pid == 0) return;
 	var pos: i32 = 0;
-	var i: i32 = 0;
-	while (i < g_svc_count and pos < len - 1) : (i += 1) {
-		if (map[@intCast(i)].pid != pid) continue;
+	for (0..@intCast(g_svc_count)) |i| {
+		if (pos >= len - 1) break;
+		if (map[i].pid != pid) continue;
 		if (pos > 0 and pos + 2 < len) {
 			buf[@intCast(pos)] = ';';
 			pos += 1;
 			buf[@intCast(pos)] = ' ';
 			pos += 1;
 		}
-		var nlen: i32 = win32.lstrlenW(@ptrCast(&map[@intCast(i)].name));
+		var nlen: i32 = win32.lstrlenW(@ptrCast(&map[i].name));
 		if (pos + nlen >= len) nlen = len - pos - 1;
 		if (nlen > 0) {
-			const src: [*]const u16 = @ptrCast(&map[@intCast(i)].name);
+			const src: [*]const u16 = @ptrCast(&map[i].name);
 			var k: i32 = 0;
 			while (k < nlen) : (k += 1) buf[@intCast(pos + k)] = src[@intCast(k)];
 			pos += nlen;
@@ -283,9 +281,8 @@ fn enumWindowsProc(hwnd: win32.HWND, lparam: win32.LPARAM) callconv(.c) win32.BO
 	_ = win32.GetWindowThreadProcessId(hwnd, &pid);
 	if (pid == 0) return 1;
 	if (g_win_map) |map| {
-		var i: i32 = 0;
-		while (i < g_win_count) : (i += 1) {
-			if (map[@intCast(i)].pid == pid) return 1; // keep the first (topmost z-order) window per pid
+		for (0..@intCast(g_win_count)) |i| {
+			if (map[i].pid == pid) return 1; // keep the first (topmost z-order) window per pid
 		}
 	}
 	if (g_win_count >= g_win_capacity) {
@@ -323,10 +320,9 @@ fn getWindowTitleForPid(pid: win32.DWORD, buf: [*:0]u16, len: i32) void {
 	buf[0] = 0;
 	if (pid == 0) return;
 	const map = g_win_map orelse return;
-	var i: i32 = 0;
-	while (i < g_win_count) : (i += 1) {
-		if (map[@intCast(i)].pid == pid) {
-			_ = win32.lstrcpynW(buf, @ptrCast(&map[@intCast(i)].title), len);
+	for (0..@intCast(g_win_count)) |i| {
+		if (map[i].pid == pid) {
+			_ = win32.lstrcpynW(buf, @ptrCast(&map[i].title), len);
 			return;
 		}
 	}
@@ -693,8 +689,7 @@ fn getProcessCmdline(h: win32.HANDLE, buf: [*:0]u16, len: i32) void {
 				var wlen: i32 = @intCast(us.Length / 2);
 				if (wlen >= len) wlen = len - 1;
 				const src = us.Buffer.?;
-				var k: i32 = 0;
-				while (k < wlen) : (k += 1) buf[@intCast(k)] = src[@intCast(k)];
+				for (0..@intCast(wlen)) |k| buf[k] = src[k];
 				buf[@intCast(wlen)] = 0;
 			}
 		}
@@ -975,8 +970,7 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 			var len: i32 = @intCast(spi.ImageName.Length / 2);
 			if (len > 63) len = 63;
 			const src = spi.ImageName.Buffer.?;
-			var k: i32 = 0;
-			while (k < len) : (k += 1) e.name[@intCast(k)] = src[@intCast(k)];
+			for (0..@intCast(len)) |k| e.name[k] = src[k];
 			e.name[@intCast(len)] = 0;
 		} else {
 			_ = win32.lstrcpyW(@ptrCast(&e.name), L("(unknown)"));
@@ -1049,15 +1043,11 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 	// Resolve parent names now that every entry is known. A recycled PID can
 	// point at a process that started after its supposed child, in which case
 	// the real parent is gone rather than whatever now holds the PID.
-	var i: i32 = 0;
-	while (i < count) : (i += 1) {
-		const ei: usize = @intCast(i);
+	for (0..@intCast(count)) |ei| {
 		entries[ei].parent_name[0] = 0;
 		const ppid = entries[ei].parent_pid;
 		if (ppid != 0 and ppid != entries[ei].pid) {
-			var j: i32 = 0;
-			while (j < count) : (j += 1) {
-				const ej: usize = @intCast(j);
+			for (0..@intCast(count)) |ej| {
 				if (entries[ej].pid != ppid) continue;
 				if (entries[ej].start_time <= entries[ei].start_time)
 					_ = win32.lstrcpynW(@ptrCast(&entries[ei].parent_name), @ptrCast(&entries[ej].name), 64);
@@ -1093,68 +1083,66 @@ pub fn getProcessPath(pid: win32.DWORD, path: [*:0]u16, size_in: win32.DWORD) vo
 	_ = win32.CloseHandle(h);
 }
 
-pub fn terminateProcess(pid: win32.DWORD) win32.BOOL {
+pub fn terminateProcess(pid: win32.DWORD) bool {
 	const h = win32.OpenProcess(win32.PROCESS_TERMINATE, 0, pid);
-	if (h == null) return 0;
-	const success = win32.TerminateProcess(h, 1);
+	if (h == null) return false;
+	const success = win32.TerminateProcess(h, 1) != 0;
 	_ = win32.CloseHandle(h);
 	return success;
 }
 
-pub fn isProcessSuspended(pid: win32.DWORD) win32.BOOL {
-	var i: i32 = 0;
-	while (i < g_suspended_count) : (i += 1) {
-		if (g_suspended_pids[@intCast(i)] == pid) return 1;
+pub fn isProcessSuspended(pid: win32.DWORD) bool {
+	for (0..@intCast(g_suspended_count)) |i| {
+		if (g_suspended_pids[i] == pid) return true;
 	}
-	return 0;
+	return false;
 }
 
 var g_nt_suspend_fn: ?FnNtProc = null;
 
-pub fn suspendProcess(pid: win32.DWORD) win32.BOOL {
+pub fn suspendProcess(pid: win32.DWORD) bool {
 	if (g_nt_suspend_fn == null) {
 		g_nt_suspend_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtSuspendProcess"));
 	}
-	const fn_ptr = g_nt_suspend_fn orelse return 0;
+	const fn_ptr = g_nt_suspend_fn orelse return false;
 	const h = win32.OpenProcess(win32.PROCESS_SUSPEND_RESUME, 0, pid);
-	if (h == null) return 0;
+	if (h == null) return false;
 	const ok = fn_ptr(h) >= 0;
 	_ = win32.CloseHandle(h);
 	if (ok and g_suspended_count < pt.SNAPSHOT_CAPACITY) {
 		g_suspended_pids[@intCast(g_suspended_count)] = pid;
 		g_suspended_count += 1;
 	}
-	return if (ok) 1 else 0;
+	return ok;
 }
 
 var g_nt_resume_fn: ?FnNtProc = null;
 
-pub fn resumeProcess(pid: win32.DWORD) win32.BOOL {
+pub fn resumeProcess(pid: win32.DWORD) bool {
 	if (g_nt_resume_fn == null) {
 		g_nt_resume_fn = asFn(FnNtProc, win32.GetProcAddress(win32.GetModuleHandleW(L("ntdll.dll")), "NtResumeProcess"));
 	}
-	const fn_ptr = g_nt_resume_fn orelse return 0;
+	const fn_ptr = g_nt_resume_fn orelse return false;
 	const h = win32.OpenProcess(win32.PROCESS_SUSPEND_RESUME, 0, pid);
-	if (h == null) return 0;
+	if (h == null) return false;
 	const ok = fn_ptr(h) >= 0;
 	_ = win32.CloseHandle(h);
 	if (ok) {
-		var i: i32 = 0;
-		while (i < g_suspended_count) : (i += 1) {
-			if (g_suspended_pids[@intCast(i)] == pid) {
+		for (0..@intCast(g_suspended_count)) |i| {
+			if (g_suspended_pids[i] == pid) {
 				g_suspended_count -= 1;
-				g_suspended_pids[@intCast(i)] = g_suspended_pids[@intCast(g_suspended_count)];
+				g_suspended_pids[i] = g_suspended_pids[@intCast(g_suspended_count)];
 				break;
 			}
 		}
 	}
-	return if (ok) 1 else 0;
+	return ok;
 }
 
-pub fn setProcessPriority(pid: win32.DWORD, priority_class: win32.DWORD) win32.BOOL {
+pub fn setProcessPriority(pid: win32.DWORD, priority_class: win32.DWORD) bool {
 	const h = win32.OpenProcess(win32.PROCESS_SET_INFORMATION, 0, pid);
-	if (h == null) return 0;
-	const success = win32.SetPriorityClass(h, priority_class);
+	if (h == null) return false;
+	const success = win32.SetPriorityClass(h, priority_class) != 0;
 	_ = win32.CloseHandle(h);
 	return success;
 }

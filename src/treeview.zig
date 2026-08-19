@@ -96,9 +96,8 @@ fn restoreExpanded(item_in: win32.HTREEITEM) void {
 		tvi.mask = win32.TVIF_PARAM;
 		tvi.hItem = item;
 		tvGetItem(&tvi);
-		var i: i32 = 0;
-		while (i < s_expanded_count) : (i += 1) {
-			if (s_expanded_pids[@intCast(i)] == @as(win32.DWORD, @intCast(tvi.lParam))) {
+		for (0..@intCast(s_expanded_count)) |i| {
+			if (s_expanded_pids[i] == @as(win32.DWORD, @intCast(tvi.lParam))) {
 				tvExpand(item, win32.TVE_EXPAND);
 				break;
 			}
@@ -116,17 +115,14 @@ fn isParentOf(parent: *const pt.ProcessEntry, child: *const pt.ProcessEntry) boo
 }
 
 fn hasLiveParent(child: *const pt.ProcessEntry, entries: [*]const pt.ProcessEntry, count: i32) bool {
-	var i: i32 = 0;
-	while (i < count) : (i += 1) {
-		if (isParentOf(&entries[@intCast(i)], child)) return true;
+	for (0..@intCast(count)) |i| {
+		if (isParentOf(&entries[i], child)) return true;
 	}
 	return false;
 }
 
 fn insertChildren(parent: win32.HTREEITEM, parent_entry: *const pt.ProcessEntry, entries: [*]pt.ProcessEntry, count: i32, done: [*]win32.BOOL) void {
-	var i: i32 = 0;
-	while (i < count) : (i += 1) {
-		const idx: usize = @intCast(i);
+	for (0..@intCast(count)) |idx| {
 		if (done[idx] != 0 or !isParentOf(parent_entry, &entries[idx])) continue;
 		done[idx] = 1;
 		var tvis: win32.TVINSERTSTRUCTW = std.mem.zeroes(win32.TVINSERTSTRUCTW);
@@ -171,9 +167,7 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	if (done_ptr) |raw_done| {
 		const done: [*]win32.BOOL = @ptrCast(@alignCast(raw_done));
 		// Roots: parent is zero, self-referential, or already gone
-		var i: i32 = 0;
-		while (i < count) : (i += 1) {
-			const idx: usize = @intCast(i);
+		for (0..@intCast(count)) |idx| {
 			if (done[idx] != 0) continue;
 			const ppid = entries[idx].parent_pid;
 			if (ppid == 0 or ppid == entries[idx].pid or !hasLiveParent(&entries[idx], entries, count)) {
@@ -182,9 +176,7 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 			}
 		}
 		// Orphaned/cycle entries become roots too
-		i = 0;
-		while (i < count) : (i += 1) {
-			const idx: usize = @intCast(i);
+		for (0..@intCast(count)) |idx| {
 			if (done[idx] == 0) {
 				done[idx] = 1;
 				insertRoot(&entries[idx], entries, count, done);
@@ -208,9 +200,8 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	_ = win32.InvalidateRect(state.hwnd_tree, null, 0);
 
 	var total: f64 = 0;
-	var i: i32 = 0;
-	while (i < count) : (i += 1) {
-		if (entries[@intCast(i)].pid != 0) total += entries[@intCast(i)].cpu_percent;
+	for (0..@intCast(count)) |i| {
+		if (entries[i].pid != 0) total += entries[i].cpu_percent;
 	}
 	tray.updateTip(total);
 	return total;

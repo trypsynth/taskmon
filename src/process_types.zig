@@ -31,7 +31,7 @@ pub const ProcessEntry = extern struct {
 	handles: win32.DWORD,
 	start_time: ULONGLONG,
 	base_priority: i32,
-	suspended: win32.BOOL,
+	suspended: bool,
 	disk_io_rate: f64,
 	io_read_rate: f64,
 	io_write_rate: f64,

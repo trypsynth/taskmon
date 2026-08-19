@@ -223,10 +223,9 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 			const combo = win32.GetDlgItem(hdlg, resource.IDC_REFRESH_COMBO);
 			_ = win32.SetWindowTheme(combo, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 			var sel: i32 = 0;
-			var i: i32 = 0;
-			while (i < REFRESH_OPTION_COUNT) : (i += 1) {
-				_ = win32.SendMessageW(combo, win32.CB_ADDSTRING, 0, @bitCast(@intFromPtr(REFRESH_LABELS[@intCast(i)])));
-				if (REFRESH_MS[@intCast(i)] == data.refresh_ms) sel = i;
+			for (0..REFRESH_OPTION_COUNT) |i| {
+				_ = win32.SendMessageW(combo, win32.CB_ADDSTRING, 0, @bitCast(@intFromPtr(REFRESH_LABELS[i])));
+				if (REFRESH_MS[i] == data.refresh_ms) sel = @intCast(i);
 			}
 			_ = win32.SendMessageW(combo, win32.CB_SETCURSEL, @intCast(sel), 0);
 			const font = win32.SendMessageW(hdlg, win32.WM_GETFONT, 0, 0);
@@ -238,15 +237,13 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 			lvc.cx = 1000;
 			_ = win32.SendMessageW(lv, win32.LVM_INSERTCOLUMNW, 0, @bitCast(@intFromPtr(&lvc)));
 			var j: i32 = 0;
-			i = 0;
-			while (i < COL_COUNT) : (i += 1) {
-				const ci: usize = @intCast(i);
+			for (0..COL_COUNT) |ci| {
 				if (COLUMNS[ci].always_visible) continue;
 				var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 				lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
 				lvi.iItem = j;
 				lvi.pszText = @constCast(COLUMNS[ci].label);
-				lvi.lParam = i;
+				lvi.lParam = @intCast(ci);
 				_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 				setCheckState(lv, lvi.iItem, data.visible[ci]);
 				j += 1;
@@ -281,14 +278,13 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 				data.refresh_ms = if (sel >= 0 and sel < REFRESH_OPTION_COUNT) REFRESH_MS[@intCast(sel)] else 0;
 				const lv = win32.GetDlgItem(hdlg, resource.IDC_COL_LIST);
 				const lv_count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
-				var j: i32 = 0;
-				while (j < lv_count) : (j += 1) {
+				for (0..@intCast(lv_count)) |j| {
 					var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 					lvi2.mask = win32.LVIF_PARAM;
-					lvi2.iItem = j;
+					lvi2.iItem = @intCast(j);
 					_ = win32.SendMessageW(lv, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
 					const idx: usize = @intCast(lvi2.lParam);
-					data.visible[idx] = getCheckState(lv, j);
+					data.visible[idx] = getCheckState(lv, @intCast(j));
 				}
 				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
 				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
@@ -316,15 +312,13 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const bool, current_skip_confirm: bool, current_start_minimized: bool, out_ms: *win32.UINT, out_visible: [*]bool, out_skip_confirm: *bool, out_start_minimized: *bool) bool {
 	var data: SettingsDlgData = undefined;
 	data.refresh_ms = current_ms;
-	var i: usize = 0;
-	while (i < COL_COUNT) : (i += 1) data.visible[i] = current_visible[i];
+	for (0..COL_COUNT) |i| data.visible[i] = current_visible[i];
 	data.skip_kill_confirm = current_skip_confirm;
 	data.start_minimized_to_tray = current_start_minimized;
 	const result = win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_SETTINGS), parent, settingsDlgProc, @bitCast(@intFromPtr(&data)));
 	if (result == 0) return false;
 	out_ms.* = data.refresh_ms;
-	i = 0;
-	while (i < COL_COUNT) : (i += 1) out_visible[i] = data.visible[i];
+	for (0..COL_COUNT) |i| out_visible[i] = data.visible[i];
 	out_skip_confirm.* = data.skip_kill_confirm;
 	out_start_minimized.* = data.start_minimized_to_tray;
 	return true;
@@ -355,22 +349,19 @@ pub fn load(prefs: *SortPrefs) void {
 	getIniPath(&path);
 	prefs.field = .name;
 	prefs.refresh_ms = 0;
-	var i: usize = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		prefs.desc[i] = false;
 		prefs.visible[i] = COLUMNS[i].always_visible;
 	}
 	var field_buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("sort"), L("field"), COLUMNS[0].label, &field_buf, 64, &path);
-	i = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		if (win32.StrCmpIW(&field_buf, COLUMNS[i].label) == 0) {
 			prefs.field = COLUMNS[i].field;
 			break;
 		}
 	}
-	i = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
 		wfmt.format(&key, 64, "%s_desc", .{COLUMNS[i].label});
@@ -403,8 +394,7 @@ pub fn load(prefs: *SortPrefs) void {
 		_ = win32.GetPrivateProfileStringW(L("window"), L("top"), L("0"), &pos_buf, 16, &path);
 		prefs.window_top = win32.StrToIntW(&pos_buf);
 	}
-	i = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
 		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});
@@ -417,8 +407,7 @@ pub fn load(prefs: *SortPrefs) void {
 pub fn save(prefs: *const SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
-	var i: usize = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		if (COLUMNS[i].field == prefs.field)
 			_ = win32.WritePrivateProfileStringW(L("sort"), L("field"), COLUMNS[i].label, &path);
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
@@ -443,8 +432,7 @@ pub fn save(prefs: *const SortPrefs) void {
 		wfmt.format(&pos_str, 16, "%d", .{prefs.window_height});
 		_ = win32.WritePrivateProfileStringW(L("window"), L("height"), &pos_str, &path);
 	}
-	i = 0;
-	while (i < COL_COUNT) : (i += 1) {
+	for (0..COL_COUNT) |i| {
 		if (COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});

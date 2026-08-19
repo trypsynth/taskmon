@@ -50,9 +50,8 @@ var last_focus: win32.HWND = null;
 fn setRefreshInterval(hwnd: win32.HWND, ms_in: win32.UINT) void {
 	var ms = ms_in;
 	var found = false;
-	var i: i32 = 0;
-	while (i < 5) : (i += 1) {
-		if (settings.REFRESH_MS[@intCast(i)] == ms) {
+	for (settings.REFRESH_MS) |option| {
+		if (option == ms) {
 			found = true;
 			break;
 		}
@@ -158,11 +157,9 @@ fn buildPriorityMenu(pid: win32.DWORD) win32.HMENU {
 		cur_cls = win32.GetPriorityClass(ph);
 		_ = win32.CloseHandle(ph);
 	}
-	var i: i32 = 0;
-	while (i < PRIORITY_CLASS_COUNT) : (i += 1) {
-		const idx: usize = @intCast(i);
+	for (0..PRIORITY_CLASS_COUNT) |idx| {
 		const flags = win32.MF_STRING | (if (PRIORITY_CLASSES[idx].cls == cur_cls) win32.MF_CHECKED else 0);
-		_ = win32.AppendMenuW(pri_menu, flags, @intCast(ID_CTX_PRIORITY_BASE + i), PRIORITY_CLASSES[idx].label);
+		_ = win32.AppendMenuW(pri_menu, flags, @intCast(ID_CTX_PRIORITY_BASE + idx), PRIORITY_CLASSES[idx].label);
 	}
 	return pri_menu;
 }
@@ -172,7 +169,7 @@ fn showProcessContextMenu(hwnd: win32.HWND, pid: win32.DWORD, point: win32.POINT
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
 	if (path[0] != 0) _ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_OPEN_LOCATION, L("Open file location"));
-	if (process.isProcessSuspended(pid) != 0)
+	if (process.isProcessSuspended(pid))
 		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_RESUME, L("Resume"))
 	else
 		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_SUSPEND, L("Suspend"));
@@ -248,13 +245,15 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 					listview.doRefresh();
 					const count: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
 					var pid_still_present = false;
-					var i: i32 = 0;
-					while (i < count and !pid_still_present) : (i += 1) {
+					for (0..@intCast(count)) |i| {
 						var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 						lvi2.mask = win32.LVIF_PARAM;
-						lvi2.iItem = i;
+						lvi2.iItem = @intCast(i);
 						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
-						if (@as(win32.DWORD, @intCast(lvi2.lParam)) == pid) pid_still_present = true;
+						if (@as(win32.DWORD, @intCast(lvi2.lParam)) == pid) {
+							pid_still_present = true;
+							break;
+						}
 					}
 					if (!pid_still_present and count > 0) {
 						const new_sel: i32 = if (selected < count) selected else count - 1;
@@ -346,16 +345,8 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		var new_skip_confirm: bool = undefined;
 		var new_start_minimized: bool = undefined;
 		if (settings.open(hwnd, state.prefs.refresh_ms, &state.prefs.visible, state.prefs.skip_kill_confirm, state.prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized)) {
-			var cols_changed = false;
-			var i: i32 = 0;
-			while (i < settings.COL_COUNT) : (i += 1) {
-				if (new_visible[@intCast(i)] != state.prefs.visible[@intCast(i)]) {
-					cols_changed = true;
-					break;
-				}
-			}
-			i = 0;
-			while (i < settings.COL_COUNT) : (i += 1) state.prefs.visible[@intCast(i)] = new_visible[@intCast(i)];
+			const cols_changed = !std.mem.eql(bool, &new_visible, &state.prefs.visible);
+			state.prefs.visible = new_visible;
 			state.prefs.skip_kill_confirm = new_skip_confirm;
 			state.prefs.start_minimized_to_tray = new_start_minimized;
 			if (new_ms != state.prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
@@ -369,9 +360,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	}
 	const hiword: u16 = @truncate(wp >> 16);
 	if (hiword == win32.BN_CLICKED) {
-		var i: i32 = 0;
-		while (i < state.sort_btn_count) : (i += 1) {
-			const idx: usize = @intCast(i);
+		for (0..@intCast(state.sort_btn_count)) |idx| {
 			if (resource.ID_SORT_BASE + state.sort_btn_cols[idx] == @as(i32, id)) {
 				const cid: usize = @intCast(state.sort_btn_cols[idx]);
 				if (settings.COLUMNS[cid].field == state.prefs.field) {
@@ -472,7 +461,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
 			state.hwnd_sort_group = sortbar.create(hwnd);
-			// Hidden label — GW_HWNDPREV of the list view points here, so MSAA/UIA
+			// Hidden label: GW_HWNDPREV of the list view points here, so MSAA/UIA
 			// use "Processes" as the list's accessible name instead of the group box.
 			_ = win32.CreateWindowExW(0, L("STATIC"), L("Processes"), win32.WS_CHILD | win32.SS_LEFT, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
 			state.hwnd_list = win32.CreateWindowExW(0, win32.WC_LISTVIEWW, L("Processes"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.LVS_REPORT | win32.LVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_LISTVIEW)), win32.GetModuleHandleW(null), null);
@@ -503,7 +492,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 					_ = win32.SetWindowPos(hwnd, null, state.prefs.window_left, state.prefs.window_top, state.prefs.window_width, state.prefs.window_height, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 			}
 			// Prime the snapshot table so the first real refresh has deltas to work from.
-			// Discard results — the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
+			// Discard results: the list stays empty until ID_PRIME_TIMER fires with accurate CPU.
 			{
 				var count: i32 = 0;
 				const primed = process.snapshotProcesses(&state.snapshots, &count, state.prefs.field, state.prefs.desc[@intCast(@intFromEnum(state.prefs.field))]);
