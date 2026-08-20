@@ -27,8 +27,8 @@ jobs:
       - name: Install Pandoc
         run: choco install pandoc
 
-      - name: Install Inno Setup
-        run: choco install innosetup
+      - name: Install NSIS
+        run: choco install nsis
 
       - name: Set version
         shell: pwsh
