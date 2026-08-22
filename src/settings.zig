@@ -369,7 +369,7 @@ pub fn load(prefs: *SortPrefs) void {
 		prefs.desc[i] = val[0] == '1';
 	}
 	var ms_buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("refresh"), L("interval_ms"), L("2000"), &ms_buf, 16, &path);
+	_ = win32.GetPrivateProfileStringW(L("refresh"), L("interval_ms"), L("0"), &ms_buf, 16, &path);
 	prefs.refresh_ms = @intCast(win32.StrToIntW(&ms_buf));
 	var skip_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("confirm"), L("skip_kill"), L("0"), &skip_buf, 4, &path);
