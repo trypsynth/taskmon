@@ -359,15 +359,43 @@ fn getIniPath(buf: [*:0]u16) void {
 	}
 }
 
+// Thin wrappers around Get/WritePrivateProfileStringW: every setting is a
+// single bool or int under some section/key, so the read/write/parse/format
+// boilerplate lives here once instead of once per setting.
+fn getIniBool(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, default: bool) bool {
+	var buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
+	_ = win32.GetPrivateProfileStringW(section, key, if (default) L("1") else L("0"), &buf, 4, path);
+	return buf[0] == '1';
+}
+
+fn setIniBool(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, value: bool) void {
+	_ = win32.WritePrivateProfileStringW(section, key, if (value) L("1") else L("0"), path);
+}
+
+fn getIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR) i32 {
+	var buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
+	_ = win32.GetPrivateProfileStringW(section, key, L("0"), &buf, 16, path);
+	return win32.StrToIntW(&buf);
+}
+
+fn setIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, value: i32) void {
+	var buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
+	wfmt.format(&buf, 16, "%d", .{value});
+	_ = win32.WritePrivateProfileStringW(section, key, &buf, path);
+}
+
+// Per-column keys are "<label>_desc" / "<label>_visible"; suffix is comptime
+// so it folds into a single wfmt spec instead of taking a runtime parameter.
+fn columnKey(comptime suffix: []const u8, buf: *[64:0]u16, label: win32.LPCWSTR) win32.LPCWSTR {
+	wfmt.format(buf, 64, "%s" ++ suffix, .{label});
+	return buf;
+}
+
 pub fn load(prefs: *SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	prefs.field = .name;
-	prefs.refresh_ms = 0;
-	for (0..COL_COUNT) |i| {
-		prefs.desc[i] = false;
-		prefs.visible[i] = COLUMNS[i].always_visible;
-	}
+
 	var field_buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("sort"), L("field"), COLUMNS[0].label, &field_buf, 64, &path);
 	for (0..COL_COUNT) |i| {
@@ -378,44 +406,23 @@ pub fn load(prefs: *SortPrefs) void {
 	}
 	for (0..COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
-		wfmt.format(&key, 64, "%s_desc", .{COLUMNS[i].label});
-		_ = win32.GetPrivateProfileStringW(L("sort"), &key, L("0"), &val, 4, &path);
-		prefs.desc[i] = val[0] == '1';
+		prefs.desc[i] = getIniBool(&path, L("sort"), columnKey("_desc", &key, COLUMNS[i].label), false);
 	}
-	var ms_buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("refresh"), L("interval_ms"), L("0"), &ms_buf, 16, &path);
-	prefs.refresh_ms = @intCast(win32.StrToIntW(&ms_buf));
-	var skip_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("confirm"), L("skip_kill"), L("0"), &skip_buf, 4, &path);
-	prefs.skip_kill_confirm = skip_buf[0] == '1';
-	var aot_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("window"), L("always_on_top"), L("0"), &aot_buf, 4, &path);
-	prefs.always_on_top = aot_buf[0] == '1';
-	var tree_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("view"), L("tree_mode"), L("0"), &tree_buf, 4, &path);
-	prefs.tree_mode = tree_buf[0] == '1';
-	var startmin_buf: [4:0]u16 = std.mem.zeroes([4:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("window"), L("start_minimized_to_tray"), L("0"), &startmin_buf, 4, &path);
-	prefs.start_minimized_to_tray = startmin_buf[0] == '1';
-	var pos_buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	_ = win32.GetPrivateProfileStringW(L("window"), L("width"), L("0"), &pos_buf, 16, &path);
-	prefs.window_width = win32.StrToIntW(&pos_buf);
+	prefs.refresh_ms = @intCast(getIniInt(&path, L("refresh"), L("interval_ms")));
+	prefs.skip_kill_confirm = getIniBool(&path, L("confirm"), L("skip_kill"), false);
+	prefs.always_on_top = getIniBool(&path, L("window"), L("always_on_top"), false);
+	prefs.tree_mode = getIniBool(&path, L("view"), L("tree_mode"), false);
+	prefs.start_minimized_to_tray = getIniBool(&path, L("window"), L("start_minimized_to_tray"), false);
+	prefs.window_width = getIniInt(&path, L("window"), L("width"));
 	if (prefs.window_width > 0) {
-		_ = win32.GetPrivateProfileStringW(L("window"), L("height"), L("0"), &pos_buf, 16, &path);
-		prefs.window_height = win32.StrToIntW(&pos_buf);
-		_ = win32.GetPrivateProfileStringW(L("window"), L("left"), L("0"), &pos_buf, 16, &path);
-		prefs.window_left = win32.StrToIntW(&pos_buf);
-		_ = win32.GetPrivateProfileStringW(L("window"), L("top"), L("0"), &pos_buf, 16, &path);
-		prefs.window_top = win32.StrToIntW(&pos_buf);
+		prefs.window_height = getIniInt(&path, L("window"), L("height"));
+		prefs.window_left = getIniInt(&path, L("window"), L("left"));
+		prefs.window_top = getIniInt(&path, L("window"), L("top"));
 	}
 	for (0..COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		var val: [4:0]u16 = std.mem.zeroes([4:0]u16);
-		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});
-		var def: [2:0]u16 = .{ if (COLUMNS[i].default_visible) '1' else '0', 0 };
-		_ = win32.GetPrivateProfileStringW(L("columns"), &key, &def, &val, 4, &path);
-		prefs.visible[i] = COLUMNS[i].always_visible or val[0] == '1';
+		const visible = getIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), COLUMNS[i].default_visible);
+		prefs.visible[i] = COLUMNS[i].always_visible or visible;
 	}
 }
 
@@ -426,31 +433,22 @@ pub fn save(prefs: *const SortPrefs) void {
 		if (COLUMNS[i].field == prefs.field)
 			_ = win32.WritePrivateProfileStringW(L("sort"), L("field"), COLUMNS[i].label, &path);
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		wfmt.format(&key, 64, "%s_desc", .{COLUMNS[i].label});
-		_ = win32.WritePrivateProfileStringW(L("sort"), &key, if (prefs.desc[i]) L("1") else L("0"), &path);
+		setIniBool(&path, L("sort"), columnKey("_desc", &key, COLUMNS[i].label), prefs.desc[i]);
 	}
-	var ms_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	wfmt.format(&ms_str, 16, "%u", .{prefs.refresh_ms});
-	_ = win32.WritePrivateProfileStringW(L("refresh"), L("interval_ms"), &ms_str, &path);
-	_ = win32.WritePrivateProfileStringW(L("confirm"), L("skip_kill"), if (prefs.skip_kill_confirm) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("window"), L("always_on_top"), if (prefs.always_on_top) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("view"), L("tree_mode"), if (prefs.tree_mode) L("1") else L("0"), &path);
-	_ = win32.WritePrivateProfileStringW(L("window"), L("start_minimized_to_tray"), if (prefs.start_minimized_to_tray) L("1") else L("0"), &path);
+	setIniInt(&path, L("refresh"), L("interval_ms"), @intCast(prefs.refresh_ms));
+	setIniBool(&path, L("confirm"), L("skip_kill"), prefs.skip_kill_confirm);
+	setIniBool(&path, L("window"), L("always_on_top"), prefs.always_on_top);
+	setIniBool(&path, L("view"), L("tree_mode"), prefs.tree_mode);
+	setIniBool(&path, L("window"), L("start_minimized_to_tray"), prefs.start_minimized_to_tray);
 	if (prefs.window_width > 0) {
-		var pos_str: [16:0]u16 = std.mem.zeroes([16:0]u16);
-		wfmt.format(&pos_str, 16, "%d", .{prefs.window_left});
-		_ = win32.WritePrivateProfileStringW(L("window"), L("left"), &pos_str, &path);
-		wfmt.format(&pos_str, 16, "%d", .{prefs.window_top});
-		_ = win32.WritePrivateProfileStringW(L("window"), L("top"), &pos_str, &path);
-		wfmt.format(&pos_str, 16, "%d", .{prefs.window_width});
-		_ = win32.WritePrivateProfileStringW(L("window"), L("width"), &pos_str, &path);
-		wfmt.format(&pos_str, 16, "%d", .{prefs.window_height});
-		_ = win32.WritePrivateProfileStringW(L("window"), L("height"), &pos_str, &path);
+		setIniInt(&path, L("window"), L("left"), prefs.window_left);
+		setIniInt(&path, L("window"), L("top"), prefs.window_top);
+		setIniInt(&path, L("window"), L("width"), prefs.window_width);
+		setIniInt(&path, L("window"), L("height"), prefs.window_height);
 	}
 	for (0..COL_COUNT) |i| {
 		if (COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		wfmt.format(&key, 64, "%s_visible", .{COLUMNS[i].label});
-		_ = win32.WritePrivateProfileStringW(L("columns"), &key, if (prefs.visible[i]) L("1") else L("0"), &path);
+		setIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), prefs.visible[i]);
 	}
 }
