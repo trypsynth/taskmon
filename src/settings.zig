@@ -166,6 +166,21 @@ pub const COLUMNS: [COL_COUNT]ColumnDef = columns: {
 	};
 };
 
+// listview.zig's populateList() skips index 0 when filling sub-item text
+// (it's rendered via LVIF_TEXT/entry.name instead), and formatColumn() has
+// no .name case of its own for the same reason - both silently rely on
+// COLUMNS[0] being the one and only always-visible Name column. Enforce
+// that here so reordering COLUMNS is a compile error instead of a silently
+// blank/misrendered first column.
+comptime {
+	if (COLUMNS[0].field != .name or !COLUMNS[0].always_visible)
+		@compileError("COLUMNS[0] must be the always-visible .name column");
+	for (COLUMNS[1..]) |col| {
+		if (col.always_visible)
+			@compileError("only COLUMNS[0] may be always_visible");
+	}
+}
+
 pub const REFRESH_MS: [REFRESH_OPTION_COUNT]win32.UINT = .{ 0, 5000, 10000, 30000, 60000 };
 pub const REFRESH_LABELS: [REFRESH_OPTION_COUNT]win32.LPCWSTR = .{ L("Off"), L("5 seconds"), L("10 seconds"), L("30 seconds"), L("1 minute") };
 
