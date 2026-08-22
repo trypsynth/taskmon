@@ -1,5 +1,5 @@
 !ifndef MyAppVersion
-	!define MyAppVersion "0.2.1"
+	!define MyAppVersion "unknown"
 !endif
 !ifndef MyAppArch
 	!define MyAppArch "x64"

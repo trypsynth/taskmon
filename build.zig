@@ -48,7 +48,7 @@ pub fn build(b: *std.Build) void {
 	}
 	if (b.findProgram(.{ .names = &.{"makensis"} })) |makensis| {
 		const arch = if (target.result.cpu.arch == .aarch64) "arm64" else "x64";
-		const version = b.graph.environ_map.get("TASKMON_VERSION") orelse "0.2.1";
+		const version = b.graph.environ_map.get("TASKMON_VERSION") orelse "unknown";
 		const installer_run = b.addSystemCommand(&.{makensis});
 		installer_run.setCwd(b.path("installer"));
 		installer_run.addArg(b.fmt("/DMyAppArch={s}", .{arch}));
