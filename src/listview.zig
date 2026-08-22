@@ -312,24 +312,41 @@ fn formatColumn(e: *const pt.ProcessEntry, cid: i32, buf: [*:0]u16, len: i32) vo
 	}
 }
 
+// Every list-item lookup below goes through the same LVM_GETNEXTITEM/
+// LVM_GETITEMW/LVM_SETITEMSTATE calls with an LVITEMW that's zeroed, filled
+// in for one field, and thrown away; wndproc.zig needed the identical
+// pattern for its own selection/context-menu handling, so it's centralized
+// here instead of being hand-rolled at every call site.
+pub fn getSelectedIndex() i32 {
+	return @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+}
+
+// A PID, not an index, is what identifies a process across a refresh (the
+// list gets fully rebuilt each time), so this is the shape nearly every
+// caller actually wants. Returns 0 for a negative/out-of-range index, same
+// as "nothing selected".
+pub fn getItemPid(index: i32) win32.DWORD {
+	if (index < 0) return 0;
+	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+	lvi.mask = win32.LVIF_PARAM;
+	lvi.iItem = index;
+	if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) == 0) return 0;
+	return @intCast(lvi.lParam);
+}
+
+pub fn selectItem(index: i32) void {
+	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+	lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+	lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+	_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, @intCast(index), @bitCast(@intFromPtr(&lvi)));
+}
+
 fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
-	var selected_pid: win32.DWORD = 0;
-	const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
-	if (selected != -1) {
-		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-		lvi.mask = win32.LVIF_PARAM;
-		lvi.iItem = selected;
-		if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) selected_pid = @intCast(lvi.lParam);
-	}
+	const selected_pid = getItemPid(getSelectedIndex());
 	var top_pid: win32.DWORD = 0;
 	const top_idx: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETTOPINDEX, 0, 0));
 	const item_count: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
-	if (top_idx != -1 and item_count > 0) {
-		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-		lvi.mask = win32.LVIF_PARAM;
-		lvi.iItem = top_idx;
-		if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi))) != 0) top_pid = @intCast(lvi.lParam);
-	}
+	if (top_idx != -1 and item_count > 0) top_pid = getItemPid(top_idx);
 	_ = win32.SendMessageW(state.hwnd_list, win32.WM_SETREDRAW, 0, 0);
 	_ = win32.SendMessageW(state.hwnd_list, win32.LVM_DELETEALLITEMS, 0, 0);
 	var total_cpu: f64 = 0;
@@ -356,15 +373,9 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 		}
 	}
 	if (new_selected_idx != -1) {
-		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-		lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_selected_idx), @bitCast(@intFromPtr(&lvi)));
+		selectItem(new_selected_idx);
 	} else if (win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0) > 0) {
-		var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-		lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&lvi)));
+		selectItem(0);
 	}
 	if (new_top_idx != -1) {
 		var rc: win32.RECT = std.mem.zeroes(win32.RECT);

@@ -134,19 +134,9 @@ fn pointFromLparam(lp: win32.LPARAM) win32.POINT {
 	return .{ .x = x, .y = y };
 }
 
-fn getSelectedListPid() win32.DWORD {
-	const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
-	if (selected == -1) return 0;
-	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-	lvi.iItem = selected;
-	lvi.mask = win32.LVIF_PARAM;
-	_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-	return @intCast(lvi.lParam);
-}
-
 fn getSelectedPid() win32.DWORD {
 	if (state.prefs.tree_mode) return treeview.getSelectedPid();
-	return getSelectedListPid();
+	return listview.getItemPid(listview.getSelectedIndex());
 }
 
 fn buildPriorityMenu(pid: win32.DWORD) win32.HMENU {
@@ -222,19 +212,15 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			}
 			return 0;
 		}
-		const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+		const selected = listview.getSelectedIndex();
 		if (selected != -1) {
-			var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-			lvi.iItem = selected;
-			lvi.mask = win32.LVIF_PARAM;
-			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+			const pid = listview.getItemPid(selected);
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
 			var get_text_lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			get_text_lvi.iSubItem = 0;
 			get_text_lvi.cchTextMax = 260;
 			get_text_lvi.pszText = &name;
 			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMTEXTW, @intCast(selected), @bitCast(@intFromPtr(&get_text_lvi)));
-			const pid: win32.DWORD = @intCast(lvi.lParam);
 			if (id == ID_CTX_OPEN_LOCATION) {
 				var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 				process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
@@ -246,21 +232,14 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 					const count: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
 					var pid_still_present = false;
 					for (0..@intCast(count)) |i| {
-						var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-						lvi2.mask = win32.LVIF_PARAM;
-						lvi2.iItem = @intCast(i);
-						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
-						if (@as(win32.DWORD, @intCast(lvi2.lParam)) == pid) {
+						if (listview.getItemPid(@intCast(i)) == pid) {
 							pid_still_present = true;
 							break;
 						}
 					}
 					if (!pid_still_present and count > 0) {
 						const new_sel: i32 = if (selected < count) selected else count - 1;
-						var lvi3: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-						lvi3.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-						lvi3.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_SETITEMSTATE, @intCast(new_sel), @bitCast(@intFromPtr(&lvi3)));
+						listview.selectItem(new_sel);
 						_ = win32.SendMessageW(state.hwnd_list, win32.LVM_ENSUREVISIBLE, @intCast(new_sel), 0);
 					}
 				}
@@ -422,13 +401,9 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 		return 0;
 	}
 	if (src_hwnd == state.hwnd_list) {
-		const selected: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+		const selected = listview.getSelectedIndex();
 		if (selected != -1) {
-			var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-			lvi.iItem = selected;
-			lvi.mask = win32.LVIF_PARAM;
-			_ = win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-			const pid: win32.DWORD = @intCast(lvi.lParam);
+			const pid = listview.getItemPid(selected);
 			var point = pointFromLparam(lp);
 			if (point.x == -1 and point.y == -1) {
 				var rc: win32.RECT = std.mem.zeroes(win32.RECT);
