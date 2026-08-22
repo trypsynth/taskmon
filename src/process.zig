@@ -111,37 +111,52 @@ pub fn gpuCleanup() void {
 	g_pdh_ready = false;
 }
 
-fn addGpuStat(pid: win32.DWORD, percent: f64, memory: u64) void {
-	const h: usize = pid % pt.SNAPSHOT_CAPACITY;
+// Both the GPU-stat and CPU-snapshot tables are fixed-size arrays keyed by
+// pid, open-addressed with linear probing from pid % table.len, using
+// `active` to mark empty slots. probeInsert finds the slot to write into -
+// the pid's existing entry, or the first empty slot probed - returning null
+// only if the table is completely full of *other* pids (never happens at
+// these table sizes). probeFind stops at the first empty slot instead,
+// since that means the pid was never inserted.
+fn probeInsert(comptime T: type, table: []T, pid: win32.DWORD) ?*T {
+	const cap = table.len;
+	const h: usize = pid % cap;
 	var i = h;
 	while (true) {
-		if (g_gpu_stats[i].active == 0 or g_gpu_stats[i].pid == pid) {
-			g_gpu_stats[i].active = 1;
-			g_gpu_stats[i].pid = pid;
-			g_gpu_stats[i].gpu_percent += percent;
-			g_gpu_stats[i].gpu_memory += memory;
-			return;
-		}
-		i = (i + 1) % pt.SNAPSHOT_CAPACITY;
+		if (table[i].active == 0 or table[i].pid == pid) return &table[i];
+		i = (i + 1) % cap;
 		if (i == h) break;
 	}
+	return null;
+}
+
+fn probeFind(comptime T: type, table: []T, pid: win32.DWORD) ?*T {
+	const cap = table.len;
+	const h: usize = pid % cap;
+	var i = h;
+	while (true) {
+		if (table[i].active == 0) return null;
+		if (table[i].pid == pid) return &table[i];
+		i = (i + 1) % cap;
+		if (i == h) break;
+	}
+	return null;
+}
+
+fn addGpuStat(pid: win32.DWORD, percent: f64, memory: u64) void {
+	const e = probeInsert(GpuStatEntry, &g_gpu_stats, pid) orelse return;
+	e.active = 1;
+	e.pid = pid;
+	e.gpu_percent += percent;
+	e.gpu_memory += memory;
 }
 
 fn getGpuStat(pid: win32.DWORD, out_percent: *f64, out_memory: *u64) void {
 	out_percent.* = 0.0;
 	out_memory.* = 0;
-	const h: usize = pid % pt.SNAPSHOT_CAPACITY;
-	var i = h;
-	while (true) {
-		if (g_gpu_stats[i].active == 0) return;
-		if (g_gpu_stats[i].pid == pid) {
-			out_percent.* = g_gpu_stats[i].gpu_percent;
-			out_memory.* = g_gpu_stats[i].gpu_memory;
-			return;
-		}
-		i = (i + 1) % pt.SNAPSHOT_CAPACITY;
-		if (i == h) break;
-	}
+	const e = probeFind(GpuStatEntry, &g_gpu_stats, pid) orelse return;
+	out_percent.* = e.gpu_percent;
+	out_memory.* = e.gpu_memory;
 }
 
 // Instance names look like "pid_1234_luid_0x00000000_0x0000abcd_phys_0_eng_0_engtype_3D".
@@ -328,30 +343,15 @@ fn queryAllProcesses(total_size: *win32.ULONG) ?[*]u8 {
 }
 
 fn updateSnapshot(snapshots: [*]pt.SnapshotEntry, pid: win32.DWORD, snap: pt.CpuSnapshot) void {
-	const h: usize = pid % pt.SNAPSHOT_CAPACITY;
-	var i = h;
-	while (true) {
-		if (snapshots[i].active == 0 or snapshots[i].pid == pid) {
-			snapshots[i].active = 1;
-			snapshots[i].pid = pid;
-			snapshots[i].snapshot = snap;
-			return;
-		}
-		i = (i + 1) % pt.SNAPSHOT_CAPACITY;
-		if (i == h) break;
-	}
+	const e = probeInsert(pt.SnapshotEntry, snapshots[0..pt.SNAPSHOT_CAPACITY], pid) orelse return;
+	e.active = 1;
+	e.pid = pid;
+	e.snapshot = snap;
 }
 
 fn findSnapshot(snapshots: [*]pt.SnapshotEntry, pid: win32.DWORD) ?*pt.CpuSnapshot {
-	const h: usize = pid % pt.SNAPSHOT_CAPACITY;
-	var i = h;
-	while (true) {
-		if (snapshots[i].active == 0) return null;
-		if (snapshots[i].pid == pid) return &snapshots[i].snapshot;
-		i = (i + 1) % pt.SNAPSHOT_CAPACITY;
-		if (i == h) break;
-	}
-	return null;
+	const e = probeFind(pt.SnapshotEntry, snapshots[0..pt.SNAPSHOT_CAPACITY], pid) orelse return null;
+	return &e.snapshot;
 }
 
 // ProcessEntry is large enough that copying it by value risks overflowing the
