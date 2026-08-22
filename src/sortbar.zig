@@ -80,7 +80,7 @@ pub fn updateTabStop() void {
 	for (0..@intCast(state.sort_btn_count)) |idx| {
 		var style = win32.GetWindowLongPtrW(state.sort_btns[idx], win32.GWL_STYLE);
 		const cid: usize = @intCast(state.sort_btn_cols[idx]);
-		style = if (settings.COLUMNS[cid].field == state.prefs.field)
+		style = if (!state.prefs.tree_mode and settings.COLUMNS[cid].field == state.prefs.field)
 			style | @as(win32.LONG_PTR, win32.WS_TABSTOP)
 		else
 			style & ~@as(win32.LONG_PTR, win32.WS_TABSTOP);

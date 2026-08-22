@@ -273,6 +273,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			_ = win32.ShowWindow(state.hwnd_list, win32.SW_SHOW);
 			_ = win32.SetFocus(state.hwnd_list);
 		}
+		sortbar.updateTabStop();
 		listview.resort();
 		settings.save(&state.prefs);
 		return 0;
