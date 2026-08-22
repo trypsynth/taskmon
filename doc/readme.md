@@ -5,7 +5,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 ## Core Features
 
 * View all running processes and sort them by various resource usage metrics.
-* Choose from over 45 customizable columns to display; see Available Columns below for the full list.
+* Choose from over 65 customizable columns to display; see Available Columns below for the full list.
 * Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
 * Available as a portable executable or via a Windows installer. Portable copies keep their settings alongside the executable so you can carry them on a USB drive; installed copies store settings per-user automatically, since Program Files isn't writable without administrator rights.
 * Optionally replace the system Task Manager during installation, so Ctrl+Shift+Esc and the taskbar's "Task Manager" entry open Taskmon instead.
@@ -135,6 +135,14 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Priority: Allows changing the CPU priority class (Idle, Below Normal, Normal, Above Normal, High, Realtime).
 
 ## Changelog
+
+### Version 0.3.1
+* Added 29 new columns: Peak Virtual Memory, Peak Private Bytes, Peak Paged Pool, Peak Non-paged Pool, Peak Threads, Hard Faults, CPU Cycles, Kernel Time, User Time, Total Page Faults, I/O Read Ops, I/O Write Ops, I/O Other Ops, Total I/O, Elapsed Time, Shared Working Set, Parent Name, Private Bytes Delta, Working Set Delta, Handle Delta, Thread Delta, Virtualization, AppContainer, Domain, User SID, Efficiency Mode, I/O Priority, Memory Priority, and Protection.
+* Fixed observable lag when switching the sorting method with the keyboard.
+* Fixed preferences being rewritten to disk on every sort-order change instead of only when needed.
+* Fixed the process tree incorrectly nesting processes under recycled parent PIDs.
+* Rewrote Taskmon from C to Zig.
+* Switched the Windows installer from Inno Setup to NSIS, shrinking it by around 95%.
 
 ### Version 0.3.0
 * Added Ctrl+Q as a shortcut to exit Taskmon completely.
