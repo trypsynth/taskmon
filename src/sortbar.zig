@@ -136,7 +136,8 @@ pub fn applyColumns() void {
 
 	var btn_x: i32 = 0;
 	var lv_col: i32 = 0;
-	for (0..settings.COL_COUNT) |ci| {
+	for (0..settings.COL_COUNT) |pos| {
+		const ci: usize = state.prefs.order[pos];
 		if (!state.prefs.visible[ci]) continue;
 		const bi: usize = @intCast(state.sort_btn_count);
 		state.sort_btns[bi] = win32.CreateWindowExW(0, L("BUTTON"), settings.COLUMNS[ci].label, win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_RADIOBUTTON, btn_x, 0, settings.COLUMNS[ci].width, 1, state.hwnd_sort_group, @ptrFromInt(@as(usize, @intCast(resource.ID_SORT_BASE + ci))), win32.GetModuleHandleW(null), null);

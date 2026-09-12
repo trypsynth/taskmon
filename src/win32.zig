@@ -194,6 +194,7 @@ pub const LVS_EX_CHECKBOXES: DWORD = 0x4;
 const LVM_FIRST: UINT = 0x1000;
 pub const LVM_GETITEMCOUNT: UINT = LVM_FIRST + 4;
 pub const LVM_INSERTITEMW: UINT = LVM_FIRST + 77;
+pub const LVM_SETITEMW: UINT = LVM_FIRST + 76;
 pub const LVM_GETITEMW: UINT = LVM_FIRST + 75;
 pub const LVM_SETITEMSTATE: UINT = LVM_FIRST + 43;
 pub const LVM_GETITEMSTATE: UINT = LVM_FIRST + 44;
@@ -247,6 +248,7 @@ pub extern "user32" fn GetDlgItem(hDlg: HWND, nIDDlgItem: c_int) callconv(.c) HW
 pub extern "user32" fn SetMenu(hWnd: HWND, hMenu: HMENU) callconv(.c) BOOL;
 pub extern "user32" fn CreateWindowExW(dwExStyle: DWORD, lpClassName: LPCWSTR, lpWindowName: ?LPCWSTR, dwStyle: DWORD, X: i32, Y: i32, nWidth: i32, nHeight: i32, hWndParent: HWND, hMenu: HMENU, hInstance: HINSTANCE, lpParam: ?*anyopaque) callconv(.c) HWND;
 pub extern "user32" fn DialogBoxParamW(hInstance: HINSTANCE, lpTemplateName: LPCWSTR, hWndParent: HWND, lpDialogFunc: DLGPROC, dwInitParam: LPARAM) callconv(.c) INT_PTR;
+pub extern "user32" fn CreateDialogParamW(hInstance: HINSTANCE, lpTemplateName: LPCWSTR, hWndParent: HWND, lpDialogFunc: DLGPROC, dwInitParam: LPARAM) callconv(.c) HWND;
 pub extern "user32" fn EndDialog(hDlg: HWND, nResult: INT_PTR) callconv(.c) BOOL;
 pub extern "user32" fn SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, X: i32, Y: i32, cx: i32, cy: i32, uFlags: UINT) callconv(.c) BOOL;
 
@@ -332,6 +334,7 @@ pub extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.c) BOOL;
 pub extern "user32" fn PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.c) BOOL;
 pub extern "user32" fn GetDlgCtrlID(hWnd: HWND) callconv(.c) c_int;
 pub extern "user32" fn SetFocus(hWnd: HWND) callconv(.c) HWND;
+pub extern "user32" fn GetKeyState(nVirtKey: i32) callconv(.c) i16;
 pub extern "user32" fn GetParent(hWnd: HWND) callconv(.c) HWND;
 
 pub extern "kernel32" fn GetProcessHeap() callconv(.c) HANDLE;
@@ -533,6 +536,7 @@ pub const TVM_SETEXTENDEDSTYLE: UINT = TV_FIRST + 44;
 pub const ICC_LISTVIEW_CLASSES: DWORD = 0x1;
 pub const ICC_TREEVIEW_CLASSES: DWORD = 0x2;
 pub const ICC_BAR_CLASSES: DWORD = 0x4;
+pub const ICC_TAB_CLASSES: DWORD = 0x8;
 pub const WC_LISTVIEWW = L("SysListView32");
 pub const WC_TREEVIEWW = L("SysTreeView32");
 pub const STATUSCLASSNAMEW = L("msctls_statusbar32");
@@ -548,6 +552,26 @@ pub const TVS_SHOWSELALWAYS: DWORD = 0x20;
 pub const TVS_EX_DOUBLEBUFFER: DWORD = 0x4;
 const LVN_FIRST: i32 = -100;
 pub const LVN_COLUMNCLICK: i32 = LVN_FIRST - 8;
+pub const LVN_ITEMCHANGED: i32 = LVN_FIRST - 1;
+
+const TCM_FIRST: UINT = 0x1300;
+pub const TCM_GETCURSEL: UINT = TCM_FIRST + 11;
+pub const TCM_SETCURSEL: UINT = TCM_FIRST + 12;
+pub const TCM_ADJUSTRECT: UINT = TCM_FIRST + 40;
+pub const TCM_INSERTITEMW: UINT = TCM_FIRST + 62;
+pub const TCIF_TEXT: UINT = 0x1;
+const TCN_FIRST: i32 = -550;
+pub const TCN_SELCHANGE: i32 = TCN_FIRST - 1;
+
+pub const TCITEMW = extern struct {
+	mask: UINT,
+	dwState: DWORD,
+	dwStateMask: DWORD,
+	pszText: LPWSTR,
+	cchTextMax: i32,
+	iImage: i32,
+	lParam: LPARAM,
+};
 
 pub const IDLE_PRIORITY_CLASS: DWORD = 0x40;
 pub const NORMAL_PRIORITY_CLASS: DWORD = 0x20;
@@ -611,6 +635,7 @@ pub extern "user32" fn TrackPopupMenu(hMenu: HMENU, uFlags: UINT, x: c_int, y: c
 pub extern "user32" fn GetForegroundWindow() callconv(.c) HWND;
 pub extern "user32" fn RedrawWindow(hWnd: HWND, lprcUpdate: ?*const RECT, hrgnUpdate: HRGN, flags: UINT) callconv(.c) BOOL;
 pub extern "user32" fn GetClientRect(hWnd: HWND, lpRect: *RECT) callconv(.c) BOOL;
+pub extern "user32" fn GetWindowRect(hWnd: HWND, lpRect: *RECT) callconv(.c) BOOL;
 pub extern "user32" fn MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) callconv(.c) c_int;
 pub extern "user32" fn GetCursorPos(lpPoint: *POINT) callconv(.c) BOOL;
 pub extern "user32" fn ScreenToClient(hWnd: HWND, lpPoint: *POINT) callconv(.c) BOOL;
@@ -822,6 +847,7 @@ pub const DLGC_WANTMESSAGE: LRESULT = 0x0004;
 pub const VK_RETURN: usize = 0x0D;
 pub const VK_ESCAPE: usize = 0x1B;
 pub const VK_LEFT: usize = 0x25;
+pub const VK_CONTROL: i32 = 0x11;
 pub const VK_UP: usize = 0x26;
 pub const VK_RIGHT: usize = 0x27;
 pub const VK_DOWN: usize = 0x28;

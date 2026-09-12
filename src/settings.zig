@@ -189,6 +189,10 @@ pub const SortPrefs = struct {
 	desc: [COL_COUNT]bool,
 	refresh_ms: win32.UINT,
 	visible: [COL_COUNT]bool,
+	// Display order as a permutation of COLUMNS indices: order[pos] is the
+	// column shown at position pos. order[0] is always the Name column (see
+	// the comptime check above).
+	order: [COL_COUNT]u8,
 	skip_kill_confirm: bool,
 	always_on_top: bool,
 	tree_mode: bool,
@@ -202,9 +206,27 @@ pub const SortPrefs = struct {
 const SettingsDlgData = struct {
 	refresh_ms: win32.UINT,
 	visible: [COL_COUNT]bool,
+	order: [COL_COUNT]u8,
 	skip_kill_confirm: bool,
 	start_minimized_to_tray: bool,
 };
+
+pub const Changes = struct {
+	refresh_ms: bool,
+	columns: bool,
+};
+
+const TAB_COUNT = 2;
+const TAB_LABELS: [TAB_COUNT]win32.LPCWSTR = .{ L("General"), L("Columns") };
+const TAB_TEMPLATES: [TAB_COUNT]usize = .{ resource.IDD_TAB_GENERAL, resource.IDD_TAB_COLUMNS };
+
+// The settings dialog is modal, so only one set of pages is ever live; keeping
+// them here saves threading the handles through every message handler.
+var tab_pages: [TAB_COUNT]win32.HWND = .{ null, null };
+
+fn dlgData(hdlg: win32.HWND) *SettingsDlgData {
+	return @ptrFromInt(@as(usize, @bitCast(win32.GetWindowLongPtrW(hdlg, win32.DWLP_USER))));
+}
 
 fn setCheckState(lv: win32.HWND, item: i32, check: bool) void {
 	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
@@ -222,11 +244,148 @@ fn getCheckState(lv: win32.HWND, item: i32) bool {
 	return image_index == 2;
 }
 
+fn colRow(lv: win32.HWND, row: i32) usize {
+	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+	lvi.mask = win32.LVIF_PARAM;
+	lvi.iItem = row;
+	_ = win32.SendMessageW(lv, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+	return @intCast(lvi.lParam);
+}
+
+fn setColRow(lv: win32.HWND, row: i32, ci: usize, checked: bool) void {
+	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+	lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
+	lvi.iItem = row;
+	lvi.pszText = @constCast(COLUMNS[ci].label);
+	lvi.lParam = @intCast(ci);
+	_ = win32.SendMessageW(lv, win32.LVM_SETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+	setCheckState(lv, row, checked);
+}
+
+fn selectedColRow(lv: win32.HWND) i32 {
+	return @intCast(win32.SendMessageW(lv, win32.LVM_GETNEXTITEM, @bitCast(@as(isize, -1)), win32.LVNI_SELECTED));
+}
+
+// Swaps the selected row with its neighbour rather than rebuilding the list, so
+// the scroll position survives and the moved row stays selected under the
+// user's cursor or reading position.
+fn moveColumn(page: win32.HWND, delta: i32) void {
+	const lv = win32.GetDlgItem(page, resource.IDC_COL_LIST);
+	const sel = selectedColRow(lv);
+	const dest = sel + delta;
+	const count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
+	if (sel < 0 or dest < 0 or dest >= count) return;
+	const sel_ci = colRow(lv, sel);
+	const sel_checked = getCheckState(lv, sel);
+	setColRow(lv, sel, colRow(lv, dest), getCheckState(lv, dest));
+	setColRow(lv, dest, sel_ci, sel_checked);
+	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+	lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+	lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+	_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, @intCast(dest), @bitCast(@intFromPtr(&lvi)));
+	_ = win32.SendMessageW(lv, win32.LVM_ENSUREVISIBLE, @intCast(dest), 0);
+}
+
+// A move button that silently does nothing at the end of the list gives a
+// screen reader nothing to announce, so grey them out instead.
+fn updateMoveButtons(page: win32.HWND) void {
+	const lv = win32.GetDlgItem(page, resource.IDC_COL_LIST);
+	const sel = selectedColRow(lv);
+	const count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
+	_ = win32.EnableWindow(win32.GetDlgItem(page, resource.IDC_COL_UP), if (sel > 0) 1 else 0);
+	_ = win32.EnableWindow(win32.GetDlgItem(page, resource.IDC_COL_DOWN), if (sel >= 0 and sel < count - 1) 1 else 0);
+}
+
 fn settingsLvProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_CHAR and wp == ' ') return 0;
+	if (msg == win32.WM_KEYDOWN and (wp == win32.VK_UP or wp == win32.VK_DOWN) and win32.GetKeyState(win32.VK_CONTROL) < 0) {
+		moveColumn(win32.GetParent(hwnd), if (wp == win32.VK_UP) -1 else 1);
+		return 0;
+	}
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
+}
+
+fn pageColors(msg: win32.UINT, wp: win32.WPARAM) win32.INT_PTR {
+	switch (msg) {
+		win32.WM_CTLCOLORDLG => {
+			const br = theme.bgBrush();
+			if (br != null) return @bitCast(@intFromPtr(br));
+		},
+		win32.WM_CTLCOLORSTATIC, win32.WM_CTLCOLORBTN, win32.WM_CTLCOLORLISTBOX, win32.WM_CTLCOLOREDIT => {
+			const br = theme.ctlColor(@ptrFromInt(@as(usize, @bitCast(wp))));
+			if (br != null) return @bitCast(@intFromPtr(br));
+		},
+		else => {},
+	}
+	return 0;
+}
+
+fn generalPageProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.INT_PTR {
+	if (msg == win32.WM_INITDIALOG) {
+		const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(lp)));
+		const combo = win32.GetDlgItem(hdlg, resource.IDC_REFRESH_COMBO);
+		_ = win32.SetWindowTheme(combo, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
+		var sel: i32 = 0;
+		for (0..REFRESH_OPTION_COUNT) |i| {
+			_ = win32.SendMessageW(combo, win32.CB_ADDSTRING, 0, @bitCast(@intFromPtr(REFRESH_LABELS[i])));
+			if (REFRESH_MS[i] == data.refresh_ms) sel = @intCast(i);
+		}
+		_ = win32.SendMessageW(combo, win32.CB_SETCURSEL, @intCast(sel), 0);
+		_ = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_SETCHECK, if (data.skip_kill_confirm) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
+		_ = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_SETCHECK, if (data.start_minimized_to_tray) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
+		return 1;
+	}
+	return pageColors(msg, wp);
+}
+
+fn columnsPageProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.INT_PTR {
+	switch (msg) {
+		win32.WM_INITDIALOG => {
+			const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(lp)));
+			const lv = win32.GetDlgItem(hdlg, resource.IDC_COL_LIST);
+			_ = win32.SendMessageW(lv, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_CHECKBOXES);
+			var lvc: win32.LVCOLUMNW = std.mem.zeroes(win32.LVCOLUMNW);
+			lvc.mask = win32.LVCF_WIDTH;
+			lvc.cx = 1000;
+			_ = win32.SendMessageW(lv, win32.LVM_INSERTCOLUMNW, 0, @bitCast(@intFromPtr(&lvc)));
+			// Row j is order position j + 1: position 0 is the always-visible Name
+			// column, which is neither listed nor movable.
+			for (1..COL_COUNT) |pos| {
+				const ci: usize = data.order[pos];
+				var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+				lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
+				lvi.iItem = @intCast(pos - 1);
+				lvi.pszText = @constCast(COLUMNS[ci].label);
+				lvi.lParam = @intCast(ci);
+				_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+				setCheckState(lv, lvi.iItem, data.visible[ci]);
+			}
+			var first: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+			first.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+			first.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+			_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&first)));
+			theme.applyListview(lv);
+			_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
+			updateMoveButtons(hdlg);
+			return 1;
+		},
+		win32.WM_COMMAND => {
+			const low: u16 = @truncate(wp);
+			if (low == resource.IDC_COL_UP or low == resource.IDC_COL_DOWN) {
+				moveColumn(hdlg, if (low == resource.IDC_COL_UP) -1 else 1);
+				_ = win32.SetFocus(win32.GetDlgItem(hdlg, resource.IDC_COL_LIST));
+				return 1;
+			}
+		},
+		win32.WM_NOTIFY => {
+			const hdr: *const win32.NMHDR = @ptrFromInt(@as(usize, @bitCast(lp)));
+			if (hdr.idFrom == resource.IDC_COL_LIST and hdr.code == @as(win32.UINT, @bitCast(win32.LVN_ITEMCHANGED))) updateMoveButtons(hdlg);
+		},
+		else => {},
+	}
+	return pageColors(msg, wp);
 }
 
 fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM) callconv(.c) win32.INT_PTR {
@@ -234,75 +393,71 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 		win32.WM_INITDIALOG => {
 			_ = win32.SetWindowLongPtrW(hdlg, win32.DWLP_USER, lp);
 			theme.applyTitlebar(hdlg);
-			const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(lp)));
-			const combo = win32.GetDlgItem(hdlg, resource.IDC_REFRESH_COMBO);
-			_ = win32.SetWindowTheme(combo, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
-			var sel: i32 = 0;
-			for (0..REFRESH_OPTION_COUNT) |i| {
-				_ = win32.SendMessageW(combo, win32.CB_ADDSTRING, 0, @bitCast(@intFromPtr(REFRESH_LABELS[i])));
-				if (REFRESH_MS[i] == data.refresh_ms) sel = @intCast(i);
+			const tab = win32.GetDlgItem(hdlg, resource.IDC_SETTINGS_TAB);
+			_ = win32.SendMessageW(tab, win32.WM_SETFONT, @bitCast(win32.SendMessageW(hdlg, win32.WM_GETFONT, 0, 0)), 0);
+			theme.applyButton(tab);
+			for (0..TAB_COUNT) |i| {
+				var tci: win32.TCITEMW = std.mem.zeroes(win32.TCITEMW);
+				tci.mask = win32.TCIF_TEXT;
+				tci.pszText = @constCast(TAB_LABELS[i]);
+				_ = win32.SendMessageW(tab, win32.TCM_INSERTITEMW, @intCast(i), @bitCast(@intFromPtr(&tci)));
 			}
-			_ = win32.SendMessageW(combo, win32.CB_SETCURSEL, @intCast(sel), 0);
-			const font = win32.SendMessageW(hdlg, win32.WM_GETFONT, 0, 0);
-			const lv = win32.GetDlgItem(hdlg, resource.IDC_COL_LIST);
-			_ = win32.SendMessageW(lv, win32.WM_SETFONT, @bitCast(font), 0);
-			_ = win32.SendMessageW(lv, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_CHECKBOXES);
-			var lvc: win32.LVCOLUMNW = std.mem.zeroes(win32.LVCOLUMNW);
-			lvc.mask = win32.LVCF_WIDTH;
-			lvc.cx = 1000;
-			_ = win32.SendMessageW(lv, win32.LVM_INSERTCOLUMNW, 0, @bitCast(@intFromPtr(&lvc)));
-			var j: i32 = 0;
-			for (0..COL_COUNT) |ci| {
-				if (COLUMNS[ci].always_visible) continue;
-				var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-				lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
-				lvi.iItem = j;
-				lvi.pszText = @constCast(COLUMNS[ci].label);
-				lvi.lParam = @intCast(ci);
-				_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-				setCheckState(lv, lvi.iItem, data.visible[ci]);
-				j += 1;
+			// A tab control marked WS_EX_CONTROLPARENT never keeps focus - the
+			// dialog manager treats it as a container and hands focus straight to
+			// the first control inside, so Left/Right can't reach the tab strip.
+			// Instead the control is trimmed to the strip itself and the pages sit
+			// below it as plain siblings: no overlap to fight over, and the sibling
+			// order below is also the tab order.
+			var client: win32.RECT = std.mem.zeroes(win32.RECT);
+			_ = win32.GetClientRect(tab, &client);
+			var display = client;
+			_ = win32.SendMessageW(tab, win32.TCM_ADJUSTRECT, 0, @bitCast(@intFromPtr(&display)));
+			const strip = display.top;
+			var placed: win32.RECT = std.mem.zeroes(win32.RECT);
+			_ = win32.GetWindowRect(tab, &placed);
+			_ = win32.MapWindowPoints(null, hdlg, @ptrCast(&placed), 2);
+			const width = placed.right - placed.left;
+			_ = win32.SetWindowPos(tab, null, placed.left, placed.top, width, strip, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+			const instance = win32.GetModuleHandleW(null);
+			var behind = tab;
+			for (0..TAB_COUNT) |i| {
+				tab_pages[i] = win32.CreateDialogParamW(instance, @ptrFromInt(TAB_TEMPLATES[i]), hdlg, if (i == 0) generalPageProc else columnsPageProc, lp);
+				_ = win32.SetWindowPos(tab_pages[i], behind, placed.left, placed.top + strip, width, placed.bottom - placed.top - strip, win32.SWP_NOACTIVATE);
+				_ = win32.ShowWindow(tab_pages[i], if (i == 0) win32.SW_SHOW else win32.SW_HIDE);
+				behind = tab_pages[i];
 			}
-			if (j > 0) {
-				var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-				lvi2.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-				lvi2.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-				_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&lvi2)));
-			}
-			theme.applyListview(lv);
-			_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
-			const skip_chk = win32.CreateWindowExW(0, L("BUTTON"), L("Disable end task confirmation (not recommended)"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.BS_AUTOCHECKBOX, 7, 118, 176, 10, hdlg, @ptrFromInt(@as(usize, resource.IDC_SKIP_CONFIRM)), win32.GetModuleHandleW(null), null);
-			_ = win32.SendMessageW(skip_chk, win32.WM_SETFONT, @bitCast(font), 0);
-			_ = win32.SendMessageW(skip_chk, win32.BM_SETCHECK, if (data.skip_kill_confirm) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
-			const min_chk = win32.CreateWindowExW(0, L("BUTTON"), L("Start minimized to tray"), win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.BS_AUTOCHECKBOX, 7, 131, 176, 10, hdlg, @ptrFromInt(@as(usize, resource.IDC_START_MINIMIZED)), win32.GetModuleHandleW(null), null);
-			_ = win32.SendMessageW(min_chk, win32.WM_SETFONT, @bitCast(font), 0);
-			_ = win32.SendMessageW(min_chk, win32.BM_SETCHECK, if (data.start_minimized_to_tray) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
-			// Tab order: combo -> listview -> skip_chk -> min_chk -> OK -> Cancel
-			_ = win32.SetWindowPos(skip_chk, lv, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
-			_ = win32.SetWindowPos(min_chk, skip_chk, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
-			_ = win32.SetWindowPos(win32.GetDlgItem(hdlg, win32.IDOK), min_chk, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
-			_ = win32.SetWindowPos(win32.GetDlgItem(hdlg, win32.IDCANCEL), win32.GetDlgItem(hdlg, win32.IDOK), 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE);
+			// Tab order: strip -> pages -> OK -> Cancel.
+			const ok = win32.GetDlgItem(hdlg, win32.IDOK);
+			_ = win32.SetWindowPos(ok, behind, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
+			_ = win32.SetWindowPos(win32.GetDlgItem(hdlg, win32.IDCANCEL), ok, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
 			return 1;
+		},
+		win32.WM_NOTIFY => {
+			const hdr: *const win32.NMHDR = @ptrFromInt(@as(usize, @bitCast(lp)));
+			if (hdr.idFrom == resource.IDC_SETTINGS_TAB and hdr.code == @as(win32.UINT, @bitCast(win32.TCN_SELCHANGE))) {
+				const cur = win32.SendMessageW(hdr.hwndFrom, win32.TCM_GETCURSEL, 0, 0);
+				for (0..TAB_COUNT) |i| _ = win32.ShowWindow(tab_pages[i], if (i == @as(usize, @intCast(cur))) win32.SW_SHOW else win32.SW_HIDE);
+				return 1;
+			}
 		},
 		win32.WM_COMMAND => {
 			const low: u16 = @truncate(wp);
 			if (low == win32.IDOK) {
-				const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(win32.GetWindowLongPtrW(hdlg, win32.DWLP_USER))));
-				const combo = win32.GetDlgItem(hdlg, resource.IDC_REFRESH_COMBO);
+				const data = dlgData(hdlg);
+				const general = tab_pages[0];
+				const combo = win32.GetDlgItem(general, resource.IDC_REFRESH_COMBO);
 				const sel: i32 = @intCast(win32.SendMessageW(combo, win32.CB_GETCURSEL, 0, 0));
 				data.refresh_ms = if (sel >= 0 and sel < REFRESH_OPTION_COUNT) REFRESH_MS[@intCast(sel)] else 0;
-				const lv = win32.GetDlgItem(hdlg, resource.IDC_COL_LIST);
-				const lv_count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
-				for (0..@intCast(lv_count)) |j| {
-					var lvi2: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-					lvi2.mask = win32.LVIF_PARAM;
-					lvi2.iItem = @intCast(j);
-					_ = win32.SendMessageW(lv, win32.LVM_GETITEMW, 0, @bitCast(@intFromPtr(&lvi2)));
-					const idx: usize = @intCast(lvi2.lParam);
-					data.visible[idx] = getCheckState(lv, @intCast(j));
+				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
+				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
+				const lv = win32.GetDlgItem(tab_pages[1], resource.IDC_COL_LIST);
+				const rows: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
+				data.order[0] = 0;
+				for (0..@intCast(rows)) |j| {
+					const ci = colRow(lv, @intCast(j));
+					data.order[j + 1] = @intCast(ci);
+					data.visible[ci] = getCheckState(lv, @intCast(j));
 				}
-				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
-				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
 				_ = win32.EndDialog(hdlg, 1);
 				return 1;
 			}
@@ -324,19 +479,25 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	return 0;
 }
 
-pub fn open(parent: win32.HWND, current_ms: win32.UINT, current_visible: [*]const bool, current_skip_confirm: bool, current_start_minimized: bool, out_ms: *win32.UINT, out_visible: [*]bool, out_skip_confirm: *bool, out_start_minimized: *bool) bool {
-	var data: SettingsDlgData = undefined;
-	data.refresh_ms = current_ms;
-	for (0..COL_COUNT) |i| data.visible[i] = current_visible[i];
-	data.skip_kill_confirm = current_skip_confirm;
-	data.start_minimized_to_tray = current_start_minimized;
-	const result = win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_SETTINGS), parent, settingsDlgProc, @bitCast(@intFromPtr(&data)));
-	if (result == 0) return false;
-	out_ms.* = data.refresh_ms;
-	for (0..COL_COUNT) |i| out_visible[i] = data.visible[i];
-	out_skip_confirm.* = data.skip_kill_confirm;
-	out_start_minimized.* = data.start_minimized_to_tray;
-	return true;
+pub fn open(parent: win32.HWND, prefs: *SortPrefs) ?Changes {
+	var data: SettingsDlgData = .{
+		.refresh_ms = prefs.refresh_ms,
+		.visible = prefs.visible,
+		.order = prefs.order,
+		.skip_kill_confirm = prefs.skip_kill_confirm,
+		.start_minimized_to_tray = prefs.start_minimized_to_tray,
+	};
+	if (win32.DialogBoxParamW(win32.GetModuleHandleW(null), @ptrFromInt(resource.IDD_SETTINGS), parent, settingsDlgProc, @bitCast(@intFromPtr(&data))) == 0) return null;
+	const changes = Changes{
+		.refresh_ms = data.refresh_ms != prefs.refresh_ms,
+		.columns = !std.mem.eql(bool, &data.visible, &prefs.visible) or !std.mem.eql(u8, &data.order, &prefs.order),
+	};
+	prefs.refresh_ms = data.refresh_ms;
+	prefs.visible = data.visible;
+	prefs.order = data.order;
+	prefs.skip_kill_confirm = data.skip_kill_confirm;
+	prefs.start_minimized_to_tray = data.start_minimized_to_tray;
+	return changes;
 }
 
 // Installed copies (under Program Files) can't write next to the exe, so they
@@ -372,9 +533,11 @@ fn setIniBool(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, v
 	_ = win32.WritePrivateProfileStringW(section, key, if (value) L("1") else L("0"), path);
 }
 
-fn getIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR) i32 {
+fn getIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, default: i32) i32 {
+	var def: [16:0]u16 = std.mem.zeroes([16:0]u16);
+	wfmt.format(&def, 16, "%d", .{default});
 	var buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
-	_ = win32.GetPrivateProfileStringW(section, key, L("0"), &buf, 16, path);
+	_ = win32.GetPrivateProfileStringW(section, key, &def, &buf, 16, path);
 	return win32.StrToIntW(&buf);
 }
 
@@ -408,21 +571,37 @@ pub fn load(prefs: *SortPrefs) void {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		prefs.desc[i] = getIniBool(&path, L("sort"), columnKey("_desc", &key, COLUMNS[i].label), false);
 	}
-	prefs.refresh_ms = @intCast(getIniInt(&path, L("refresh"), L("interval_ms")));
+	prefs.refresh_ms = @intCast(getIniInt(&path, L("refresh"), L("interval_ms"), 0));
 	prefs.skip_kill_confirm = getIniBool(&path, L("confirm"), L("skip_kill"), false);
 	prefs.always_on_top = getIniBool(&path, L("window"), L("always_on_top"), false);
 	prefs.tree_mode = getIniBool(&path, L("view"), L("tree_mode"), false);
 	prefs.start_minimized_to_tray = getIniBool(&path, L("window"), L("start_minimized_to_tray"), false);
-	prefs.window_width = getIniInt(&path, L("window"), L("width"));
+	prefs.window_width = getIniInt(&path, L("window"), L("width"), 0);
 	if (prefs.window_width > 0) {
-		prefs.window_height = getIniInt(&path, L("window"), L("height"));
-		prefs.window_left = getIniInt(&path, L("window"), L("left"));
-		prefs.window_top = getIniInt(&path, L("window"), L("top"));
+		prefs.window_height = getIniInt(&path, L("window"), L("height"), 0);
+		prefs.window_left = getIniInt(&path, L("window"), L("left"), 0);
+		prefs.window_top = getIniInt(&path, L("window"), L("top"), 0);
 	}
 	for (0..COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		const visible = getIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), COLUMNS[i].default_visible);
 		prefs.visible[i] = COLUMNS[i].always_visible or visible;
+	}
+	// Saved ranks are insertion-sorted (stable, natural index breaking ties)
+	// rather than trusted as positions, so a hand-edited ini, a duplicate rank,
+	// or a column added by a later version still yields a full permutation.
+	var rank: [COL_COUNT]i32 = undefined;
+	for (0..COL_COUNT) |i| {
+		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
+		rank[i] = getIniInt(&path, L("columns"), columnKey("_order", &key, COLUMNS[i].label), @intCast(i));
+	}
+	prefs.order[0] = 0;
+	var n: usize = 1;
+	for (1..COL_COUNT) |i| {
+		var pos = n;
+		while (pos > 1 and rank[prefs.order[pos - 1]] > rank[i]) : (pos -= 1) prefs.order[pos] = prefs.order[pos - 1];
+		prefs.order[pos] = @intCast(i);
+		n += 1;
 	}
 }
 
@@ -450,5 +629,10 @@ pub fn save(prefs: *const SortPrefs) void {
 		if (COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		setIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), prefs.visible[i]);
+	}
+	for (0..COL_COUNT) |pos| {
+		const ci: usize = prefs.order[pos];
+		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
+		setIniInt(&path, L("columns"), columnKey("_order", &key, COLUMNS[ci].label), @intCast(pos));
 	}
 }

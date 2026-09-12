@@ -330,17 +330,9 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_SETTINGS) {
-		var new_ms: win32.UINT = undefined;
-		var new_visible: [settings.COL_COUNT]bool = undefined;
-		var new_skip_confirm: bool = undefined;
-		var new_start_minimized: bool = undefined;
-		if (settings.open(hwnd, state.prefs.refresh_ms, &state.prefs.visible, state.prefs.skip_kill_confirm, state.prefs.start_minimized_to_tray, &new_ms, &new_visible, &new_skip_confirm, &new_start_minimized)) {
-			const cols_changed = !std.mem.eql(bool, &new_visible, &state.prefs.visible);
-			state.prefs.visible = new_visible;
-			state.prefs.skip_kill_confirm = new_skip_confirm;
-			state.prefs.start_minimized_to_tray = new_start_minimized;
-			if (new_ms != state.prefs.refresh_ms) setRefreshInterval(hwnd, new_ms);
-			if (cols_changed) {
+		if (settings.open(hwnd, &state.prefs)) |changed| {
+			if (changed.refresh_ms) setRefreshInterval(hwnd, state.prefs.refresh_ms);
+			if (changed.columns) {
 				sortbar.applyColumns();
 				listview.resort();
 			}
