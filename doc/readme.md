@@ -18,7 +18,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 * Restart Taskmon as administrator from the File menu to manage processes you don't otherwise have access to.
 * Keep Taskmon Always on Top via the View menu.
 * Configurable auto-refresh interval (Off, 5 seconds, 10 seconds, 30 seconds, 1 minute).
-* Remembers your window size, position, and column preferences across sessions.
+* Remembers your window size, position, and column choice and order across sessions.
 * Option to disable the end task confirmation prompt for faster workflow.
 
 ## Process Tree View
@@ -31,7 +31,7 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 
 ## Available Columns
 
-All columns are optional except Name, which is always shown. Enable the ones you want from Settings (Ctrl+,); Name, PID, CPU %, and Memory are shown by default.
+All columns are optional except Name, which is always shown. Enable the ones you want from the Columns tab in Settings (Ctrl+,); Name, PID, CPU %, and Memory are shown by default.
 
 * Name: The process's executable name.
 * PID: The unique numeric process ID assigned by Windows.
@@ -108,7 +108,8 @@ All columns are optional except Name, which is always shown. Enable the ones you
 
 Taskmon has robust support for customizing how data is displayed, built specifically with accessibility in mind.
 
-* Drag and drop: You can drag and drop column headers with the mouse to reorder them to your liking.
+* Settings: Press Ctrl+, and open the Columns tab. Check a column to show it, or clear it to hide it. To change the order, select a column and press Ctrl+Up or Ctrl+Down, or use the Move up and Move down buttons. Taskmon saves this order between runs. Name always stays first.
+* Drag and drop: You can drag and drop column headers with the mouse to reorder them for the current session.
 * Accessible sorting: Screen reader users can press Shift+Tab from the process list to focus a specialized set of hidden radio buttons. From there, use the Left and Right arrow keys to instantly change which column the list is sorted by. Pressing Enter will toggle the sort order between ascending and descending.
 
 ## Keyboard Shortcuts
@@ -135,6 +136,12 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Priority: Allows changing the CPU priority class (Idle, Below Normal, Normal, Above Normal, High, Realtime).
 
 ## Changelog
+
+### Version 0.3.2
+* Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.
+* Fixed the Ctrl+Shift+~ hotkey doing nothing after using File > Restart as administrator.
+* Fixed the installer not reflecting your earlier choices. Its checkboxes now show what is actually installed, and clearing one removes it.
+* Fixed the installer not remembering a custom install location.
 
 ### Version 0.3.1
 * Added 29 new columns: Peak Virtual Memory, Peak Private Bytes, Peak Paged Pool, Peak Non-paged Pool, Peak Threads, Hard Faults, CPU Cycles, Kernel Time, User Time, Total Page Faults, I/O Read Ops, I/O Write Ops, I/O Other Ops, Total I/O, Elapsed Time, Shared Working Set, Parent Name, Private Bytes Delta, Working Set Delta, Handle Delta, Thread Delta, Virtualization, AppContainer, Domain, User SID, Efficiency Mode, I/O Priority, Memory Priority, and Protection.
