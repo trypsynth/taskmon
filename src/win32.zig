@@ -867,6 +867,17 @@ const HDM_FIRST: UINT = 0x1200;
 pub const HDM_GETITEMW: UINT = HDM_FIRST + 11;
 pub const HDM_SETITEMW: UINT = HDM_FIRST + 12;
 pub const HDM_GETITEMCOUNT: UINT = HDM_FIRST + 0;
+
+const HDN_FIRST: i32 = -300;
+pub const HDN_BEGINDRAG: i32 = HDN_FIRST - 10;
+pub const HDN_ENDDRAG: i32 = HDN_FIRST - 11;
+
+pub const NMHEADER = extern struct {
+	hdr: NMHDR,
+	iItem: i32,
+	iButton: i32,
+	pitem: ?*HDITEMW,
+};
 pub const LVM_GETHEADER: UINT = LVM_FIRST + 31;
 pub const LVM_DELETECOLUMN: UINT = LVM_FIRST + 28;
 

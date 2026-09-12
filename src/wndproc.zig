@@ -25,6 +25,7 @@ const ID_CTX_PRIORITY_BASE = 310; // +0=Idle +1=BelowNormal +2=Normal +3=AboveNo
 const PRIORITY_CLASS_COUNT = 6;
 const WM_TRAYICON: win32.UINT = win32.WM_APP + 1;
 const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
+const WM_COLUMN_DRAGGED: win32.UINT = win32.WM_APP + 3;
 const ID_REFRESH_TIMER = 1;
 const ID_PRIME_TIMER = 2;
 const ID_HOTKEY_TOGGLE = 1;
@@ -523,8 +524,32 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		},
 		win32.WM_COMMAND => return handleCommand(hwnd, wp),
 		win32.WM_CONTEXTMENU => return handleContextMenu(hwnd, wp, lp),
+		WM_COLUMN_DRAGGED => {
+			sortbar.moveVisibleColumn(@intCast(wp), @intCast(lp));
+			sortbar.applyColumns();
+			listview.resort();
+			settings.save(&state.prefs);
+			return 0;
+		},
 		win32.WM_NOTIFY => {
 			const hdr: *const win32.NMHDR = @ptrFromInt(@as(usize, @bitCast(lp)));
+			if (hdr.code == @as(win32.UINT, @bitCast(win32.HDN_BEGINDRAG)) or hdr.code == @as(win32.UINT, @bitCast(win32.HDN_ENDDRAG))) {
+				const header = win32.SendMessageW(state.hwnd_list, win32.LVM_GETHEADER, 0, 0);
+				if (hdr.hwndFrom == @as(win32.HWND, @ptrFromInt(@as(usize, @bitCast(header))))) {
+					const nmh: *const win32.NMHEADER = @ptrFromInt(@as(usize, @bitCast(lp)));
+					// Name has to stay leftmost: populateList renders it from the item
+					// label rather than a subitem, so refuse any drag that touches it.
+					if (nmh.iItem == 0) return 1;
+					if (hdr.code == @as(win32.UINT, @bitCast(win32.HDN_ENDDRAG))) {
+						// Rebuilding the columns from inside the header's own drag
+						// handler is asking for trouble, so cancel the control's
+						// reorder and redo it properly once the drag has unwound.
+						const to: i32 = if (nmh.pitem) |item| item.iOrder else 0;
+						if (to > 0) _ = win32.PostMessageW(hwnd, WM_COLUMN_DRAGGED, @intCast(nmh.iItem), @intCast(to));
+						return 1;
+					}
+				}
+			}
 			if (hdr.idFrom == ID_LISTVIEW and hdr.code == @as(win32.UINT, @bitCast(win32.LVN_COLUMNCLICK))) {
 				const nmlv: *const win32.NMLISTVIEW = @ptrFromInt(@as(usize, @bitCast(lp)));
 				const col = nmlv.iSubItem;

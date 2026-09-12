@@ -109,7 +109,7 @@ All columns are optional except Name, which is always shown. Enable the ones you
 Taskmon has robust support for customizing how data is displayed, built specifically with accessibility in mind.
 
 * Settings: Press Ctrl+, and open the Columns tab. Check a column to show it, or clear it to hide it. To change the order, select a column and press Ctrl+Up or Ctrl+Down, or use the Move up and Move down buttons. Taskmon saves this order between runs. Name always stays first.
-* Drag and drop: You can drag and drop column headers with the mouse to reorder them for the current session.
+* Drag and drop: You can drag column headers with the mouse to reorder them. Taskmon saves the result just as it does an order set from the Columns tab, and the accessible sort buttons follow along. Name cannot be dragged, because it always stays first.
 * Accessible sorting: Screen reader users can press Shift+Tab from the process list to focus a specialized set of hidden radio buttons. From there, use the Left and Right arrow keys to instantly change which column the list is sorted by. Pressing Enter will toggle the sort order between ascending and descending.
 
 ## Keyboard Shortcuts
@@ -139,6 +139,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.
+* Fixed column header drag and drop being forgotten on restart, and leaving the accessible sort buttons in the old order.
 * Fixed the Ctrl+Shift+~ hotkey doing nothing after using File > Restart as administrator.
 * Fixed the installer not reflecting your earlier choices. Its checkboxes now show what is actually installed, and clearing one removes it.
 * Fixed the installer not remembering a custom install location.

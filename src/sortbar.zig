@@ -118,6 +118,36 @@ pub fn updateSortUi() void {
 	}
 }
 
+// Bakes a header drag into prefs.order. Only the visible columns change places;
+// the hidden ones keep the slots they already hold, so re-enabling one puts it
+// back where it was rather than at the end.
+pub fn moveVisibleColumn(from: i32, to: i32) void {
+	var slots: [settings.COL_COUNT]u8 = undefined;
+	var seq: [settings.COL_COUNT]u8 = undefined;
+	var n: usize = 0;
+	for (0..settings.COL_COUNT) |pos| {
+		const ci = state.prefs.order[pos];
+		if (!state.prefs.visible[ci]) continue;
+		slots[n] = @intCast(pos);
+		seq[n] = ci;
+		n += 1;
+	}
+	const count: i32 = @intCast(n);
+	if (from == to or from <= 0 or to <= 0 or from >= count or to >= count) return;
+	const f: usize = @intCast(from);
+	const t: usize = @intCast(to);
+	const moved = seq[f];
+	if (f < t) {
+		var i = f;
+		while (i < t) : (i += 1) seq[i] = seq[i + 1];
+	} else {
+		var i = f;
+		while (i > t) : (i -= 1) seq[i] = seq[i - 1];
+	}
+	seq[t] = moved;
+	for (0..n) |k| state.prefs.order[slots[k]] = seq[k];
+}
+
 pub fn applyColumns() void {
 	for (0..@intCast(state.sort_btn_count)) |idx| {
 		_ = win32.DestroyWindow(state.sort_btns[idx]);
