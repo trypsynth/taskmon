@@ -107,6 +107,10 @@ fn openItemLocation(path: [*:0]const u16) bool {
 	return @intFromPtr(win32.ShellExecuteW(null, L("open"), &folder, null, null, win32.SW_SHOW)) > 32;
 }
 
+fn registerToggleHotkey(hwnd: win32.HWND) void {
+	_ = win32.RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, win32.MOD_CONTROL | win32.MOD_SHIFT | win32.MOD_NOREPEAT, @intCast(win32.VK_OEM_3));
+}
+
 fn createMenuBar(hwnd: win32.HWND) void {
 	const bar = win32.CreateMenu();
 	const file = win32.CreatePopupMenu();
@@ -297,10 +301,16 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 			_ = win32.CloseHandle(state.mutex);
 			state.mutex = null;
 		}
-		if (@intFromPtr(win32.ShellExecuteW(null, L("runas"), &path, null, null, win32.SW_SHOW)) > 32)
-			_ = win32.DestroyWindow(hwnd)
-		else if (state.mutex == null)
+		// The elevated instance registers the toggle hotkey from its WM_CREATE, which
+		// runs while this process is still alive. Holding the hotkey until DestroyWindow
+		// makes that registration fail and leaves the new instance with no hotkey.
+		_ = win32.UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
+		if (@intFromPtr(win32.ShellExecuteW(null, L("runas"), &path, null, null, win32.SW_SHOW)) > 32) {
+			_ = win32.DestroyWindow(hwnd);
+		} else {
+			registerToggleHotkey(hwnd);
 			state.mutex = win32.CreateMutexW(null, 1, L("Local\\TaskmonSingleInstance"));
+		}
 		return 0;
 	}
 	if (id == resource.ID_FILE_EXIT) {
@@ -433,7 +443,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		},
 		win32.WM_CREATE => {
 			state.hwnd = hwnd;
-			_ = win32.RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, win32.MOD_CONTROL | win32.MOD_SHIFT | win32.MOD_NOREPEAT, @intCast(win32.VK_OEM_3));
+			registerToggleHotkey(hwnd);
 			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
 			state.hwnd_sort_group = sortbar.create(hwnd);
