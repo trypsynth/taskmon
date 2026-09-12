@@ -27,6 +27,7 @@ SetCompressor /SOLID lzma
 !include "MUI2.nsh"
 !include "x64.nsh"
 !include "LogicLib.nsh"
+!include "Sections.nsh"
 
 !define MUI_ABORTWARNING
 
@@ -41,21 +42,6 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "English"
-
-Function .onInit
-	SetRegView 64
-!if "${MyAppArch}" == "arm64"
-	${IfNot} ${IsNativeARM64}
-		MessageBox MB_OK|MB_ICONSTOP "This is the ARM64 build of ${MyAppName}, but this PC isn't running ARM64 Windows."
-		Quit
-	${EndIf}
-!else
-	${IfNot} ${RunningX64}
-		MessageBox MB_OK|MB_ICONSTOP "${MyAppName} requires 64-bit Windows."
-		Quit
-	${EndIf}
-!endif
-FunctionEnd
 
 Section "${MyAppName}" SecMain
 	SectionIn RO
@@ -88,6 +74,51 @@ SectionEnd
 Section /o "Replace Windows Task Manager (Ctrl+Shift+Esc / taskbar) with ${MyAppName}" SecReplaceTaskmgr
 	SetRegView 64
 	WriteRegStr HKLM "${TaskmgrIfeoKey}" "Debugger" '"$INSTDIR\taskmon.exe"'
+SectionEnd
+
+; Section indices are only defined once their Section blocks have been parsed,
+; so .onInit has to live below them.
+Function .onInit
+	SetRegView 64
+!if "${MyAppArch}" == "arm64"
+	${IfNot} ${IsNativeARM64}
+		MessageBox MB_OK|MB_ICONSTOP "This is the ARM64 build of ${MyAppName}, but this PC isn't running ARM64 Windows."
+		Quit
+	${EndIf}
+!else
+	${IfNot} ${RunningX64}
+		MessageBox MB_OK|MB_ICONSTOP "${MyAppName} requires 64-bit Windows."
+		Quit
+	${EndIf}
+!endif
+	; InstallDirRegKey runs before .onInit, so it reads the 32-bit view and misses
+	; the value Section SecMain writes under SetRegView 64.
+	ReadRegStr $0 HKLM "Software\${MyAppName}" "InstallDir"
+	${If} $0 == ""
+		Return ; Fresh install: leave the section defaults alone.
+	${EndIf}
+	StrCpy $INSTDIR $0
+	${IfNot} ${FileExists} "$DESKTOP\${MyAppName}.lnk"
+		!insertmacro UnselectSection ${SecDesktopIcon}
+	${EndIf}
+	ReadRegStr $0 HKLM "${TaskmgrIfeoKey}" "Debugger"
+	${If} $0 == '"$INSTDIR\taskmon.exe"'
+		!insertmacro SelectSection ${SecReplaceTaskmgr}
+	${EndIf}
+FunctionEnd
+
+; Optional sections that are unchecked on a reinstall have to undo themselves,
+; otherwise the pre-checked boxes would not match what the installer leaves behind.
+Section -Undo
+	SetRegView 64
+	${IfNot} ${SectionIsSelected} ${SecDesktopIcon}
+		Delete "$DESKTOP\${MyAppName}.lnk"
+	${EndIf}
+	ReadRegStr $0 HKLM "${TaskmgrIfeoKey}" "Debugger"
+	${IfNot} ${SectionIsSelected} ${SecReplaceTaskmgr}
+	${AndIf} $0 == '"$INSTDIR\taskmon.exe"'
+		DeleteRegValue HKLM "${TaskmgrIfeoKey}" "Debugger"
+	${EndIf}
 SectionEnd
 
 Section "Uninstall"
