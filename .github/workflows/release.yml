@@ -22,7 +22,7 @@ jobs:
             target: aarch64-windows
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Pandoc
         run: choco install pandoc
@@ -73,13 +73,13 @@ jobs:
           Compress-Archive -Path "$dist/*" -DestinationPath "taskmon-$arch.zip"
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: taskmon-${{ matrix.arch }}
           path: taskmon-*.zip
 
       - name: Upload Installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: taskmon-installer-${{ matrix.arch }}
           path: zig-out/bin/taskmon-setup-*.exe
@@ -90,7 +90,7 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Move nightly tag
         if: github.ref_type == 'branch'
@@ -99,7 +99,7 @@ jobs:
           git push -f origin nightly
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./artifacts
 
@@ -107,7 +107,7 @@ jobs:
         run: ls -R ./artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
           name: ${{ github.ref_type == 'tag' && format('Taskmon Release {0}', github.ref_name) || 'Taskmon Nightly Build' }}
