@@ -6,6 +6,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 
 * View all running processes and sort them by various resource usage metrics.
 * Switch between a Processes tab and a Services tab with Ctrl+Tab, or with the arrow keys on the tab strip.
+* Find a process or service by name with Ctrl+F, then step through the matches with F3 and Shift+F3.
 * Start, stop, and restart Windows services, and jump from a service to the process hosting it.
 * Choose from over 65 customizable columns to display; see Available Columns below for the full list.
 * Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
@@ -30,6 +31,15 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 * Press Ctrl+T, or choose View > Process Tree, to toggle between the list and tree views.
 * Expand or collapse a process's children using the tree's disclosure triangles or the keyboard.
 * Right-click a process in tree view for an additional End process tree action, which terminates that process and all of its descendants, ending the children before their parents.
+
+## Finding a Process or Service
+
+* Press Ctrl+F to open the Find dialog, type part of a name, and press Enter. Taskmon selects the first match.
+* F3 moves to the next match and Shift+F3 moves to the previous one. Both wrap around the end of the list.
+* The search is not case sensitive and matches anywhere in the name, so "host" finds svchost.exe.
+* Find always works on the tab you are looking at. On the Processes tab it searches process names, in either the list or the tree. On the Services tab it searches both the service name and the display name, so either wuauserv or Windows Update finds the same row.
+* In the process tree, a match inside a collapsed branch still counts. Taskmon expands whatever it needs to show you the result.
+* Pressing F3 before you have searched for anything opens the Find dialog rather than doing nothing.
 
 ## Services
 
@@ -134,6 +144,8 @@ Taskmon supports the following keyboard shortcuts for quick navigation and contr
 * Ctrl+N: Open the Run dialog to start a new task.
 * Ctrl+T: Toggle between the list and process tree views. Processes tab only.
 * Ctrl+Tab: Move to the next tab. Ctrl+Shift+Tab moves to the previous one.
+* Ctrl+F: Open the Find dialog to search the current tab.
+* F3: Move to the next match. Shift+F3 moves to the previous one.
 * Ctrl+,: Open the Settings dialog to customize columns and refresh rates.
 * Delete: End the currently selected task.
 * Escape: Hide Taskmon to the system tray.
@@ -154,6 +166,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ### Version 0.4.0
 * Added a tabbed interface, with the existing process list on a Processes tab and a new Services tab alongside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
 * Added a Services tab listing every Windows service with its display name, status, startup type, and PID, with Start, Stop, Restart, and Go to process actions.
+* Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.

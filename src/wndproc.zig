@@ -8,6 +8,7 @@ const tray = @import("tray.zig");
 const run = @import("run.zig");
 const sortbar = @import("sortbar.zig");
 const services = @import("services.zig");
+const find = @import("find.zig");
 const treeview = @import("treeview.zig");
 const listview = @import("listview.zig");
 const process = @import("process.zig");
@@ -241,6 +242,10 @@ fn createMenuBar(hwnd: win32.HWND) void {
 	const view = win32.CreatePopupMenu();
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("Refresh\tF5"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND, L("Find...\tCtrl+F"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_NEXT, L("Find next\tF3"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_PREV, L("Find previous\tShift+F3"));
+	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_NEXT_TAB, L("Next tab\tCtrl+Tab"));
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_PREV_TAB, L("Previous tab\tCtrl+Shift+Tab"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
@@ -450,6 +455,16 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	}
 	if (id == resource.ID_VIEW_REFRESH) {
 		refreshActiveTab();
+		return 0;
+	}
+	if (id == resource.ID_EDIT_FIND) {
+		find.openDialog(hwnd);
+		return 0;
+	}
+	if (id == resource.ID_EDIT_FIND_NEXT or id == resource.ID_EDIT_FIND_PREV) {
+		// F3 before anything has been searched for opens the dialog rather than
+		// doing nothing, which is what people expect the first time they press it.
+		if (find.hasQuery()) find.findNext(hwnd, id == resource.ID_EDIT_FIND_NEXT) else find.openDialog(hwnd);
 		return 0;
 	}
 	if (id == resource.ID_VIEW_NEXT_TAB or id == resource.ID_VIEW_PREV_TAB) {

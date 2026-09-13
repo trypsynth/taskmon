@@ -263,6 +263,7 @@ pub extern "shlwapi" fn PathRemoveFileSpecW(pszPath: [*:0]u16) callconv(.c) BOOL
 pub extern "shlwapi" fn PathIsPrefixW(pszPrefix: LPCWSTR, pszPath: LPCWSTR) callconv(.c) BOOL;
 pub extern "shlwapi" fn PathAppendW(pszPath: [*:0]u16, pszMore: LPCWSTR) callconv(.c) BOOL;
 pub extern "shlwapi" fn StrCmpIW(pszStr1: LPCWSTR, pszStr2: LPCWSTR) callconv(.c) c_int;
+pub extern "shlwapi" fn StrStrIW(pszFirst: LPCWSTR, pszSrch: LPCWSTR) callconv(.c) ?[*:0]const u16;
 pub extern "shlwapi" fn StrToIntW(pszString: LPCWSTR) callconv(.c) c_int;
 pub extern "shlwapi" fn PathRemoveBlanksW(pszPath: [*:0]u16) callconv(.c) void;
 
@@ -692,6 +693,7 @@ pub const CS_HREDRAW: UINT = 0x0002;
 pub const CS_VREDRAW: UINT = 0x0001;
 pub const COLOR_WINDOW: usize = 5;
 pub const MB_ICONERROR: UINT = 0x00000010;
+pub const MB_ICONINFORMATION: UINT = 0x00000040;
 pub const WS_OVERLAPPED: DWORD = 0x00000000;
 pub const WS_CAPTION: DWORD = 0x00C00000;
 pub const WS_SYSMENU: DWORD = 0x00080000;
