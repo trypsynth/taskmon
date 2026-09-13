@@ -9,6 +9,7 @@ const std = @import("std");
 const win32 = @import("win32.zig");
 const settings = @import("settings.zig");
 const pt = @import("process_types.zig");
+const services = @import("services.zig");
 
 // Private window messages. Kept together so the WM_APP numbering has a single
 // owner: WM_HIDE_TO_TRAY is posted by every control subclass that handles
@@ -25,6 +26,14 @@ pub var hwnd_status: win32.HWND = null;
 pub var sort_btns: [settings.COL_COUNT]win32.HWND = std.mem.zeroes([settings.COL_COUNT]win32.HWND);
 pub var sort_btn_cols: [settings.COL_COUNT]i32 = std.mem.zeroes([settings.COL_COUNT]i32);
 pub var sort_btn_count: i32 = 0;
+pub var hwnd_tab: win32.HWND = null;
+pub var hwnd_svc_list: win32.HWND = null;
+pub var hwnd_svc_sort_group: win32.HWND = null;
+pub var svc_sort_btns: [services.COL_COUNT]win32.HWND = std.mem.zeroes([services.COL_COUNT]win32.HWND);
+pub var svc_field: services.SortField = .name;
+pub var svc_desc: bool = false;
+pub var active_tab: i32 = 0;
+
 pub var prefs: settings.SortPrefs = undefined;
 pub var snapshots: [pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry = std.mem.zeroes([pt.SNAPSHOT_CAPACITY]pt.SnapshotEntry);
 pub var mutex: win32.HANDLE = null;

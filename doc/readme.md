@@ -5,6 +5,8 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 ## Core Features
 
 * View all running processes and sort them by various resource usage metrics.
+* Switch between a Processes tab and a Services tab with Ctrl+Tab, or with the arrow keys on the tab strip.
+* Start, stop, and restart Windows services, and jump from a service to the process hosting it.
 * Choose from over 65 customizable columns to display; see Available Columns below for the full list.
 * Switch to a hierarchical Process Tree view to see which processes launched which; see Process Tree View below.
 * Available as a portable executable or via a Windows installer. Portable copies keep their settings alongside the executable so you can carry them on a USB drive; installed copies store settings per-user automatically, since Program Files isn't writable without administrator rights.
@@ -28,6 +30,17 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 * Press Ctrl+T, or choose View > Process Tree, to toggle between the list and tree views.
 * Expand or collapse a process's children using the tree's disclosure triangles or the keyboard.
 * Right-click a process in tree view for an additional End process tree action, which terminates that process and all of its descendants, ending the children before their parents.
+
+## Services
+
+The Services tab lists every Windows service, whether it is running or not.
+
+* Press Ctrl+Tab to move between the Processes and Services tabs, or Tab to the tab strip and use the Left and Right arrow keys.
+* Columns are Name, Display Name, Status, Startup Type, and PID. A blank PID means the service is not running.
+* Sorting works exactly as it does on the Processes tab; see Column Reordering and Accessible Sorting below.
+* Right-click a service, or press the context menu key, for Start, Stop, Restart, and Go to process. Start and Stop grey out when they do not apply.
+* Go to process switches to the Processes tab and selects the process hosting that service.
+* Controlling a service needs administrator rights. If you are not elevated, Taskmon tells you and points you at File > Restart as administrator.
 
 ## Available Columns
 
@@ -110,16 +123,17 @@ Taskmon has robust support for customizing how data is displayed, built specific
 
 * Settings: Press Ctrl+, and open the Columns tab. Check a column to show it, or clear it to hide it. To change the order, select a column and press Ctrl+Up or Ctrl+Down, or use the Move up and Move down buttons. Taskmon saves this order between runs. Name always stays first.
 * Drag and drop: You can drag column headers with the mouse to reorder them. Taskmon saves the result just as it does an order set from the Columns tab, and the accessible sort buttons follow along. Name cannot be dragged, because it always stays first.
-* Accessible sorting: Screen reader users can press Shift+Tab from the process list to focus a specialized set of hidden radio buttons. From there, use the Left and Right arrow keys to instantly change which column the list is sorted by. Pressing Enter will toggle the sort order between ascending and descending.
+* Accessible sorting: Screen reader users can press Tab from either list to focus a specialized set of hidden radio buttons. From there, use the Left and Right arrow keys to instantly change which column the list is sorted by. Pressing Enter will toggle the sort order between ascending and descending. The Services tab has its own set of these, covering its own columns.
 
 ## Keyboard Shortcuts
 
 Taskmon supports the following keyboard shortcuts for quick navigation and control:
 
 * Ctrl+Shift+~: Global hotkey to toggle Taskmon visibility from anywhere.
-* F5: Refresh the process list manually.
+* F5: Refresh the current tab manually.
 * Ctrl+N: Open the Run dialog to start a new task.
-* Ctrl+T: Toggle between the list and process tree views.
+* Ctrl+T: Toggle between the list and process tree views. Processes tab only.
+* Ctrl+Tab: Move to the next tab. Ctrl+Shift+Tab moves to the previous one.
 * Ctrl+,: Open the Settings dialog to customize columns and refresh rates.
 * Delete: End the currently selected task.
 * Escape: Hide Taskmon to the system tray.
@@ -136,6 +150,10 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Priority: Allows changing the CPU priority class (Idle, Below Normal, Normal, Above Normal, High, Realtime).
 
 ## Changelog
+
+### Version 0.4.0
+* Added a tabbed interface, with the existing process list on a Processes tab and a new Services tab alongside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
+* Added a Services tab listing every Windows service with its display name, status, startup type, and PID, with Start, Stop, Restart, and Go to process actions.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.

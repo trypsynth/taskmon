@@ -7,6 +7,7 @@ const theme = @import("theme.zig");
 const tray = @import("tray.zig");
 const run = @import("run.zig");
 const sortbar = @import("sortbar.zig");
+const services = @import("services.zig");
 const treeview = @import("treeview.zig");
 const listview = @import("listview.zig");
 const process = @import("process.zig");
@@ -23,6 +24,9 @@ const ID_CTX_SUSPEND = 303;
 const ID_CTX_RESUME = 304;
 const ID_CTX_PRIORITY_BASE = 310; // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
 const PRIORITY_CLASS_COUNT = 6;
+const TAB_COUNT: i32 = 2;
+const TAB_PROCESSES: i32 = 0;
+const TAB_SERVICES: i32 = 1;
 const ID_REFRESH_TIMER = 1;
 const ID_PRIME_TIMER = 2;
 const ID_HOTKEY_TOGGLE = 1;
@@ -109,6 +113,122 @@ fn registerToggleHotkey(hwnd: win32.HWND) void {
 	_ = win32.RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, win32.MOD_CONTROL | win32.MOD_SHIFT | win32.MOD_NOREPEAT, @intCast(win32.VK_OEM_3));
 }
 
+fn handleServiceCommand(hwnd: win32.HWND, id: i32) void {
+	if (id == resource.ID_CTX_SVC_GOTO) {
+		const pid = services.getSelectedPid();
+		if (pid == 0) return;
+		selectTab(TAB_PROCESSES);
+		if (state.prefs.tree_mode) treeview.selectPid(pid) else listview.selectPid(pid);
+		return;
+	}
+	var name: [services.NAME_LEN:0]u16 = std.mem.zeroes([services.NAME_LEN:0]u16);
+	services.getSelectedName(&name);
+	if (name[0] == 0) return;
+	const action: services.Action = switch (id) {
+		resource.ID_CTX_SVC_START => .start,
+		resource.ID_CTX_SVC_STOP => .stop,
+		else => .restart,
+	};
+	const err = services.control(&name, action);
+	if (err != 0) {
+		// Controlling a service needs rights an ordinary user does not have, and
+		// that is the failure people will actually hit, so name the fix.
+		const text: win32.LPCWSTR = if (err == win32.ERROR_ACCESS_DENIED)
+			L("Access denied. Use File > Restart as administrator, then try again.")
+		else
+			L("The service could not be controlled.");
+		_ = win32.MessageBoxW(hwnd, text, &WINDOW_TITLE, win32.MB_ICONERROR);
+	}
+	services.doRefresh();
+}
+
+fn showServiceMenu(hwnd: win32.HWND, point: win32.POINT) win32.LRESULT {
+	var name: [services.NAME_LEN:0]u16 = std.mem.zeroes([services.NAME_LEN:0]u16);
+	services.getSelectedName(&name);
+	if (name[0] == 0) return 0;
+	const running = services.getSelectedState() == win32.SERVICE_RUNNING;
+	const menu = win32.CreatePopupMenu();
+	if (menu == null) return 0;
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) win32.MF_GRAYED else 0), resource.ID_CTX_SVC_START, L("Start"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_STOP, L("Stop"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_SVC_RESTART, L("Restart"));
+	_ = win32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, null);
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (services.getSelectedPid() != 0) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_GOTO, L("Go to process"));
+	_ = win32.TrackPopupMenu(menu, win32.TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, null);
+	_ = win32.DestroyMenu(menu);
+	return 0;
+}
+
+fn createTabStrip(hwnd: win32.HWND) win32.HWND {
+	// No WS_EX_CONTROLPARENT: that would make the dialog manager treat the strip
+	// as a container and pass focus straight through to the page, leaving
+	// Left/Right unable to reach the tabs. The pages are plain siblings instead.
+	const tab = win32.CreateWindowExW(0, win32.WC_TABCONTROLW, null, win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_TABSTOP | win32.WS_CLIPSIBLINGS, 0, 0, 0, 0, hwnd, @ptrFromInt(@as(usize, resource.IDC_MAIN_TAB)), win32.GetModuleHandleW(null), null);
+	const labels = [_]win32.LPCWSTR{ L("Processes"), L("Services") };
+	for (labels, 0..) |label, i| {
+		var tci: win32.TCITEMW = std.mem.zeroes(win32.TCITEMW);
+		tci.mask = win32.TCIF_TEXT;
+		tci.pszText = @constCast(label);
+		_ = win32.SendMessageW(tab, win32.TCM_INSERTITEMW, @intCast(i), @bitCast(@intFromPtr(&tci)));
+	}
+	return tab;
+}
+
+// Height of the tab row alone. TCM_ADJUSTRECT reports the inset from a window
+// rect to the page area, which is exactly what the strip occupies, and it stays
+// correct across DPI and theme changes.
+fn tabStripHeight() i32 {
+	var rc = win32.RECT{ .left = 0, .top = 0, .right = 100, .bottom = 100 };
+	_ = win32.SendMessageW(state.hwnd_tab, win32.TCM_ADJUSTRECT, 0, @bitCast(@intFromPtr(&rc)));
+	return rc.top;
+}
+
+// Tab order follows sibling z-order, and creation order does not give the one
+// we want: from a list, Tab should reach that tab's sort bar first and the tab
+// strip second. Each call drops its window directly below the named sibling, so
+// the result reads list, sort bar, strip. The hidden "Processes"/"Services"
+// labels are left where they are, immediately above their list, because
+// MSAA/UIA take the list's accessible name from GW_HWNDPREV.
+fn setTabOrder() void {
+	const keep = win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE;
+	_ = win32.SetWindowPos(state.hwnd_sort_group, state.hwnd_tree, 0, 0, 0, 0, keep);
+	_ = win32.SetWindowPos(state.hwnd_svc_sort_group, state.hwnd_svc_list, 0, 0, 0, 0, keep);
+	_ = win32.SetWindowPos(state.hwnd_tab, state.hwnd_svc_sort_group, 0, 0, 0, 0, keep);
+}
+
+fn activeView() win32.HWND {
+	if (state.active_tab == TAB_SERVICES) return state.hwnd_svc_list;
+	return if (state.prefs.tree_mode) state.hwnd_tree else state.hwnd_list;
+}
+
+fn refreshActiveTab() void {
+	if (state.active_tab == TAB_SERVICES) services.doRefresh() else listview.doRefresh();
+}
+
+fn showTab(index: i32) void {
+	state.active_tab = index;
+	const procs = index == TAB_PROCESSES;
+	// Hiding a sort group takes its radio buttons out of the tab order with it,
+	// which is the whole point: only the visible tab should be reachable.
+	_ = win32.ShowWindow(state.hwnd_sort_group, if (procs) win32.SW_SHOW else win32.SW_HIDE);
+	_ = win32.ShowWindow(state.hwnd_list, if (procs and !state.prefs.tree_mode) win32.SW_SHOW else win32.SW_HIDE);
+	_ = win32.ShowWindow(state.hwnd_tree, if (procs and state.prefs.tree_mode) win32.SW_SHOW else win32.SW_HIDE);
+	_ = win32.ShowWindow(state.hwnd_svc_sort_group, if (procs) win32.SW_HIDE else win32.SW_SHOW);
+	_ = win32.ShowWindow(state.hwnd_svc_list, if (procs) win32.SW_HIDE else win32.SW_SHOW);
+	const view = win32.GetSubMenu(win32.GetMenu(state.hwnd), 1);
+	_ = win32.EnableMenuItem(view, resource.ID_VIEW_TREE_MODE, if (procs) win32.MF_ENABLED else win32.MF_GRAYED);
+	refreshActiveTab();
+	// Arrowing along the strip switches tabs, so focus has to stay put; it only
+	// needs rescuing when the control holding it is the one that just went away.
+	const focus = win32.GetFocus();
+	if (focus == null or win32.IsWindowVisible(focus) == 0) _ = win32.SetFocus(activeView());
+}
+
+fn selectTab(index: i32) void {
+	_ = win32.SendMessageW(state.hwnd_tab, win32.TCM_SETCURSEL, @intCast(index), 0);
+	showTab(index);
+}
+
 fn createMenuBar(hwnd: win32.HWND) void {
 	const bar = win32.CreateMenu();
 	const file = win32.CreatePopupMenu();
@@ -120,6 +240,9 @@ fn createMenuBar(hwnd: win32.HWND) void {
 	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(file), L("&File"));
 	const view = win32.CreatePopupMenu();
 	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("Refresh\tF5"));
+	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_NEXT_TAB, L("Next tab\tCtrl+Tab"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_PREV_TAB, L("Previous tab\tCtrl+Shift+Tab"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
 	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
 	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
@@ -196,6 +319,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == ID_CTX_OPEN_LOCATION or id == resource.ID_CTX_END_TASK) {
+		if (state.active_tab != TAB_PROCESSES) return 0;
 		if (state.prefs.tree_mode) {
 			var name: [260:0]u16 = std.mem.zeroes([260:0]u16);
 			treeview.getSelectedName(&name, 260);
@@ -263,6 +387,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_TREE_MODE) {
+		if (state.active_tab != TAB_PROCESSES) return 0;
 		state.prefs.tree_mode = !state.prefs.tree_mode;
 		const view = win32.GetSubMenu(win32.GetMenu(hwnd), 1);
 		_ = win32.CheckMenuItem(view, resource.ID_VIEW_TREE_MODE, if (state.prefs.tree_mode) win32.MF_CHECKED else win32.MF_UNCHECKED);
@@ -324,7 +449,16 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == resource.ID_VIEW_REFRESH) {
-		listview.doRefresh();
+		refreshActiveTab();
+		return 0;
+	}
+	if (id == resource.ID_VIEW_NEXT_TAB or id == resource.ID_VIEW_PREV_TAB) {
+		const delta: i32 = if (id == resource.ID_VIEW_NEXT_TAB) 1 else TAB_COUNT - 1;
+		selectTab(@mod(state.active_tab + delta, TAB_COUNT));
+		return 0;
+	}
+	if (id >= resource.ID_CTX_SVC_START and id <= resource.ID_CTX_SVC_GOTO) {
+		handleServiceCommand(hwnd, id);
 		return 0;
 	}
 	if (id == resource.ID_VIEW_SETTINGS) {
@@ -340,6 +474,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 	}
 	const hiword: u16 = @truncate(wp >> 16);
 	if (hiword == win32.BN_CLICKED) {
+		if (id >= resource.ID_SVC_SORT_BASE and id < resource.ID_SVC_SORT_BASE + @as(i32, @intCast(services.COL_COUNT))) {
+			services.onSortCommand(@intCast(id - resource.ID_SVC_SORT_BASE));
+			return 0;
+		}
 		for (0..@intCast(state.sort_btn_count)) |idx| {
 			if (resource.ID_SORT_BASE + state.sort_btn_cols[idx] == @as(i32, id)) {
 				const cid: usize = @intCast(state.sort_btn_cols[idx]);
@@ -369,6 +507,20 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 
 fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32.LRESULT {
 	const src_hwnd: win32.HWND = @ptrFromInt(@as(usize, @bitCast(wp)));
+	if (src_hwnd == state.hwnd_svc_list) {
+		var point = pointFromLparam(lp);
+		if (point.x == -1 and point.y == -1) {
+			var rc: win32.RECT = std.mem.zeroes(win32.RECT);
+			rc.left = win32.LVIR_BOUNDS;
+			const sel = services.getSelectedIndex();
+			if (sel >= 0 and win32.SendMessageW(state.hwnd_svc_list, win32.LVM_GETITEMRECT, @intCast(sel), @bitCast(@intFromPtr(&rc))) != 0) {
+				_ = win32.MapWindowPoints(state.hwnd_svc_list, win32.HWND_DESKTOP, @ptrCast(&rc), 2);
+				point.x = rc.left;
+				point.y = rc.bottom;
+			}
+		}
+		return showServiceMenu(hwnd, point);
+	}
 	if (src_hwnd == state.hwnd_tree) {
 		var point = pointFromLparam(lp);
 		var sel: win32.HTREEITEM = null;
@@ -427,7 +579,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			if (low == win32.WA_INACTIVE) {
 				last_focus = win32.GetFocus();
 			} else {
-				_ = win32.SetFocus(if (last_focus != null) last_focus else if (state.prefs.tree_mode) state.hwnd_tree else state.hwnd_list);
+				_ = win32.SetFocus(if (last_focus != null) last_focus else activeView());
 			}
 			return 0;
 		},
@@ -436,6 +588,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			registerToggleHotkey(hwnd);
 			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES | win32.ICC_TAB_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
+			state.hwnd_tab = createTabStrip(hwnd);
 			state.hwnd_sort_group = sortbar.create(hwnd);
 			// Hidden label: GW_HWNDPREV of the list view points here, so MSAA/UIA
 			// use "Processes" as the list's accessible name instead of the group box.
@@ -446,6 +599,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			state.hwnd_tree = win32.CreateWindowExW(0, win32.WC_TREEVIEWW, null, win32.WS_CHILD | win32.WS_TABSTOP | win32.TVS_HASLINES | win32.TVS_HASBUTTONS | win32.TVS_LINESATROOT | win32.TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_TREEVIEW)), win32.GetModuleHandleW(null), null);
 			_ = win32.SetWindowSubclass(state.hwnd_tree, treeview.keyProc, 0, 0);
 			_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_SETEXTENDEDSTYLE, win32.TVS_EX_DOUBLEBUFFER, win32.TVS_EX_DOUBLEBUFFER);
+			services.create(hwnd, resource.ID_SVC_LISTVIEW, resource.ID_SVC_SORT_BASE);
 			state.hwnd_status = win32.CreateWindowExW(0, win32.STATUSCLASSNAMEW, null, win32.WS_CHILD | win32.WS_VISIBLE, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
 			settings.load(&state.prefs);
 			theme.update();
@@ -458,6 +612,8 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				_ = win32.ShowWindow(state.hwnd_list, win32.SW_HIDE);
 				_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
 			}
+			theme.applyButton(state.hwnd_tab);
+			setTabOrder();
 			createMenuBar(hwnd);
 			tray.add(hwnd, state.WM_TRAYICON, &WINDOW_TITLE);
 			if (state.prefs.always_on_top)
@@ -492,10 +648,20 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				_ = win32.SendMessageW(state.hwnd_status, win32.WM_SIZE, wp, lp);
 				var sr: win32.RECT = undefined;
 				_ = win32.GetClientRect(state.hwnd_status, &sr);
-				const view_h = h - 1 - (sr.bottom - sr.top);
-				_ = win32.SetWindowPos(state.hwnd_list, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+				const strip = tabStripHeight();
+				_ = win32.SetWindowPos(state.hwnd_tab, null, 0, 0, w, strip, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+				// The sort groups are one pixel tall and only exist to hold the
+				// hidden radio buttons, so they just follow the strip down. Their
+				// width is owned by applyColumns, hence SWP_NOSIZE.
+				const move = win32.SWP_NOSIZE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE;
+				_ = win32.SetWindowPos(state.hwnd_sort_group, null, 0, strip, 0, 0, move);
+				_ = win32.SetWindowPos(state.hwnd_svc_sort_group, null, 0, strip, 0, 0, move);
+				const view_y = strip + 1;
+				const view_h = h - view_y - (sr.bottom - sr.top);
+				_ = win32.SetWindowPos(state.hwnd_list, null, 0, view_y, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+				_ = win32.SetWindowPos(state.hwnd_svc_list, null, 0, view_y, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 				if (state.hwnd_tree != null)
-					_ = win32.SetWindowPos(state.hwnd_tree, null, 0, 1, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+					_ = win32.SetWindowPos(state.hwnd_tree, null, 0, view_y, w, view_h, win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 			}
 			return 0;
 		},
@@ -530,6 +696,10 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		},
 		win32.WM_NOTIFY => {
 			const hdr: *const win32.NMHDR = @ptrFromInt(@as(usize, @bitCast(lp)));
+			if (hdr.idFrom == resource.IDC_MAIN_TAB and hdr.code == @as(win32.UINT, @bitCast(win32.TCN_SELCHANGE))) {
+				showTab(@intCast(win32.SendMessageW(state.hwnd_tab, win32.TCM_GETCURSEL, 0, 0)));
+				return 0;
+			}
 			if (hdr.code == @as(win32.UINT, @bitCast(win32.HDN_BEGINDRAG)) or hdr.code == @as(win32.UINT, @bitCast(win32.HDN_ENDDRAG))) {
 				const header = win32.SendMessageW(state.hwnd_list, win32.LVM_GETHEADER, 0, 0);
 				if (hdr.hwndFrom == @as(win32.HWND, @ptrFromInt(@as(usize, @bitCast(header))))) {
@@ -576,7 +746,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				return 0;
 			}
 			if (wp == ID_REFRESH_TIMER) {
-				listview.doRefresh();
+				refreshActiveTab();
 				return 0;
 			}
 		},

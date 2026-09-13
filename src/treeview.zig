@@ -226,6 +226,15 @@ pub fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
 }
 
+/// Selects the node for this PID, if the tree still holds it.
+pub fn selectPid(pid: win32.DWORD) void {
+	const item = findByPid(tvGetRoot(), pid);
+	if (item != null) {
+		tvSelect(item);
+		_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_ENSUREVISIBLE, 0, @bitCast(@intFromPtr(item)));
+	}
+}
+
 pub fn getSelectedPid() win32.DWORD {
 	const sel = tvGetSel();
 	if (sel == null) return 0;

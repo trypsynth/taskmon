@@ -332,6 +332,18 @@ pub fn getItemPid(index: i32) win32.DWORD {
 	return @intCast(lvi.lParam);
 }
 
+/// Selects the row showing this PID, if it is still in the list.
+pub fn selectPid(pid: win32.DWORD) void {
+	const total: i32 = @intCast(win32.SendMessageW(state.hwnd_list, win32.LVM_GETITEMCOUNT, 0, 0));
+	var i: i32 = 0;
+	while (i < total) : (i += 1) {
+		if (getItemPid(i) != pid) continue;
+		selectItem(i);
+		_ = win32.SendMessageW(state.hwnd_list, win32.LVM_ENSUREVISIBLE, @intCast(i), 0);
+		return;
+	}
+}
+
 pub fn selectItem(index: i32) void {
 	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 	lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;

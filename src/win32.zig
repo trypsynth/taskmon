@@ -161,6 +161,7 @@ pub const WM_CTLCOLORSTATIC: UINT = 0x0138;
 pub const WS_CHILD: DWORD = 0x40000000;
 pub const WS_VISIBLE: DWORD = 0x10000000;
 pub const WS_TABSTOP: DWORD = 0x00010000;
+pub const WS_CLIPSIBLINGS: DWORD = 0x04000000;
 pub const SWP_NOSIZE: UINT = 0x0001;
 pub const SWP_NOMOVE: UINT = 0x0002;
 pub const SWP_NOZORDER: UINT = 0x0004;
@@ -338,6 +339,7 @@ pub extern "user32" fn GetParent(hWnd: HWND) callconv(.c) HWND;
 
 pub extern "kernel32" fn GetProcessHeap() callconv(.c) HANDLE;
 pub extern "kernel32" fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: usize) callconv(.c) ?*anyopaque;
+pub extern "kernel32" fn Sleep(dwMilliseconds: DWORD) callconv(.c) void;
 pub extern "kernel32" fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: ?*anyopaque) callconv(.c) BOOL;
 pub const HEAP_ZERO_MEMORY: DWORD = 0x00000008;
 
@@ -476,6 +478,11 @@ pub extern "advapi32" fn LocalFree(hMem: ?*anyopaque) callconv(.c) ?*anyopaque;
 pub extern "advapi32" fn OpenSCManagerW(lpMachineName: ?LPCWSTR, lpDatabaseName: ?LPCWSTR, dwDesiredAccess: DWORD) callconv(.c) HANDLE;
 pub extern "advapi32" fn CloseServiceHandle(hSCObject: HANDLE) callconv(.c) BOOL;
 pub extern "advapi32" fn EnumServicesStatusExW(hSCManager: HANDLE, InfoLevel: c_int, dwServiceType: DWORD, dwServiceState: DWORD, lpServices: ?[*]u8, cbBufSize: DWORD, pcbBytesNeeded: *DWORD, lpServicesReturned: *DWORD, lpResumeHandle: *DWORD, pszGroupName: ?LPCWSTR) callconv(.c) BOOL;
+pub extern "advapi32" fn OpenServiceW(hSCManager: HANDLE, lpServiceName: LPCWSTR, dwDesiredAccess: DWORD) callconv(.c) HANDLE;
+pub extern "advapi32" fn QueryServiceConfigW(hService: HANDLE, lpServiceConfig: ?*QUERY_SERVICE_CONFIGW, cbBufSize: DWORD, pcbBytesNeeded: *DWORD) callconv(.c) BOOL;
+pub extern "advapi32" fn StartServiceW(hService: HANDLE, dwNumServiceArgs: DWORD, lpServiceArgVectors: ?*anyopaque) callconv(.c) BOOL;
+pub extern "advapi32" fn ControlService(hService: HANDLE, dwControl: DWORD, lpServiceStatus: *SERVICE_STATUS) callconv(.c) BOOL;
+pub extern "advapi32" fn QueryServiceStatusEx(hService: HANDLE, InfoLevel: c_int, lpBuffer: ?[*]u8, cbBufSize: DWORD, pcbBytesNeeded: *DWORD) callconv(.c) BOOL;
 
 pub extern "shlwapi" fn ConvertSidToStringSidW(Sid: ?*anyopaque, StringSid: *LPWSTR) callconv(.c) BOOL;
 
@@ -522,6 +529,7 @@ pub const IDYES: c_int = 6;
 pub const MF_STRING: UINT = 0x00000000;
 pub const MF_UNCHECKED: UINT = 0x00000000;
 pub const MF_GRAYED: UINT = 0x00000001;
+pub const MF_ENABLED: UINT = 0x00000000;
 pub const MF_CHECKED: UINT = 0x00000008;
 pub const MF_POPUP: UINT = 0x00000010;
 pub const MF_SEPARATOR: UINT = 0x00000800;
@@ -538,6 +546,7 @@ pub const ICC_BAR_CLASSES: DWORD = 0x4;
 pub const ICC_TAB_CLASSES: DWORD = 0x8;
 pub const WC_LISTVIEWW = L("SysListView32");
 pub const WC_TREEVIEWW = L("SysTreeView32");
+pub const WC_TABCONTROLW = L("SysTabControl32");
 pub const STATUSCLASSNAMEW = L("msctls_statusbar32");
 pub const LVS_REPORT: DWORD = 0x1;
 pub const LVS_SHOWSELALWAYS: DWORD = 0x8;
@@ -555,6 +564,7 @@ pub const LVN_ITEMCHANGED: i32 = LVN_FIRST - 1;
 
 const TCM_FIRST: UINT = 0x1300;
 pub const TCM_GETCURSEL: UINT = TCM_FIRST + 11;
+pub const TCM_SETCURSEL: UINT = TCM_FIRST + 12;
 pub const TCM_ADJUSTRECT: UINT = TCM_FIRST + 40;
 pub const TCM_INSERTITEMW: UINT = TCM_FIRST + 62;
 pub const TCIF_TEXT: UINT = 0x1;
@@ -627,6 +637,7 @@ pub extern "user32" fn CreateMenu() callconv(.c) HMENU;
 pub extern "user32" fn CreatePopupMenu() callconv(.c) HMENU;
 pub extern "user32" fn DestroyMenu(hMenu: HMENU) callconv(.c) BOOL;
 pub extern "user32" fn CheckMenuItem(hMenu: HMENU, uIDCheckItem: UINT, uCheck: UINT) callconv(.c) DWORD;
+pub extern "user32" fn EnableMenuItem(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) callconv(.c) BOOL;
 pub extern "user32" fn GetSubMenu(hMenu: HMENU, nPos: c_int) callconv(.c) HMENU;
 pub extern "user32" fn AppendMenuW(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: ?LPCWSTR) callconv(.c) BOOL;
 pub extern "user32" fn TrackPopupMenu(hMenu: HMENU, uFlags: UINT, x: c_int, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ?*const RECT) callconv(.c) BOOL;
@@ -733,6 +744,28 @@ pub const SC_MANAGER_ENUMERATE_SERVICE: DWORD = 0x0004;
 pub const SC_ENUM_PROCESS_INFO: c_int = 0;
 pub const SERVICE_WIN32: DWORD = 0x00000030;
 pub const SERVICE_STATE_ALL: DWORD = 0x00000003;
+pub const SC_MANAGER_CONNECT: DWORD = 0x0001;
+pub const SERVICE_QUERY_CONFIG: DWORD = 0x0001;
+pub const SERVICE_QUERY_STATUS: DWORD = 0x0004;
+pub const SERVICE_START: DWORD = 0x0010;
+pub const SERVICE_STOP: DWORD = 0x0020;
+pub const SERVICE_CONTROL_STOP: DWORD = 0x00000001;
+pub const SC_STATUS_PROCESS_INFO: c_int = 0;
+pub const SERVICE_STOPPED: DWORD = 0x00000001;
+pub const SERVICE_START_PENDING: DWORD = 0x00000002;
+pub const SERVICE_STOP_PENDING: DWORD = 0x00000003;
+pub const SERVICE_RUNNING: DWORD = 0x00000004;
+pub const SERVICE_CONTINUE_PENDING: DWORD = 0x00000005;
+pub const SERVICE_PAUSE_PENDING: DWORD = 0x00000006;
+pub const SERVICE_PAUSED: DWORD = 0x00000007;
+pub const SERVICE_BOOT_START: DWORD = 0x00000000;
+pub const SERVICE_SYSTEM_START: DWORD = 0x00000001;
+pub const SERVICE_AUTO_START: DWORD = 0x00000002;
+pub const SERVICE_DEMAND_START: DWORD = 0x00000003;
+pub const SERVICE_DISABLED: DWORD = 0x00000004;
+pub const ERROR_SERVICE_ALREADY_RUNNING: DWORD = 1056;
+pub const ERROR_SERVICE_NOT_ACTIVE: DWORD = 1062;
+pub const ERROR_ACCESS_DENIED: DWORD = 5;
 
 pub const SID_AND_ATTRIBUTES = extern struct {
 	Sid: ?*anyopaque,
@@ -793,6 +826,28 @@ pub const SERVICE_STATUS_PROCESS = extern struct {
 	dwWaitHint: DWORD,
 	dwProcessId: DWORD,
 	dwServiceFlags: DWORD,
+};
+
+pub const SERVICE_STATUS = extern struct {
+	dwServiceType: DWORD,
+	dwCurrentState: DWORD,
+	dwControlsAccepted: DWORD,
+	dwWin32ExitCode: DWORD,
+	dwServiceSpecificExitCode: DWORD,
+	dwCheckPoint: DWORD,
+	dwWaitHint: DWORD,
+};
+
+pub const QUERY_SERVICE_CONFIGW = extern struct {
+	dwServiceType: DWORD,
+	dwStartType: DWORD,
+	dwErrorControl: DWORD,
+	lpBinaryPathName: LPWSTR,
+	lpLoadOrderGroup: LPWSTR,
+	dwTagId: DWORD,
+	lpDependencies: LPWSTR,
+	lpServiceStartName: LPWSTR,
+	lpDisplayName: LPWSTR,
 };
 
 pub const PDH_HQUERY = HANDLE;
@@ -878,6 +933,7 @@ pub const NMHEADER = extern struct {
 };
 pub const LVM_GETHEADER: UINT = LVM_FIRST + 31;
 pub const LVM_DELETECOLUMN: UINT = LVM_FIRST + 28;
+pub const LVS_SINGLESEL: DWORD = 0x0004;
 
 pub const HDITEMW = extern struct {
 	mask: UINT,
