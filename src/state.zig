@@ -10,6 +10,13 @@ const win32 = @import("win32.zig");
 const settings = @import("settings.zig");
 const pt = @import("process_types.zig");
 
+// Private window messages. Kept together so the WM_APP numbering has a single
+// owner: WM_HIDE_TO_TRAY is posted by every control subclass that handles
+// Escape, so it cannot live next to the handlers in wndproc.zig.
+pub const WM_TRAYICON: win32.UINT = win32.WM_APP + 1;
+pub const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
+pub const WM_COLUMN_DRAGGED: win32.UINT = win32.WM_APP + 3;
+
 pub var hwnd: win32.HWND = null;
 pub var hwnd_list: win32.HWND = null;
 pub var hwnd_tree: win32.HWND = null;

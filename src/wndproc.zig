@@ -23,9 +23,6 @@ const ID_CTX_SUSPEND = 303;
 const ID_CTX_RESUME = 304;
 const ID_CTX_PRIORITY_BASE = 310; // +0=Idle +1=BelowNormal +2=Normal +3=AboveNormal +4=High +5=Realtime
 const PRIORITY_CLASS_COUNT = 6;
-const WM_TRAYICON: win32.UINT = win32.WM_APP + 1;
-const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
-const WM_COLUMN_DRAGGED: win32.UINT = win32.WM_APP + 3;
 const ID_REFRESH_TIMER = 1;
 const ID_PRIME_TIMER = 2;
 const ID_HOTKEY_TOGGLE = 1;
@@ -187,7 +184,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 		return 0;
 	}
 	if (id == win32.IDCANCEL) {
-		_ = win32.PostMessageW(hwnd, WM_HIDE_TO_TRAY, 0, 0);
+		_ = win32.PostMessageW(hwnd, state.WM_HIDE_TO_TRAY, 0, 0);
 		return 0;
 	}
 	if (id == ID_CTX_SUSPEND or id == ID_CTX_RESUME) {
@@ -375,8 +372,9 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 	if (src_hwnd == state.hwnd_tree) {
 		var point = pointFromLparam(lp);
 		var sel: win32.HTREEITEM = null;
+		// WM_CONTEXTMENU reports -1,-1 when the menu came from the keyboard, so
+		// there is no cursor to hit-test and the existing selection is the target.
 		if (point.x == -1 and point.y == -1) {
-			// Keyboard-triggered: use current selection
 			sel = treeview.getSelection();
 			if (sel != null) {
 				var rc: win32.RECT align(8) = std.mem.zeroes(win32.RECT);
@@ -388,7 +386,6 @@ fn handleContextMenu(hwnd: win32.HWND, wp: win32.WPARAM, lp: win32.LPARAM) win32
 				}
 			}
 		} else {
-			// Mouse-triggered: select item under cursor first
 			var local = point;
 			_ = win32.ScreenToClient(state.hwnd_tree, &local);
 			var tvht: win32.TVHITTESTINFO = std.mem.zeroes(win32.TVHITTESTINFO);
@@ -437,7 +434,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		win32.WM_CREATE => {
 			state.hwnd = hwnd;
 			registerToggleHotkey(hwnd);
-			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES };
+			var icc: win32.INITCOMMONCONTROLSEX = .{ .dwSize = @sizeOf(win32.INITCOMMONCONTROLSEX), .dwICC = win32.ICC_LISTVIEW_CLASSES | win32.ICC_BAR_CLASSES | win32.ICC_TREEVIEW_CLASSES | win32.ICC_TAB_CLASSES };
 			_ = win32.InitCommonControlsEx(&icc);
 			state.hwnd_sort_group = sortbar.create(hwnd);
 			// Hidden label: GW_HWNDPREV of the list view points here, so MSAA/UIA
@@ -462,7 +459,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				_ = win32.ShowWindow(state.hwnd_tree, win32.SW_SHOW);
 			}
 			createMenuBar(hwnd);
-			tray.add(hwnd, WM_TRAYICON, &WINDOW_TITLE);
+			tray.add(hwnd, state.WM_TRAYICON, &WINDOW_TITLE);
 			if (state.prefs.always_on_top)
 				_ = win32.SetWindowPos(hwnd, win32.HWND_TOPMOST, 0, 0, 0, 0, win32.SWP_NOMOVE | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE);
 			if (state.prefs.window_width > 0) {
@@ -502,11 +499,11 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			}
 			return 0;
 		},
-		WM_HIDE_TO_TRAY => {
+		state.WM_HIDE_TO_TRAY => {
 			_ = win32.ShowWindow(hwnd, win32.SW_HIDE);
 			return 0;
 		},
-		WM_TRAYICON => {
+		state.WM_TRAYICON => {
 			if (lp == win32.WM_LBUTTONUP) {
 				tray.restore();
 			} else if (lp == win32.WM_RBUTTONUP) {
@@ -524,7 +521,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		},
 		win32.WM_COMMAND => return handleCommand(hwnd, wp),
 		win32.WM_CONTEXTMENU => return handleContextMenu(hwnd, wp, lp),
-		WM_COLUMN_DRAGGED => {
+		state.WM_COLUMN_DRAGGED => {
 			sortbar.moveVisibleColumn(@intCast(wp), @intCast(lp));
 			sortbar.applyColumns();
 			listview.resort();
@@ -545,7 +542,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 						// handler is asking for trouble, so cancel the control's
 						// reorder and redo it properly once the drag has unwound.
 						const to: i32 = if (nmh.pitem) |item| item.iOrder else 0;
-						if (to > 0) _ = win32.PostMessageW(hwnd, WM_COLUMN_DRAGGED, @intCast(nmh.iItem), @intCast(to));
+						if (to > 0) _ = win32.PostMessageW(hwnd, state.WM_COLUMN_DRAGGED, @intCast(nmh.iItem), @intCast(to));
 						return 1;
 					}
 				}
@@ -590,7 +587,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				} else if (win32.GetForegroundWindow() != hwnd) {
 					_ = win32.SetForegroundWindow(hwnd);
 				} else {
-					_ = win32.PostMessageW(hwnd, WM_HIDE_TO_TRAY, 0, 0);
+					_ = win32.PostMessageW(hwnd, state.WM_HIDE_TO_TRAY, 0, 0);
 				}
 			}
 			return 0;

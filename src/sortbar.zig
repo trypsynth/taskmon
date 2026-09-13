@@ -8,8 +8,6 @@ const state = @import("state.zig");
 const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
-const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
-
 fn sortGroupProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
 	_ = id;
 	_ = data;
@@ -35,7 +33,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	if (msg == win32.WM_CHAR and wp == '\r') return 0;
 	if (msg == win32.WM_KEYDOWN) {
 		if (wp == win32.VK_ESCAPE) {
-			_ = win32.PostMessageW(state.hwnd, WM_HIDE_TO_TRAY, 0, 0);
+			_ = win32.PostMessageW(state.hwnd, state.WM_HIDE_TO_TRAY, 0, 0);
 			return 0;
 		}
 		if (wp == win32.VK_RETURN) {
@@ -154,16 +152,13 @@ pub fn applyColumns() void {
 		state.sort_btns[idx] = null;
 	}
 	state.sort_btn_count = 0;
-
 	const header = win32.SendMessageW(state.hwnd_list, win32.LVM_GETHEADER, 0, 0);
 	const header_hwnd: win32.HWND = @ptrFromInt(@as(usize, @bitCast(header)));
 	const lv_cols: i32 = @intCast(win32.SendMessageW(header_hwnd, win32.HDM_GETITEMCOUNT, 0, 0));
 	var i = lv_cols - 1;
 	while (i >= 0) : (i -= 1) _ = win32.SendMessageW(state.hwnd_list, win32.LVM_DELETECOLUMN, @intCast(i), 0);
-
 	const field_idx: usize = @intCast(@intFromEnum(state.prefs.field));
 	if (!state.prefs.visible[field_idx]) state.prefs.field = .name;
-
 	var btn_x: i32 = 0;
 	var lv_col: i32 = 0;
 	for (0..settings.COL_COUNT) |pos| {

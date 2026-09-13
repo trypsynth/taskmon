@@ -1,5 +1,5 @@
-// Hand rolled, non zigwin32 Win32 bindings. Mirrors the approach used in
-// ../sysinfo.
+// Hand rolled Win32 bindings: just the declarations this app uses, so there
+// is no zigwin32 dependency to keep in step with the Zig release cycle.
 const std = @import("std");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
@@ -161,7 +161,6 @@ pub const WM_CTLCOLORSTATIC: UINT = 0x0138;
 pub const WS_CHILD: DWORD = 0x40000000;
 pub const WS_VISIBLE: DWORD = 0x10000000;
 pub const WS_TABSTOP: DWORD = 0x00010000;
-pub const BS_AUTOCHECKBOX: DWORD = 0x00000003;
 pub const SWP_NOSIZE: UINT = 0x0001;
 pub const SWP_NOMOVE: UINT = 0x0002;
 pub const SWP_NOZORDER: UINT = 0x0004;
@@ -556,7 +555,6 @@ pub const LVN_ITEMCHANGED: i32 = LVN_FIRST - 1;
 
 const TCM_FIRST: UINT = 0x1300;
 pub const TCM_GETCURSEL: UINT = TCM_FIRST + 11;
-pub const TCM_SETCURSEL: UINT = TCM_FIRST + 12;
 pub const TCM_ADJUSTRECT: UINT = TCM_FIRST + 40;
 pub const TCM_INSERTITEMW: UINT = TCM_FIRST + 62;
 pub const TCIF_TEXT: UINT = 0x1;

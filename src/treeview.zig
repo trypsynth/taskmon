@@ -5,7 +5,6 @@ const tray = @import("tray.zig");
 const process = @import("process.zig");
 const state = @import("state.zig");
 
-const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
 const MAX_EXPANDED = 512;
 
 fn tvGetItem(tvi: *win32.TVITEMW) void {
@@ -159,10 +158,8 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	}
 	s_expanded_count = 0;
 	collectState(tvGetRoot());
-
 	_ = win32.SendMessageW(state.hwnd_tree, win32.WM_SETREDRAW, 0, 0);
 	tvDeleteAll();
-
 	const done_ptr = win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, @as(usize, @intCast(count)) * @sizeOf(win32.BOOL));
 	if (done_ptr) |raw_done| {
 		const done: [*]win32.BOOL = @ptrCast(@alignCast(raw_done));
@@ -184,9 +181,7 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 		}
 		_ = win32.HeapFree(win32.GetProcessHeap(), 0, raw_done);
 	}
-
 	restoreExpanded(tvGetRoot());
-
 	const sel_item: win32.HTREEITEM = if (s_selected_pid != 0) findByPid(tvGetRoot(), s_selected_pid) else null;
 	if (sel_item != null) {
 		tvSelect(sel_item);
@@ -195,10 +190,8 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 		const root = tvGetRoot();
 		if (root != null) tvSelect(root);
 	}
-
 	_ = win32.SendMessageW(state.hwnd_tree, win32.WM_SETREDRAW, 1, 0);
 	_ = win32.InvalidateRect(state.hwnd_tree, null, 0);
-
 	var total: f64 = 0;
 	for (0..@intCast(count)) |i| {
 		if (entries[i].pid != 0) total += entries[i].cpu_percent;
@@ -227,7 +220,7 @@ pub fn keyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_KEYDOWN and wp == win32.VK_ESCAPE) {
-		_ = win32.PostMessageW(win32.GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
+		_ = win32.PostMessageW(win32.GetParent(hwnd), state.WM_HIDE_TO_TRAY, 0, 0);
 		return 0;
 	}
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);

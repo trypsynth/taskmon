@@ -9,8 +9,6 @@ const state = @import("state.zig");
 const wfmt = @import("wfmt.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
-const WM_HIDE_TO_TRAY: win32.UINT = win32.WM_APP + 2;
-
 /// 100-nanosecond FILETIME ticks to h:mm:ss.
 fn formatDuration(ticks: pt.ULONGLONG, buf: [*:0]u16, len: i32) void {
 	const total_secs = ticks / 10000000;
@@ -451,7 +449,7 @@ pub fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	_ = id;
 	_ = data;
 	if (msg == win32.WM_KEYDOWN and wp == win32.VK_ESCAPE) {
-		_ = win32.PostMessageW(win32.GetParent(hwnd), WM_HIDE_TO_TRAY, 0, 0);
+		_ = win32.PostMessageW(win32.GetParent(hwnd), state.WM_HIDE_TO_TRAY, 0, 0);
 		return 0;
 	}
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);

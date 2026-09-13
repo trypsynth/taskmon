@@ -558,7 +558,6 @@ pub fn load(prefs: *SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
 	prefs.field = .name;
-
 	var field_buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 	_ = win32.GetPrivateProfileStringW(L("sort"), L("field"), COLUMNS[0].label, &field_buf, 64, &path);
 	for (0..COL_COUNT) |i| {

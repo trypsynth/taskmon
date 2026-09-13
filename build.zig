@@ -17,9 +17,9 @@ pub fn build(b: *std.Build) void {
 		.stack_protector = false,
 		.omit_frame_pointer = true,
 	});
-	// The .rc file still #includes windows.h/commctrl.h for the resource
-	// compiler, even though no C source remains; point it at Zig's bundled
-	// mingw-w64 headers the same way the old C build did.
+	// The .rc file #includes windows.h and commctrl.h for the resource
+	// compiler, so point that at Zig's bundled mingw-w64 headers. Nothing
+	// else in the build needs C headers.
 	const win32_headers = b.graph.cwdRelativePath(b.pathJoin(&.{
 		std.fs.path.dirname(b.graph.zig_exe) orelse ".",
 		"lib",
