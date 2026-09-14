@@ -184,7 +184,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ## Changelog
 
 ### Version 0.4.0
-* Added a tabbed interface. The process list now sits on a Processes tab, with a new Services tab beside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
+* Added a tabbed interface. The process list now sits on a Processes tab, with a new Services tab beside it.
 * Added a Services tab covering every Windows service, with Start, Stop, Restart, and Go to process actions, and its own columns that you can show, hide, and reorder from Settings.
 * Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
 * Added a customizable system tray tooltip, written as a template with tokens such as {cpu}, {mem} and {processes}, set on the General tab in Settings.
