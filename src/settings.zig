@@ -4,6 +4,7 @@ const resource = @import("resource.zig");
 const theme = @import("theme.zig");
 const wfmt = @import("wfmt.zig");
 const services = @import("services.zig");
+const tray = @import("tray.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub const SortField = enum(i32) {
@@ -198,6 +199,7 @@ pub const SortPrefs = struct {
 	// order because its columns have nothing to do with the process ones.
 	svc_visible: [services.COL_COUNT]bool,
 	svc_order: [services.COL_COUNT]u8,
+	tray_tip: [tray.TEMPLATE_LEN:0]u16,
 	skip_kill_confirm: bool,
 	always_on_top: bool,
 	tree_mode: bool,
@@ -214,6 +216,7 @@ const SettingsDlgData = struct {
 	order: [COL_COUNT]u8,
 	svc_visible: [services.COL_COUNT]bool,
 	svc_order: [services.COL_COUNT]u8,
+	tray_tip: [tray.TEMPLATE_LEN:0]u16,
 	skip_kill_confirm: bool,
 	start_minimized_to_tray: bool,
 };
@@ -244,6 +247,7 @@ pub const Changes = struct {
 	refresh_ms: bool,
 	columns: bool,
 	svc_columns: bool,
+	tray_tip: bool,
 };
 
 const TAB_COUNT = 2;
@@ -366,6 +370,9 @@ fn generalPageProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 		_ = win32.SendMessageW(combo, win32.CB_SETCURSEL, @intCast(sel), 0);
 		_ = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_SKIP_CONFIRM), win32.BM_SETCHECK, if (data.skip_kill_confirm) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
 		_ = win32.SendMessageW(win32.GetDlgItem(hdlg, resource.IDC_START_MINIMIZED), win32.BM_SETCHECK, if (data.start_minimized_to_tray) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
+		_ = win32.SendDlgItemMessageW(hdlg, resource.IDC_TRAY_TIP_EDIT, win32.EM_SETLIMITTEXT, tray.TEMPLATE_LEN - 1, 0);
+		_ = win32.SetDlgItemTextW(hdlg, resource.IDC_TRAY_TIP_EDIT, &data.tray_tip);
+		_ = win32.SetDlgItemTextW(hdlg, resource.IDC_TRAY_TOKENS, tray.TOKENS);
 		return 1;
 	}
 	return pageColors(msg, wp);
@@ -487,6 +494,7 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 				data.refresh_ms = if (sel >= 0 and sel < REFRESH_OPTION_COUNT) REFRESH_MS[@intCast(sel)] else 0;
 				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
 				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
+				_ = win32.GetDlgItemTextW(general, resource.IDC_TRAY_TIP_EDIT, &data.tray_tip, tray.TEMPLATE_LEN);
 				for (COLUMN_LISTS, 0..) |cl, which| {
 					const lv = win32.GetDlgItem(tab_pages[1], cl.list_id);
 					const rows: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
@@ -530,6 +538,7 @@ pub fn open(parent: win32.HWND, prefs: *SortPrefs) ?Changes {
 		.order = prefs.order,
 		.svc_visible = prefs.svc_visible,
 		.svc_order = prefs.svc_order,
+		.tray_tip = prefs.tray_tip,
 		.skip_kill_confirm = prefs.skip_kill_confirm,
 		.start_minimized_to_tray = prefs.start_minimized_to_tray,
 	};
@@ -538,12 +547,14 @@ pub fn open(parent: win32.HWND, prefs: *SortPrefs) ?Changes {
 		.refresh_ms = data.refresh_ms != prefs.refresh_ms,
 		.columns = !std.mem.eql(bool, &data.visible, &prefs.visible) or !std.mem.eql(u8, &data.order, &prefs.order),
 		.svc_columns = !std.mem.eql(bool, &data.svc_visible, &prefs.svc_visible) or !std.mem.eql(u8, &data.svc_order, &prefs.svc_order),
+		.tray_tip = !std.mem.eql(u16, &data.tray_tip, &prefs.tray_tip),
 	};
 	prefs.refresh_ms = data.refresh_ms;
 	prefs.visible = data.visible;
 	prefs.order = data.order;
 	prefs.svc_visible = data.svc_visible;
 	prefs.svc_order = data.svc_order;
+	prefs.tray_tip = data.tray_tip;
 	prefs.skip_kill_confirm = data.skip_kill_confirm;
 	prefs.start_minimized_to_tray = data.start_minimized_to_tray;
 	return changes;
@@ -588,6 +599,14 @@ fn getIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, de
 	var buf: [16:0]u16 = std.mem.zeroes([16:0]u16);
 	_ = win32.GetPrivateProfileStringW(section, key, &def, &buf, 16, path);
 	return win32.StrToIntW(&buf);
+}
+
+fn getIniStr(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, default: win32.LPCWSTR, out: [*:0]u16, cch: win32.DWORD) void {
+	_ = win32.GetPrivateProfileStringW(section, key, default, out, cch, path);
+}
+
+fn setIniStr(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, value: win32.LPCWSTR) void {
+	_ = win32.WritePrivateProfileStringW(section, key, value, path);
 }
 
 fn setIniInt(path: win32.LPCWSTR, section: win32.LPCWSTR, key: win32.LPCWSTR, value: i32) void {
@@ -678,6 +697,7 @@ pub fn load(prefs: *SortPrefs) void {
 		prefs.svc_visible[i] = services.COLUMNS[i].always_visible or visible;
 	}
 	loadOrder(&path, L("service_columns"), services.COL_COUNT, SVC_COLUMN_LABELS, &prefs.svc_order);
+	getIniStr(&path, L("tray"), L("tooltip"), tray.DEFAULT_TEMPLATE, &prefs.tray_tip, tray.TEMPLATE_LEN);
 }
 
 pub fn save(prefs: *const SortPrefs) void {
@@ -712,4 +732,5 @@ pub fn save(prefs: *const SortPrefs) void {
 		setIniBool(&path, L("service_columns"), columnKey("_visible", &key, services.COLUMNS[i].label), prefs.svc_visible[i]);
 	}
 	saveOrder(&path, L("service_columns"), services.COL_COUNT, SVC_COLUMN_LABELS, &prefs.svc_order);
+	setIniStr(&path, L("tray"), L("tooltip"), &prefs.tray_tip);
 }

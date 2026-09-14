@@ -2,7 +2,6 @@ const std = @import("std");
 const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
 const settings = @import("settings.zig");
-const tray = @import("tray.zig");
 const treeview = @import("treeview.zig");
 const process = @import("process.zig");
 const state = @import("state.zig");
@@ -397,7 +396,6 @@ fn populateList(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	}
 	_ = win32.SendMessageW(state.hwnd_list, win32.WM_SETREDRAW, 1, 0);
 	_ = win32.InvalidateRect(state.hwnd_list, null, 0);
-	tray.updateTip(total_cpu);
 	return total_cpu;
 }
 

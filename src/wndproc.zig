@@ -30,6 +30,11 @@ const TAB_PROCESSES: i32 = 0;
 const TAB_SERVICES: i32 = 1;
 const ID_REFRESH_TIMER = 1;
 const ID_PRIME_TIMER = 2;
+// The tray tooltip is deliberately independent of which tab is showing and of
+// the refresh interval, which the user can switch off entirely, so it runs on
+// its own timer. Everything it reads is a couple of cheap kernel counters.
+const ID_TRAY_TIMER = 3;
+const TRAY_TIP_MS: win32.UINT = 2000;
 const ID_HOTKEY_TOGGLE = 1;
 
 const PriorityEntry = struct {
@@ -487,6 +492,7 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				services.applyColumns();
 				services.resort();
 			}
+			if (changed.tray_tip) tray.updateTip(&state.prefs.tray_tip);
 			settings.save(&state.prefs);
 		}
 		return 0;
@@ -652,6 +658,8 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				if (primed) |pr| process.freeProcessEntries(pr);
 			}
 			_ = win32.SetTimer(hwnd, ID_PRIME_TIMER, 250, null);
+			tray.updateTip(&state.prefs.tray_tip);
+			_ = win32.SetTimer(hwnd, ID_TRAY_TIMER, TRAY_TIP_MS, null);
 			setRefreshInterval(hwnd, state.prefs.refresh_ms);
 			// Skip when starting minimized: SetFocus on a hidden window can still activate
 			// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
@@ -770,6 +778,10 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				refreshActiveTab();
 				return 0;
 			}
+			if (wp == ID_TRAY_TIMER) {
+				tray.updateTip(&state.prefs.tray_tip);
+				return 0;
+			}
 		},
 		win32.WM_HOTKEY => {
 			if (wp == ID_HOTKEY_TOGGLE) {
@@ -822,6 +834,7 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			settings.save(&state.prefs);
 			_ = win32.UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 			_ = win32.KillTimer(hwnd, ID_REFRESH_TIMER);
+			_ = win32.KillTimer(hwnd, ID_TRAY_TIMER);
 			tray.remove();
 			process.gpuCleanup();
 			win32.PostQuitMessage(0);

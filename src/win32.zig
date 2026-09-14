@@ -464,6 +464,27 @@ pub extern "kernel32" fn TerminateProcess(hProcess: HANDLE, uExitCode: UINT) cal
 pub extern "kernel32" fn SetPriorityClass(hProcess: HANDLE, dwPriorityClass: DWORD) callconv(.c) BOOL;
 pub extern "kernel32" fn QueryFullProcessImageNameW(hProcess: HANDLE, dwFlags: DWORD, lpExeName: [*:0]u16, lpdwSize: *DWORD) callconv(.c) BOOL;
 pub extern "kernel32" fn GetSystemTimes(lpIdleTime: ?*FILETIME, lpKernelTime: ?*FILETIME, lpUserTime: ?*FILETIME) callconv(.c) BOOL;
+// The kernel32 alias of psapi's GetPerformanceInfo, so no extra import library.
+// Counts come straight from the kernel, with none of the cost of walking every
+// process the way SystemProcessInformation does.
+pub extern "kernel32" fn K32GetPerformanceInfo(pPerformanceInformation: *PERFORMANCE_INFORMATION, cb: DWORD) callconv(.c) BOOL;
+
+pub const PERFORMANCE_INFORMATION = extern struct {
+	cb: DWORD,
+	CommitTotal: usize,
+	CommitLimit: usize,
+	CommitPeak: usize,
+	PhysicalTotal: usize,
+	PhysicalAvailable: usize,
+	SystemCache: usize,
+	KernelTotal: usize,
+	KernelPaged: usize,
+	KernelNonpaged: usize,
+	PageSize: usize,
+	HandleCount: DWORD,
+	ProcessCount: DWORD,
+	ThreadCount: DWORD,
+};
 pub extern "kernel32" fn GetSystemTimeAsFileTime(lpSystemTimeAsFileTime: *FILETIME) callconv(.c) void;
 pub extern "kernel32" fn GetTickCount64() callconv(.c) u64;
 pub extern "kernel32" fn GetNativeSystemInfo(lpSystemInfo: *SYSTEM_INFO) callconv(.c) void;

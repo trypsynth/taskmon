@@ -1,7 +1,6 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
 const pt = @import("process_types.zig");
-const tray = @import("tray.zig");
 const process = @import("process.zig");
 const state = @import("state.zig");
 
@@ -196,7 +195,6 @@ pub fn populate(entries: [*]pt.ProcessEntry, count: i32) f64 {
 	for (0..@intCast(count)) |i| {
 		if (entries[i].pid != 0) total += entries[i].cpu_percent;
 	}
-	tray.updateTip(total);
 	return total;
 }
 

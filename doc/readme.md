@@ -14,7 +14,7 @@ Welcome to the Taskmon user manual. Taskmon is designed to be a fast and keyboar
 * Optionally replace the system Task Manager during installation, so Ctrl+Shift+Esc and the taskbar's "Task Manager" entry open Taskmon instead.
 * Minimize to the system tray to keep your taskbar clean.
 * Optionally launch Taskmon already minimized to the tray, with no window shown on startup.
-* Hover over the system tray icon to quickly view CPU and memory usage.
+* Hover over the system tray icon for a tooltip you write yourself, from a short list of tokens.
 * Suspend, resume, or terminate processes directly from the list.
 * Change the priority class of any running process.
 * Launch new tasks directly from the application.
@@ -31,6 +31,24 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 * Press Ctrl+T, or choose View > Process Tree, to toggle between the list and tree views.
 * Expand or collapse a process's children using the tree's disclosure triangles or the keyboard.
 * Right-click a process in tree view for an additional End process tree action, which terminates that process and all of its descendants, ending the children before their parents.
+
+## System Tray Tooltip
+
+The text you get when hovering the tray icon is a template you control. Set it under System tray tooltip on the General tab in Settings.
+
+Anything you type is kept as-is, and these tokens are replaced with live values:
+
+* `{cpu}`: processor use across the whole system, as a percentage.
+* `{mem}`: physical memory in use.
+* `{mem_total}`: total physical memory.
+* `{mem_percent}`: physical memory in use, as a percentage.
+* `{processes}`: number of running processes.
+* `{threads}`: number of threads.
+* `{handles}`: number of open handles.
+
+The default is `CPU {cpu}%, {mem} memory used`. Something like `{mem_percent}% memory, {processes} processes` works just as well.
+
+Every value is read straight from the kernel rather than from the process list, so the tooltip shows the same thing whichever tab you have open, and it keeps updating while the window is hidden. A token you misspell is left in the tooltip unchanged, so you can see what went wrong.
 
 ## Finding a Process or Service
 
@@ -171,6 +189,8 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
 * Added column choice and ordering for the Services tab. The Columns tab in Settings now holds a list for each tab, each with its own Move up and Move down buttons.
 * Added four Services columns, off by default: Log On As, Binary Path, Service Type, and Group.
+* Added a customizable system tray tooltip, written as a template with tokens such as {cpu}, {mem} and {processes}, set on the General tab in Settings.
+* Fixed the tray tooltip freezing while the Services tab was open. It now updates independently of the visible tab and of the auto-refresh interval.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.

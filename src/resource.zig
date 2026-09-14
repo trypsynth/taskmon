@@ -43,3 +43,5 @@ pub const ID_EDIT_FIND_PREV = 412;
 pub const IDC_SVC_COL_LIST = 1012;
 pub const IDC_SVC_COL_UP = 1013;
 pub const IDC_SVC_COL_DOWN = 1014;
+pub const IDC_TRAY_TIP_EDIT = 1015;
+pub const IDC_TRAY_TOKENS = 1016;
