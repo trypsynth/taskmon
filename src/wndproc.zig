@@ -649,10 +649,10 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			setRefreshInterval(hwnd, state.prefs.refresh_ms);
 			// Skip when starting minimized: SetFocus on a hidden window can still activate
 			// it, stealing foreground from whatever the user was doing. WM_ACTIVATE already
-			// assigns focus (falling back to state.hwnd_list/state.hwnd_tree) once the window is
-			// actually shown via tray.restore().
+			// assigns focus (falling back to activeView()) once the window is actually shown
+			// via tray.restore().
 			if (!state.prefs.start_minimized_to_tray)
-				_ = win32.SetFocus(state.hwnd_list);
+				_ = win32.SetFocus(activeView());
 			return 0;
 		},
 		win32.WM_SIZE => {
