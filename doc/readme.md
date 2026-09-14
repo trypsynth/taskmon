@@ -184,13 +184,12 @@ Bringing up the context menu on a process in the list or tree view provides acce
 ## Changelog
 
 ### Version 0.4.0
-* Added a tabbed interface, with the existing process list on a Processes tab and a new Services tab alongside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
-* Added a Services tab listing every Windows service with its display name, status, startup type, and PID, with Start, Stop, Restart, and Go to process actions.
+* Added a tabbed interface. The process list now sits on a Processes tab, with a new Services tab beside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
+* Added a Services tab covering every Windows service, with Start, Stop, Restart, and Go to process actions, and its own columns that you can show, hide, and reorder from Settings.
 * Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
-* Added column choice and ordering for the Services tab. The Columns tab in Settings now holds a list for each tab, each with its own Move up and Move down buttons.
-* Added four Services columns, off by default: Log On As, Binary Path, Service Type, and Group.
 * Added a customizable system tray tooltip, written as a template with tokens such as {cpu}, {mem} and {processes}, set on the General tab in Settings.
-* Fixed the tray tooltip freezing while the Services tab was open. It now updates independently of the visible tab and of the auto-refresh interval.
+* Fixed the process tree not taking focus at startup when Taskmon was last closed in tree view, which left screen readers announcing the hidden process list instead.
+* Fixed the system tray tooltip not updating while auto-refresh was set to Off.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.
