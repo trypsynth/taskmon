@@ -40,3 +40,6 @@ pub const IDC_FIND_EDIT = 1011;
 pub const ID_EDIT_FIND = 410;
 pub const ID_EDIT_FIND_NEXT = 411;
 pub const ID_EDIT_FIND_PREV = 412;
+pub const IDC_SVC_COL_LIST = 1012;
+pub const IDC_SVC_COL_UP = 1013;
+pub const IDC_SVC_COL_DOWN = 1014;

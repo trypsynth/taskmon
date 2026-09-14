@@ -46,7 +46,7 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 The Services tab lists every Windows service, whether it is running or not.
 
 * Press Ctrl+Tab to move between the Processes and Services tabs, or Tab to the tab strip and use the Left and Right arrow keys.
-* Columns are Name, Display Name, Status, Startup Type, and PID. A blank PID means the service is not running.
+* Columns are Name, Display Name, Status, Startup Type, and PID. A blank PID means the service is not running. All except Name can be hidden or reordered from the Columns tab in Settings, independently of the process columns.
 * Sorting works exactly as it does on the Processes tab; see Column Reordering and Accessible Sorting below.
 * Right-click a service, or press the context menu key, for Start, Stop, Restart, and Go to process. Start and Stop grey out when they do not apply.
 * Go to process switches to the Processes tab and selects the process hosting that service.
@@ -131,7 +131,7 @@ All columns are optional except Name, which is always shown. Enable the ones you
 
 Taskmon has robust support for customizing how data is displayed, built specifically with accessibility in mind.
 
-* Settings: Press Ctrl+, and open the Columns tab. Check a column to show it, or clear it to hide it. To change the order, select a column and press Ctrl+Up or Ctrl+Down, or use the Move up and Move down buttons. Taskmon saves this order between runs. Name always stays first.
+* Settings: Press Ctrl+, and open the Columns tab. It holds two lists, one for the Processes tab and one for the Services tab. Check a column to show it, or clear it to hide it. To change the order, select a column and press Ctrl+Up or Ctrl+Down, or use that list's Move up and Move down buttons. Taskmon saves both lists between runs. Name always stays first in each.
 * Drag and drop: You can drag column headers with the mouse to reorder them. Taskmon saves the result just as it does an order set from the Columns tab, and the accessible sort buttons follow along. Name cannot be dragged, because it always stays first.
 * Accessible sorting: Screen reader users can press Tab from either list to focus a specialized set of hidden radio buttons. From there, use the Left and Right arrow keys to instantly change which column the list is sorted by. Pressing Enter will toggle the sort order between ascending and descending. The Services tab has its own set of these, covering its own columns.
 
@@ -167,6 +167,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Added a tabbed interface, with the existing process list on a Processes tab and a new Services tab alongside it. Ctrl+Tab and Ctrl+Shift+Tab move between them.
 * Added a Services tab listing every Windows service with its display name, status, startup type, and PID, with Start, Stop, Restart, and Go to process actions.
 * Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
+* Added column choice and ordering for the Services tab. The Columns tab in Settings now holds a list for each tab, each with its own Move up and Move down buttons.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.

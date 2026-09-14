@@ -1,5 +1,6 @@
 const std = @import("std");
 const win32 = @import("win32.zig");
+const resource = @import("resource.zig");
 const state = @import("state.zig");
 const theme = @import("theme.zig");
 const wfmt = @import("wfmt.zig");
@@ -31,22 +32,29 @@ pub const ColumnDef = struct {
 	label: win32.LPCWSTR,
 	width: i32,
 	field: SortField,
+	always_visible: bool,
+	default_visible: bool,
 };
 
 pub const COL_COUNT: usize = 5;
 pub const COLUMNS: [COL_COUNT]ColumnDef = .{
-	.{ .label = L("Name"), .width = 200, .field = .name },
-	.{ .label = L("Display Name"), .width = 300, .field = .display },
-	.{ .label = L("Status"), .width = 110, .field = .status },
-	.{ .label = L("Startup Type"), .width = 110, .field = .start_type },
-	.{ .label = L("PID"), .width = 80, .field = .pid },
+	.{ .label = L("Name"), .width = 200, .field = .name, .always_visible = true, .default_visible = true },
+	.{ .label = L("Display Name"), .width = 300, .field = .display, .always_visible = false, .default_visible = true },
+	.{ .label = L("Status"), .width = 110, .field = .status, .always_visible = false, .default_visible = true },
+	.{ .label = L("Startup Type"), .width = 110, .field = .start_type, .always_visible = false, .default_visible = true },
+	.{ .label = L("PID"), .width = 80, .field = .pid, .always_visible = false, .default_visible = true },
 };
 
-// COLUMNS[0] is rendered from the item label rather than a subitem, exactly as
-// in the process list, so it has to stay the Name column.
+// populate() renders COLUMNS[0] from the item label rather than a subitem, and
+// order[0] is pinned to it, so it has to be the one and only always-visible
+// column - the same contract settings.COLUMNS carries for the process list.
 comptime {
-	if (COLUMNS[0].field != .name)
-		@compileError("COLUMNS[0] must be the Name column");
+	if (COLUMNS[0].field != .name or !COLUMNS[0].always_visible)
+		@compileError("COLUMNS[0] must be the always-visible Name column");
+	for (COLUMNS[1..]) |col| {
+		if (col.always_visible)
+			@compileError("only COLUMNS[0] may be always_visible");
+	}
 }
 
 var entries: ?[*]ServiceEntry = null;
@@ -162,19 +170,50 @@ fn sortEntries() void {
 	}
 }
 
+// Rebuilds both the list columns and the hidden sort buttons from the saved
+// order and visibility, the same shape as sortbar.applyColumns does for
+// processes. Both are torn down and recreated because a column can appear,
+// disappear, or change place in one go.
 pub fn applyColumns() void {
+	for (0..@intCast(state.svc_sort_count)) |i| {
+		_ = win32.DestroyWindow(state.svc_sort_btns[i]);
+		state.svc_sort_btns[i] = null;
+	}
+	state.svc_sort_count = 0;
 	const header = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_GETHEADER, 0, 0);
 	const header_hwnd: win32.HWND = @ptrFromInt(@as(usize, @bitCast(header)));
-	var i: i32 = @as(i32, @intCast(win32.SendMessageW(header_hwnd, win32.HDM_GETITEMCOUNT, 0, 0))) - 1;
-	while (i >= 0) : (i -= 1) _ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_DELETECOLUMN, @intCast(i), 0);
-	for (0..COL_COUNT) |c| {
+	var old: i32 = @as(i32, @intCast(win32.SendMessageW(header_hwnd, win32.HDM_GETITEMCOUNT, 0, 0))) - 1;
+	while (old >= 0) : (old -= 1) _ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_DELETECOLUMN, @intCast(old), 0);
+	// Sorting by a column that has just been hidden would leave no way back to
+	// it, so fall back to Name.
+	var field_shown = false;
+	for (0..COL_COUNT) |i| {
+		if (COLUMNS[i].field == state.svc_field and state.prefs.svc_visible[i]) field_shown = true;
+	}
+	if (!field_shown) state.svc_field = .name;
+	var btn_x: i32 = 0;
+	var lv_col: i32 = 0;
+	for (0..COL_COUNT) |pos| {
+		const ci: usize = state.prefs.svc_order[pos];
+		if (!state.prefs.svc_visible[ci]) continue;
+		const bi: usize = @intCast(state.svc_sort_count);
+		state.svc_sort_btns[bi] = win32.CreateWindowExW(0, L("BUTTON"), COLUMNS[ci].label, win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_RADIOBUTTON, btn_x, 0, COLUMNS[ci].width, 1, state.hwnd_svc_sort_group, @ptrFromInt(@as(usize, @intCast(resource.ID_SVC_SORT_BASE)) + ci), win32.GetModuleHandleW(null), null);
+		_ = win32.SetWindowSubclass(state.svc_sort_btns[bi], sortBtnProc, @intCast(bi), 0);
+		state.svc_sort_cols[bi] = @intCast(ci);
+		btn_x += COLUMNS[ci].width;
+		state.svc_sort_count += 1;
 		var lvc: win32.LVCOLUMNW = std.mem.zeroes(win32.LVCOLUMNW);
 		lvc.mask = win32.LVCF_TEXT | win32.LVCF_WIDTH | win32.LVCF_SUBITEM;
-		lvc.pszText = @constCast(COLUMNS[c].label);
-		lvc.cx = COLUMNS[c].width;
-		lvc.iSubItem = @intCast(c);
-		_ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_INSERTCOLUMNW, @intCast(c), @bitCast(@intFromPtr(&lvc)));
+		lvc.pszText = @constCast(COLUMNS[ci].label);
+		lvc.cx = COLUMNS[ci].width;
+		lvc.iSubItem = lv_col;
+		_ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_INSERTCOLUMNW, @intCast(lv_col), @bitCast(@intFromPtr(&lvc)));
+		lv_col += 1;
 	}
+	_ = win32.SetWindowPos(state.hwnd_svc_sort_group, null, 0, 0, btn_x, 1, win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
+	updateSortUi();
+	updateTabStop();
+	applyTheme();
 }
 
 fn formatColumn(e: *const ServiceEntry, field: SortField, buf: [*:0]u16, len: i32) void {
@@ -234,8 +273,8 @@ pub fn populate() void {
 		_ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 		if (selected[0] != 0 and win32.StrCmpIW(&selected, @ptrCast(&e.name)) == 0) new_selected = @intCast(i);
 		var buf: [300:0]u16 = std.mem.zeroes([300:0]u16);
-		for (1..COL_COUNT) |c| {
-			formatColumn(e, COLUMNS[c].field, &buf, 300);
+		for (1..@intCast(state.svc_sort_count)) |c| {
+			formatColumn(e, COLUMNS[@intCast(state.svc_sort_cols[c])].field, &buf, 300);
 			var set_lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 			set_lvi.iSubItem = @intCast(c);
 			set_lvi.pszText = &buf;
@@ -329,27 +368,18 @@ fn waitForStop(svc: win32.HANDLE) void {
 	}
 }
 
-pub fn create(parent: win32.HWND, list_id: usize, sort_base: usize) void {
+pub fn create(parent: win32.HWND, list_id: usize) void {
 	state.hwnd_svc_sort_group = win32.CreateWindowExW(win32.WS_EX_CONTROLPARENT, L("BUTTON"), L("Sort by"), win32.WS_CHILD | win32.BS_GROUPBOX, 0, 0, 0, 1, parent, null, win32.GetModuleHandleW(null), null);
 	_ = win32.SetWindowSubclass(state.hwnd_svc_sort_group, sortGroupProc, 0, 0);
-	var btn_x: i32 = 0;
-	for (0..COL_COUNT) |i| {
-		state.svc_sort_btns[i] = win32.CreateWindowExW(0, L("BUTTON"), COLUMNS[i].label, win32.WS_CHILD | win32.WS_VISIBLE | win32.BS_RADIOBUTTON, btn_x, 0, COLUMNS[i].width, 1, state.hwnd_svc_sort_group, @ptrFromInt(sort_base + i), win32.GetModuleHandleW(null), null);
-		_ = win32.SetWindowSubclass(state.svc_sort_btns[i], sortBtnProc, @intCast(i), 0);
-		btn_x += COLUMNS[i].width;
-	}
-	_ = win32.SetWindowPos(state.hwnd_svc_sort_group, null, 0, 0, btn_x, 1, win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE);
 	// Hidden label ahead of the list so MSAA/UIA name it "Services" rather than
 	// reaching back to the sort group box, matching the process list.
 	_ = win32.CreateWindowExW(0, L("STATIC"), L("Services"), win32.WS_CHILD | win32.SS_LEFT, 0, 0, 0, 0, parent, null, win32.GetModuleHandleW(null), null);
 	state.hwnd_svc_list = win32.CreateWindowExW(0, win32.WC_LISTVIEWW, L("Services"), win32.WS_CHILD | win32.WS_TABSTOP | win32.LVS_REPORT | win32.LVS_SHOWSELALWAYS | win32.LVS_SINGLESEL, 0, 1, 760, 537, parent, @ptrFromInt(list_id), win32.GetModuleHandleW(null), null);
 	_ = win32.SetWindowSubclass(state.hwnd_svc_list, listKeyProc, 0, 0);
 	_ = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_FULLROWSELECT | win32.LVS_EX_GRIDLINES);
-	applyColumns();
-	updateTabStop();
-	updateSortUi();
-	theme.applyListview(state.hwnd_svc_list);
-	applyTheme();
+	// No applyColumns() here: it reads state.prefs, which WM_CREATE has not
+	// loaded yet at this point. wndproc calls it after settings.load(), the same
+	// way it does for the process list.
 }
 
 fn listKeyProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
@@ -392,7 +422,7 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 		}
 		if (wp == win32.VK_LEFT or wp == win32.VK_RIGHT) {
 			var idx: i32 = -1;
-			for (0..COL_COUNT) |i| {
+			for (0..@intCast(state.svc_sort_count)) |i| {
 				if (state.svc_sort_btns[i] == hwnd) {
 					idx = @intCast(i);
 					break;
@@ -400,13 +430,14 @@ fn sortBtnProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			}
 			if (idx < 0) return 0;
 			const next: i32 = if (wp == win32.VK_RIGHT) idx + 1 else idx - 1;
-			if (next < 0 or next >= COL_COUNT) return 0;
-			state.svc_field = COLUMNS[@intCast(next)].field;
+			if (next < 0 or next >= state.svc_sort_count) return 0;
+			const next_ci: usize = @intCast(state.svc_sort_cols[@intCast(next)]);
+			state.svc_field = COLUMNS[next_ci].field;
 			// Give the destination its final label before focus lands, and only
 			// relabel the rest afterwards: renaming a button that still holds
 			// focus makes a screen reader read the field being left behind.
 			var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
-			wfmt.format(&buf, 64, "%s (%s)", .{ COLUMNS[@intCast(next)].label, if (state.svc_desc) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
+			wfmt.format(&buf, 64, "%s (%s)", .{ COLUMNS[next_ci].label, if (state.svc_desc) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
 			_ = win32.SetWindowTextW(state.svc_sort_btns[@intCast(next)], &buf);
 			_ = win32.SendMessageW(state.svc_sort_btns[@intCast(next)], win32.BM_SETCHECK, win32.BST_CHECKED, 0);
 			updateTabStop();
@@ -434,9 +465,9 @@ fn sortGroupProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.
 /// Only the button for the active sort field is a tab stop, so Tab lands on the
 /// current choice and Left/Right move between the rest.
 pub fn updateTabStop() void {
-	for (0..COL_COUNT) |i| {
+	for (0..@intCast(state.svc_sort_count)) |i| {
 		var style = win32.GetWindowLongPtrW(state.svc_sort_btns[i], win32.GWL_STYLE);
-		style = if (COLUMNS[i].field == state.svc_field)
+		style = if (COLUMNS[@intCast(state.svc_sort_cols[i])].field == state.svc_field)
 			style | @as(win32.LONG_PTR, win32.WS_TABSTOP)
 		else
 			style & ~@as(win32.LONG_PTR, win32.WS_TABSTOP);
@@ -447,13 +478,14 @@ pub fn updateTabStop() void {
 pub fn updateSortUi() void {
 	const header = win32.SendMessageW(state.hwnd_svc_list, win32.LVM_GETHEADER, 0, 0);
 	const header_hwnd: win32.HWND = @ptrFromInt(@as(usize, @bitCast(header)));
-	for (0..COL_COUNT) |i| {
-		const active = COLUMNS[i].field == state.svc_field;
+	for (0..@intCast(state.svc_sort_count)) |i| {
+		const ci: usize = @intCast(state.svc_sort_cols[i]);
+		const active = COLUMNS[ci].field == state.svc_field;
 		var buf: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		if (active) {
-			wfmt.format(&buf, 64, "%s (%s)", .{ COLUMNS[i].label, if (state.svc_desc) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
+			wfmt.format(&buf, 64, "%s (%s)", .{ COLUMNS[ci].label, if (state.svc_desc) @as(win32.LPCWSTR, L("descending")) else @as(win32.LPCWSTR, L("ascending")) });
 		} else {
-			_ = win32.lstrcpyW(&buf, COLUMNS[i].label);
+			_ = win32.lstrcpyW(&buf, COLUMNS[ci].label);
 		}
 		_ = win32.SetWindowTextW(state.svc_sort_btns[i], &buf);
 		_ = win32.SendMessageW(state.svc_sort_btns[i], win32.BM_SETCHECK, if (active) win32.BST_CHECKED else win32.BST_UNCHECKED, 0);
@@ -483,5 +515,5 @@ pub fn onSortCommand(index: usize) void {
 
 pub fn applyTheme() void {
 	theme.applyButton(state.hwnd_svc_sort_group);
-	for (0..COL_COUNT) |i| theme.applyButton(state.svc_sort_btns[i]);
+	for (0..@intCast(state.svc_sort_count)) |i| theme.applyButton(state.svc_sort_btns[i]);
 }

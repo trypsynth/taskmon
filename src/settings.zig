@@ -3,6 +3,7 @@ const win32 = @import("win32.zig");
 const resource = @import("resource.zig");
 const theme = @import("theme.zig");
 const wfmt = @import("wfmt.zig");
+const services = @import("services.zig");
 const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub const SortField = enum(i32) {
@@ -193,6 +194,10 @@ pub const SortPrefs = struct {
 	// column shown at position pos. order[0] is always the Name column (see
 	// the comptime check above).
 	order: [COL_COUNT]u8,
+	// Same pair again for the services list, which keeps its own choice and
+	// order because its columns have nothing to do with the process ones.
+	svc_visible: [services.COL_COUNT]bool,
+	svc_order: [services.COL_COUNT]u8,
 	skip_kill_confirm: bool,
 	always_on_top: bool,
 	tree_mode: bool,
@@ -207,13 +212,38 @@ const SettingsDlgData = struct {
 	refresh_ms: win32.UINT,
 	visible: [COL_COUNT]bool,
 	order: [COL_COUNT]u8,
+	svc_visible: [services.COL_COUNT]bool,
+	svc_order: [services.COL_COUNT]u8,
 	skip_kill_confirm: bool,
 	start_minimized_to_tray: bool,
 };
 
+// The Columns page drives two identical lists over different column tables, so
+// each one is described once here instead of duplicating every handler.
+const ColumnList = struct {
+	list_id: i32,
+	up_id: i32,
+	down_id: i32,
+	count: usize,
+	labels: []const win32.LPCWSTR,
+};
+
+const COLUMN_LISTS = [2]ColumnList{
+	.{ .list_id = resource.IDC_COL_LIST, .up_id = resource.IDC_COL_UP, .down_id = resource.IDC_COL_DOWN, .count = COL_COUNT, .labels = &COLUMN_LABELS },
+	.{ .list_id = resource.IDC_SVC_COL_LIST, .up_id = resource.IDC_SVC_COL_UP, .down_id = resource.IDC_SVC_COL_DOWN, .count = services.COL_COUNT, .labels = &SVC_COLUMN_LABELS },
+};
+
+fn listForControl(id: i32) ?ColumnList {
+	for (COLUMN_LISTS) |cl| {
+		if (id == cl.list_id or id == cl.up_id or id == cl.down_id) return cl;
+	}
+	return null;
+}
+
 pub const Changes = struct {
 	refresh_ms: bool,
 	columns: bool,
+	svc_columns: bool,
 };
 
 const TAB_COUNT = 2;
@@ -252,11 +282,11 @@ fn colRow(lv: win32.HWND, row: i32) usize {
 	return @intCast(lvi.lParam);
 }
 
-fn setColRow(lv: win32.HWND, row: i32, ci: usize, checked: bool) void {
+fn setColRow(lv: win32.HWND, row: i32, ci: usize, checked: bool, labels: []const win32.LPCWSTR) void {
 	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 	lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
 	lvi.iItem = row;
-	lvi.pszText = @constCast(COLUMNS[ci].label);
+	lvi.pszText = @constCast(labels[ci]);
 	lvi.lParam = @intCast(ci);
 	_ = win32.SendMessageW(lv, win32.LVM_SETITEMW, 0, @bitCast(@intFromPtr(&lvi)));
 	setCheckState(lv, row, checked);
@@ -269,16 +299,16 @@ fn selectedColRow(lv: win32.HWND) i32 {
 // Swaps the selected row with its neighbour rather than rebuilding the list, so
 // the scroll position survives and the moved row stays selected under the
 // user's cursor or reading position.
-fn moveColumn(page: win32.HWND, delta: i32) void {
-	const lv = win32.GetDlgItem(page, resource.IDC_COL_LIST);
+fn moveColumn(page: win32.HWND, cl: ColumnList, delta: i32) void {
+	const lv = win32.GetDlgItem(page, cl.list_id);
 	const sel = selectedColRow(lv);
 	const dest = sel + delta;
 	const count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
 	if (sel < 0 or dest < 0 or dest >= count) return;
 	const sel_ci = colRow(lv, sel);
 	const sel_checked = getCheckState(lv, sel);
-	setColRow(lv, sel, colRow(lv, dest), getCheckState(lv, dest));
-	setColRow(lv, dest, sel_ci, sel_checked);
+	setColRow(lv, sel, colRow(lv, dest), getCheckState(lv, dest), cl.labels);
+	setColRow(lv, dest, sel_ci, sel_checked, cl.labels);
 	var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
 	lvi.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
 	lvi.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
@@ -288,12 +318,12 @@ fn moveColumn(page: win32.HWND, delta: i32) void {
 
 // A move button that silently does nothing at the end of the list gives a
 // screen reader nothing to announce, so grey them out instead.
-fn updateMoveButtons(page: win32.HWND) void {
-	const lv = win32.GetDlgItem(page, resource.IDC_COL_LIST);
+fn updateMoveButtons(page: win32.HWND, cl: ColumnList) void {
+	const lv = win32.GetDlgItem(page, cl.list_id);
 	const sel = selectedColRow(lv);
 	const count: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
-	_ = win32.EnableWindow(win32.GetDlgItem(page, resource.IDC_COL_UP), if (sel > 0) 1 else 0);
-	_ = win32.EnableWindow(win32.GetDlgItem(page, resource.IDC_COL_DOWN), if (sel >= 0 and sel < count - 1) 1 else 0);
+	_ = win32.EnableWindow(win32.GetDlgItem(page, cl.up_id), if (sel > 0) 1 else 0);
+	_ = win32.EnableWindow(win32.GetDlgItem(page, cl.down_id), if (sel >= 0 and sel < count - 1) 1 else 0);
 }
 
 fn settingsLvProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LPARAM, id: win32.UINT_PTR, data: win32.DWORD_PTR) callconv(.c) win32.LRESULT {
@@ -301,7 +331,8 @@ fn settingsLvProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32
 	_ = data;
 	if (msg == win32.WM_CHAR and wp == ' ') return 0;
 	if (msg == win32.WM_KEYDOWN and (wp == win32.VK_UP or wp == win32.VK_DOWN) and win32.GetKeyState(win32.VK_CONTROL) < 0) {
-		moveColumn(win32.GetParent(hwnd), if (wp == win32.VK_UP) -1 else 1);
+		if (listForControl(win32.GetDlgCtrlID(hwnd))) |cl|
+			moveColumn(win32.GetParent(hwnd), cl, if (wp == win32.VK_UP) -1 else 1);
 		return 0;
 	}
 	return win32.DefSubclassProc(hwnd, msg, wp, lp);
@@ -344,44 +375,50 @@ fn columnsPageProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 	switch (msg) {
 		win32.WM_INITDIALOG => {
 			const data: *SettingsDlgData = @ptrFromInt(@as(usize, @bitCast(lp)));
-			const lv = win32.GetDlgItem(hdlg, resource.IDC_COL_LIST);
-			_ = win32.SendMessageW(lv, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_CHECKBOXES);
-			var lvc: win32.LVCOLUMNW = std.mem.zeroes(win32.LVCOLUMNW);
-			lvc.mask = win32.LVCF_WIDTH;
-			lvc.cx = 1000;
-			_ = win32.SendMessageW(lv, win32.LVM_INSERTCOLUMNW, 0, @bitCast(@intFromPtr(&lvc)));
-			// Row j is order position j + 1: position 0 is the always-visible Name
-			// column, which is neither listed nor movable.
-			for (1..COL_COUNT) |pos| {
-				const ci: usize = data.order[pos];
-				var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-				lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
-				lvi.iItem = @intCast(pos - 1);
-				lvi.pszText = @constCast(COLUMNS[ci].label);
-				lvi.lParam = @intCast(ci);
-				_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
-				setCheckState(lv, lvi.iItem, data.visible[ci]);
+			for (COLUMN_LISTS, 0..) |cl, which| {
+				const lv = win32.GetDlgItem(hdlg, cl.list_id);
+				_ = win32.SendMessageW(lv, win32.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, win32.LVS_EX_CHECKBOXES);
+				var lvc: win32.LVCOLUMNW = std.mem.zeroes(win32.LVCOLUMNW);
+				lvc.mask = win32.LVCF_WIDTH;
+				lvc.cx = 1000;
+				_ = win32.SendMessageW(lv, win32.LVM_INSERTCOLUMNW, 0, @bitCast(@intFromPtr(&lvc)));
+				// Row j is order position j + 1: position 0 is the always-visible Name
+				// column, which is neither listed nor movable.
+				for (1..cl.count) |pos| {
+					const ci: usize = if (which == 0) data.order[pos] else data.svc_order[pos];
+					var lvi: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+					lvi.mask = win32.LVIF_TEXT | win32.LVIF_PARAM;
+					lvi.iItem = @intCast(pos - 1);
+					lvi.pszText = @constCast(cl.labels[ci]);
+					lvi.lParam = @intCast(ci);
+					_ = win32.SendMessageW(lv, win32.LVM_INSERTITEMW, 0, @bitCast(@intFromPtr(&lvi)));
+					setCheckState(lv, lvi.iItem, if (which == 0) data.visible[ci] else data.svc_visible[ci]);
+				}
+				var first: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
+				first.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+				first.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
+				_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&first)));
+				theme.applyListview(lv);
+				_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
+				updateMoveButtons(hdlg, cl);
 			}
-			var first: win32.LVITEMW = std.mem.zeroes(win32.LVITEMW);
-			first.stateMask = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-			first.state = win32.LVIS_SELECTED | win32.LVIS_FOCUSED;
-			_ = win32.SendMessageW(lv, win32.LVM_SETITEMSTATE, 0, @bitCast(@intFromPtr(&first)));
-			theme.applyListview(lv);
-			_ = win32.SetWindowSubclass(lv, settingsLvProc, 0, 0);
-			updateMoveButtons(hdlg);
 			return 1;
 		},
 		win32.WM_COMMAND => {
 			const low: u16 = @truncate(wp);
-			if (low == resource.IDC_COL_UP or low == resource.IDC_COL_DOWN) {
-				moveColumn(hdlg, if (low == resource.IDC_COL_UP) -1 else 1);
-				_ = win32.SetFocus(win32.GetDlgItem(hdlg, resource.IDC_COL_LIST));
-				return 1;
+			if (listForControl(@intCast(low))) |cl| {
+				if (low == cl.up_id or low == cl.down_id) {
+					moveColumn(hdlg, cl, if (low == cl.up_id) -1 else 1);
+					_ = win32.SetFocus(win32.GetDlgItem(hdlg, cl.list_id));
+					return 1;
+				}
 			}
 		},
 		win32.WM_NOTIFY => {
 			const hdr: *const win32.NMHDR = @ptrFromInt(@as(usize, @bitCast(lp)));
-			if (hdr.idFrom == resource.IDC_COL_LIST and hdr.code == @as(win32.UINT, @bitCast(win32.LVN_ITEMCHANGED))) updateMoveButtons(hdlg);
+			if (hdr.code == @as(win32.UINT, @bitCast(win32.LVN_ITEMCHANGED))) {
+				if (listForControl(@intCast(hdr.idFrom))) |cl| updateMoveButtons(hdlg, cl);
+			}
 		},
 		else => {},
 	}
@@ -450,13 +487,20 @@ fn settingsDlgProc(hdlg: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win3
 				data.refresh_ms = if (sel >= 0 and sel < REFRESH_OPTION_COUNT) REFRESH_MS[@intCast(sel)] else 0;
 				data.skip_kill_confirm = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_SKIP_CONFIRM), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
 				data.start_minimized_to_tray = win32.SendMessageW(win32.GetDlgItem(general, resource.IDC_START_MINIMIZED), win32.BM_GETCHECK, 0, 0) == win32.BST_CHECKED;
-				const lv = win32.GetDlgItem(tab_pages[1], resource.IDC_COL_LIST);
-				const rows: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
-				data.order[0] = 0;
-				for (0..@intCast(rows)) |j| {
-					const ci = colRow(lv, @intCast(j));
-					data.order[j + 1] = @intCast(ci);
-					data.visible[ci] = getCheckState(lv, @intCast(j));
+				for (COLUMN_LISTS, 0..) |cl, which| {
+					const lv = win32.GetDlgItem(tab_pages[1], cl.list_id);
+					const rows: i32 = @intCast(win32.SendMessageW(lv, win32.LVM_GETITEMCOUNT, 0, 0));
+					if (which == 0) data.order[0] = 0 else data.svc_order[0] = 0;
+					for (0..@intCast(rows)) |j| {
+						const ci = colRow(lv, @intCast(j));
+						if (which == 0) {
+							data.order[j + 1] = @intCast(ci);
+							data.visible[ci] = getCheckState(lv, @intCast(j));
+						} else {
+							data.svc_order[j + 1] = @intCast(ci);
+							data.svc_visible[ci] = getCheckState(lv, @intCast(j));
+						}
+					}
 				}
 				_ = win32.EndDialog(hdlg, 1);
 				return 1;
@@ -484,6 +528,8 @@ pub fn open(parent: win32.HWND, prefs: *SortPrefs) ?Changes {
 		.refresh_ms = prefs.refresh_ms,
 		.visible = prefs.visible,
 		.order = prefs.order,
+		.svc_visible = prefs.svc_visible,
+		.svc_order = prefs.svc_order,
 		.skip_kill_confirm = prefs.skip_kill_confirm,
 		.start_minimized_to_tray = prefs.start_minimized_to_tray,
 	};
@@ -491,10 +537,13 @@ pub fn open(parent: win32.HWND, prefs: *SortPrefs) ?Changes {
 	const changes = Changes{
 		.refresh_ms = data.refresh_ms != prefs.refresh_ms,
 		.columns = !std.mem.eql(bool, &data.visible, &prefs.visible) or !std.mem.eql(u8, &data.order, &prefs.order),
+		.svc_columns = !std.mem.eql(bool, &data.svc_visible, &prefs.svc_visible) or !std.mem.eql(u8, &data.svc_order, &prefs.svc_order),
 	};
 	prefs.refresh_ms = data.refresh_ms;
 	prefs.visible = data.visible;
 	prefs.order = data.order;
+	prefs.svc_visible = data.svc_visible;
+	prefs.svc_order = data.svc_order;
 	prefs.skip_kill_confirm = data.skip_kill_confirm;
 	prefs.start_minimized_to_tray = data.start_minimized_to_tray;
 	return changes;
@@ -554,6 +603,42 @@ fn columnKey(comptime suffix: []const u8, buf: *[64:0]u16, label: win32.LPCWSTR)
 	return buf;
 }
 
+// Saved ranks are insertion-sorted (stable, natural index breaking ties) rather
+// than trusted as positions, so a hand-edited ini, a duplicate rank, or a column
+// added by a later version still yields a full permutation with index 0 pinned.
+fn loadOrder(path: win32.LPCWSTR, section: win32.LPCWSTR, comptime n: usize, labels: [n]win32.LPCWSTR, order: *[n]u8) void {
+	var rank: [n]i32 = undefined;
+	for (0..n) |i| {
+		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
+		rank[i] = getIniInt(path, section, columnKey("_order", &key, labels[i]), @intCast(i));
+	}
+	order[0] = 0;
+	var count: usize = 1;
+	for (1..n) |i| {
+		var pos = count;
+		while (pos > 1 and rank[order[pos - 1]] > rank[i]) : (pos -= 1) order[pos] = order[pos - 1];
+		order[pos] = @intCast(i);
+		count += 1;
+	}
+}
+
+fn saveOrder(path: win32.LPCWSTR, section: win32.LPCWSTR, comptime n: usize, labels: [n]win32.LPCWSTR, order: *const [n]u8) void {
+	for (0..n) |pos| {
+		const ci: usize = order[pos];
+		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
+		setIniInt(path, section, columnKey("_order", &key, labels[ci]), @intCast(pos));
+	}
+}
+
+fn columnLabels(comptime n: usize, comptime defs: anytype) [n]win32.LPCWSTR {
+	var out: [n]win32.LPCWSTR = undefined;
+	for (0..n) |i| out[i] = defs[i].label;
+	return out;
+}
+
+const COLUMN_LABELS = columnLabels(COL_COUNT, COLUMNS);
+const SVC_COLUMN_LABELS = columnLabels(services.COL_COUNT, services.COLUMNS);
+
 pub fn load(prefs: *SortPrefs) void {
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	getIniPath(&path);
@@ -586,22 +671,13 @@ pub fn load(prefs: *SortPrefs) void {
 		const visible = getIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), COLUMNS[i].default_visible);
 		prefs.visible[i] = COLUMNS[i].always_visible or visible;
 	}
-	// Saved ranks are insertion-sorted (stable, natural index breaking ties)
-	// rather than trusted as positions, so a hand-edited ini, a duplicate rank,
-	// or a column added by a later version still yields a full permutation.
-	var rank: [COL_COUNT]i32 = undefined;
-	for (0..COL_COUNT) |i| {
+	loadOrder(&path, L("columns"), COL_COUNT, COLUMN_LABELS, &prefs.order);
+	for (0..services.COL_COUNT) |i| {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		rank[i] = getIniInt(&path, L("columns"), columnKey("_order", &key, COLUMNS[i].label), @intCast(i));
+		const visible = getIniBool(&path, L("service_columns"), columnKey("_visible", &key, services.COLUMNS[i].label), services.COLUMNS[i].default_visible);
+		prefs.svc_visible[i] = services.COLUMNS[i].always_visible or visible;
 	}
-	prefs.order[0] = 0;
-	var n: usize = 1;
-	for (1..COL_COUNT) |i| {
-		var pos = n;
-		while (pos > 1 and rank[prefs.order[pos - 1]] > rank[i]) : (pos -= 1) prefs.order[pos] = prefs.order[pos - 1];
-		prefs.order[pos] = @intCast(i);
-		n += 1;
-	}
+	loadOrder(&path, L("service_columns"), services.COL_COUNT, SVC_COLUMN_LABELS, &prefs.svc_order);
 }
 
 pub fn save(prefs: *const SortPrefs) void {
@@ -629,9 +705,11 @@ pub fn save(prefs: *const SortPrefs) void {
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
 		setIniBool(&path, L("columns"), columnKey("_visible", &key, COLUMNS[i].label), prefs.visible[i]);
 	}
-	for (0..COL_COUNT) |pos| {
-		const ci: usize = prefs.order[pos];
+	saveOrder(&path, L("columns"), COL_COUNT, COLUMN_LABELS, &prefs.order);
+	for (0..services.COL_COUNT) |i| {
+		if (services.COLUMNS[i].always_visible) continue;
 		var key: [64:0]u16 = std.mem.zeroes([64:0]u16);
-		setIniInt(&path, L("columns"), columnKey("_order", &key, COLUMNS[ci].label), @intCast(pos));
+		setIniBool(&path, L("service_columns"), columnKey("_visible", &key, services.COLUMNS[i].label), prefs.svc_visible[i]);
 	}
+	saveOrder(&path, L("service_columns"), services.COL_COUNT, SVC_COLUMN_LABELS, &prefs.svc_order);
 }

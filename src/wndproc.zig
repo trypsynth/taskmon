@@ -483,6 +483,10 @@ fn handleCommand(hwnd: win32.HWND, wp: win32.WPARAM) win32.LRESULT {
 				sortbar.applyColumns();
 				listview.resort();
 			}
+			if (changed.svc_columns) {
+				services.applyColumns();
+				services.resort();
+			}
 			settings.save(&state.prefs);
 		}
 		return 0;
@@ -614,13 +618,15 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 			state.hwnd_tree = win32.CreateWindowExW(0, win32.WC_TREEVIEWW, null, win32.WS_CHILD | win32.WS_TABSTOP | win32.TVS_HASLINES | win32.TVS_HASBUTTONS | win32.TVS_LINESATROOT | win32.TVS_SHOWSELALWAYS, 0, 1, 760, 537, hwnd, @ptrFromInt(@as(usize, ID_TREEVIEW)), win32.GetModuleHandleW(null), null);
 			_ = win32.SetWindowSubclass(state.hwnd_tree, treeview.keyProc, 0, 0);
 			_ = win32.SendMessageW(state.hwnd_tree, win32.TVM_SETEXTENDEDSTYLE, win32.TVS_EX_DOUBLEBUFFER, win32.TVS_EX_DOUBLEBUFFER);
-			services.create(hwnd, resource.ID_SVC_LISTVIEW, resource.ID_SVC_SORT_BASE);
+			services.create(hwnd, resource.ID_SVC_LISTVIEW);
 			state.hwnd_status = win32.CreateWindowExW(0, win32.STATUSCLASSNAMEW, null, win32.WS_CHILD | win32.WS_VISIBLE, 0, 0, 0, 0, hwnd, null, win32.GetModuleHandleW(null), null);
 			settings.load(&state.prefs);
 			theme.update();
 			sortbar.applyColumns();
+			services.applyColumns();
 			theme.applyTitlebar(hwnd);
 			theme.applyListview(state.hwnd_list);
+			theme.applyListview(state.hwnd_svc_list);
 			theme.applyTreeview(state.hwnd_tree);
 			_ = win32.SetWindowTheme(state.hwnd_status, if (theme.isDark() != 0) L("DarkMode_Explorer") else L("Explorer"), null);
 			if (state.prefs.tree_mode) {
