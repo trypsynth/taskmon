@@ -8,6 +8,9 @@ const L = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub const NAME_LEN = 64;
 pub const DISPLAY_LEN = 128;
+const ACCOUNT_LEN = 128;
+const PATH_LEN = 260;
+const GROUP_LEN = 64;
 
 // Fixed-size and extern so the whole table can be sorted with raw byte swaps,
 // the same way process.zig sorts its entries without a heap-allocated scratch
@@ -15,9 +18,13 @@ pub const DISPLAY_LEN = 128;
 pub const ServiceEntry = extern struct {
 	name: [NAME_LEN:0]u16,
 	display: [DISPLAY_LEN:0]u16,
+	log_on_as: [ACCOUNT_LEN:0]u16,
+	binary_path: [PATH_LEN:0]u16,
+	group: [GROUP_LEN:0]u16,
 	pid: win32.DWORD,
 	current_state: win32.DWORD,
 	start_type: win32.DWORD,
+	service_type: win32.DWORD,
 };
 
 pub const SortField = enum(i32) {
@@ -26,6 +33,10 @@ pub const SortField = enum(i32) {
 	status,
 	start_type,
 	pid,
+	log_on_as,
+	binary_path,
+	service_type,
+	group,
 };
 
 pub const ColumnDef = struct {
@@ -36,13 +47,17 @@ pub const ColumnDef = struct {
 	default_visible: bool,
 };
 
-pub const COL_COUNT: usize = 5;
+pub const COL_COUNT: usize = 9;
 pub const COLUMNS: [COL_COUNT]ColumnDef = .{
 	.{ .label = L("Name"), .width = 200, .field = .name, .always_visible = true, .default_visible = true },
 	.{ .label = L("Display Name"), .width = 300, .field = .display, .always_visible = false, .default_visible = true },
 	.{ .label = L("Status"), .width = 110, .field = .status, .always_visible = false, .default_visible = true },
 	.{ .label = L("Startup Type"), .width = 110, .field = .start_type, .always_visible = false, .default_visible = true },
 	.{ .label = L("PID"), .width = 80, .field = .pid, .always_visible = false, .default_visible = true },
+	.{ .label = L("Log On As"), .width = 180, .field = .log_on_as, .always_visible = false, .default_visible = false },
+	.{ .label = L("Binary Path"), .width = 400, .field = .binary_path, .always_visible = false, .default_visible = false },
+	.{ .label = L("Service Type"), .width = 130, .field = .service_type, .always_visible = false, .default_visible = false },
+	.{ .label = L("Group"), .width = 130, .field = .group, .always_visible = false, .default_visible = false },
 };
 
 // populate() renders COLUMNS[0] from the item label rather than a subitem, and
@@ -82,6 +97,27 @@ fn stateLabel(s: win32.DWORD) win32.LPCWSTR {
 	};
 }
 
+// The base type comes with flags layered on top: SERVICE_INTERACTIVE_PROCESS,
+// SERVICE_USERSERVICE_INSTANCE for the per-user copies Windows spawns under a
+// suffixed name like AarSvc_16b23, and SERVICE_PKG_SERVICE for the packaged ones
+// sc reports as WIN32_PACKAGED_PROCESS. Mask all three off so those report the
+// same type as any other service instead of falling through to blank. Driver
+// types cannot appear while the enumeration asks for SERVICE_WIN32 only, but
+// they cost nothing to name if that filter is ever widened.
+const TYPE_FLAGS: win32.DWORD = win32.SERVICE_INTERACTIVE_PROCESS | win32.SERVICE_USERSERVICE_INSTANCE | win32.SERVICE_PKG_SERVICE;
+
+fn serviceTypeLabel(t: win32.DWORD) win32.LPCWSTR {
+	return switch (t & ~TYPE_FLAGS) {
+		win32.SERVICE_KERNEL_DRIVER => L("Kernel Driver"),
+		win32.SERVICE_FILE_SYSTEM_DRIVER => L("File System Driver"),
+		win32.SERVICE_WIN32_OWN_PROCESS => L("Own Process"),
+		win32.SERVICE_WIN32_SHARE_PROCESS => L("Shared Process"),
+		win32.SERVICE_USER_OWN_PROCESS => L("User Own Process"),
+		win32.SERVICE_USER_SHARE_PROCESS => L("User Shared Process"),
+		else => L(""),
+	};
+}
+
 fn startTypeLabel(t: win32.DWORD) win32.LPCWSTR {
 	return switch (t) {
 		win32.SERVICE_BOOT_START => L("Boot"),
@@ -93,22 +129,28 @@ fn startTypeLabel(t: win32.DWORD) win32.LPCWSTR {
 	};
 }
 
-// Start type is the one field EnumServicesStatusExW doesn't return, so it costs
-// an open and a query per service. SERVICE_QUERY_CONFIG is granted to ordinary
-// users, so this still works unelevated; a service that refuses the open just
-// shows a blank startup type rather than failing the whole refresh.
-fn readStartType(scm: win32.HANDLE, name: win32.LPCWSTR) win32.DWORD {
+// Everything EnumServicesStatusExW does not return comes from one config query,
+// so the open-and-query is paid once per service and fills five fields rather
+// than just the startup type. SERVICE_QUERY_CONFIG is granted to ordinary users,
+// so this still works unelevated; a service that refuses the open keeps the
+// zeroed defaults and renders as blanks rather than failing the whole refresh.
+fn readConfig(scm: win32.HANDLE, name: win32.LPCWSTR, dst: *ServiceEntry) void {
+	dst.start_type = 0xFFFFFFFF;
 	const svc = win32.OpenServiceW(scm, name, win32.SERVICE_QUERY_CONFIG);
-	if (svc == null) return 0xFFFFFFFF;
+	if (svc == null) return;
 	defer _ = win32.CloseServiceHandle(svc);
 	var needed: win32.DWORD = 0;
 	_ = win32.QueryServiceConfigW(svc, null, 0, &needed);
-	if (needed == 0) return 0xFFFFFFFF;
-	const buf = heapAlloc(needed) orelse return 0xFFFFFFFF;
+	if (needed == 0) return;
+	const buf = heapAlloc(needed) orelse return;
 	defer heapFree(buf);
 	const cfg: *win32.QUERY_SERVICE_CONFIGW = @ptrCast(@alignCast(buf));
-	if (win32.QueryServiceConfigW(svc, cfg, needed, &needed) == 0) return 0xFFFFFFFF;
-	return cfg.dwStartType;
+	if (win32.QueryServiceConfigW(svc, cfg, needed, &needed) == 0) return;
+	dst.start_type = cfg.dwStartType;
+	dst.service_type = cfg.dwServiceType;
+	if (cfg.lpServiceStartName) |v| _ = win32.lstrcpynW(@ptrCast(&dst.log_on_as), v, ACCOUNT_LEN);
+	if (cfg.lpBinaryPathName) |v| _ = win32.lstrcpynW(@ptrCast(&dst.binary_path), v, PATH_LEN);
+	if (cfg.lpLoadOrderGroup) |v| _ = win32.lstrcpynW(@ptrCast(&dst.group), v, GROUP_LEN);
 }
 
 pub fn refresh() void {
@@ -138,7 +180,7 @@ pub fn refresh() void {
 		if (sv[i].lpDisplayName) |disp| _ = win32.lstrcpynW(@ptrCast(&dst.display), disp, DISPLAY_LEN);
 		dst.pid = sv[i].ServiceStatusProcess.dwProcessId;
 		dst.current_state = sv[i].ServiceStatusProcess.dwCurrentState;
-		dst.start_type = readStartType(scm, name);
+		readConfig(scm, name, dst);
 		count += 1;
 	}
 	sortEntries();
@@ -151,6 +193,10 @@ fn compare(a: *const ServiceEntry, b: *const ServiceEntry) bool {
 		.status => @as(i32, @intCast(a.current_state)) - @as(i32, @intCast(b.current_state)),
 		.start_type => @as(i32, @intCast(a.start_type & 0xFF)) - @as(i32, @intCast(b.start_type & 0xFF)),
 		.pid => @as(i32, @bitCast(a.pid)) - @as(i32, @bitCast(b.pid)),
+		.log_on_as => win32.StrCmpIW(@ptrCast(&a.log_on_as), @ptrCast(&b.log_on_as)),
+		.binary_path => win32.StrCmpIW(@ptrCast(&a.binary_path), @ptrCast(&b.binary_path)),
+		.group => win32.StrCmpIW(@ptrCast(&a.group), @ptrCast(&b.group)),
+		.service_type => @as(i32, @intCast(a.service_type & 0xFFF)) - @as(i32, @intCast(b.service_type & 0xFFF)),
 	};
 	return if (state.svc_desc) order > 0 else order < 0;
 }
@@ -225,6 +271,10 @@ fn formatColumn(e: *const ServiceEntry, field: SortField, buf: [*:0]u16, len: i3
 		.pid => {
 			if (e.pid != 0) wfmt.format(buf, len, "%u", .{e.pid}) else buf[0] = 0;
 		},
+		.log_on_as => _ = win32.lstrcpynW(buf, @ptrCast(&e.log_on_as), len),
+		.binary_path => _ = win32.lstrcpynW(buf, @ptrCast(&e.binary_path), len),
+		.group => _ = win32.lstrcpynW(buf, @ptrCast(&e.group), len),
+		.service_type => _ = win32.lstrcpynW(buf, serviceTypeLabel(e.service_type), len),
 	}
 }
 

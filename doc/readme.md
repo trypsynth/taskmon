@@ -46,7 +46,9 @@ Taskmon can display processes as a hierarchical tree instead of a flat list, gro
 The Services tab lists every Windows service, whether it is running or not.
 
 * Press Ctrl+Tab to move between the Processes and Services tabs, or Tab to the tab strip and use the Left and Right arrow keys.
-* Columns are Name, Display Name, Status, Startup Type, and PID. A blank PID means the service is not running. All except Name can be hidden or reordered from the Columns tab in Settings, independently of the process columns.
+* Shown by default: Name, Display Name, Status, Startup Type, and PID. A blank PID means the service is not running.
+* Also available, off by default: Log On As (the account the service runs under), Binary Path (the command line Windows starts it with), Service Type (own process, shared process, or a per-user copy), and Group (the load order group, which most services leave empty).
+* All columns except Name can be hidden or reordered from the Columns tab in Settings, independently of the process columns.
 * Sorting works exactly as it does on the Processes tab; see Column Reordering and Accessible Sorting below.
 * Right-click a service, or press the context menu key, for Start, Stop, Restart, and Go to process. Start and Stop grey out when they do not apply.
 * Go to process switches to the Processes tab and selects the process hosting that service.
@@ -168,6 +170,7 @@ Bringing up the context menu on a process in the list or tree view provides acce
 * Added a Services tab listing every Windows service with its display name, status, startup type, and PID, with Start, Stop, Restart, and Go to process actions.
 * Added a Find dialog (Ctrl+F) for locating a process or service by name, with F3 and Shift+F3 to step through the matches.
 * Added column choice and ordering for the Services tab. The Columns tab in Settings now holds a list for each tab, each with its own Move up and Move down buttons.
+* Added four Services columns, off by default: Log On As, Binary Path, Service Type, and Group.
 
 ### Version 0.3.2
 * Added column reordering. The Settings dialog is now split into a General tab and a Columns tab, and on the Columns tab you can reorder columns with Ctrl+Up and Ctrl+Down or with the Move up and Move down buttons. Taskmon saves the order between runs.
