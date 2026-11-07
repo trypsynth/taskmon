@@ -111,8 +111,14 @@ pub fn gpuCleanup() void {
 	g_pdh_ready = false;
 }
 
+// Windows PIDs are multiples of 4, so a plain pid % len would only ever pick
+// a quarter of the slots and pile every entry into long probe runs.
+fn probeHome(pid: win32.DWORD, cap: usize) usize {
+	return (pid >> 2) % cap;
+}
+
 // Both the GPU-stat and CPU-snapshot tables are fixed-size arrays keyed by
-// pid, open-addressed with linear probing from pid % table.len, using
+// pid, open-addressed with linear probing from probeHome(), using
 // `active` to mark empty slots. probeInsert finds the slot to write into -
 // the pid's existing entry, or the first empty slot probed - returning null
 // only if the table is completely full of *other* pids (never happens at
@@ -120,7 +126,7 @@ pub fn gpuCleanup() void {
 // since that means the pid was never inserted.
 fn probeInsert(comptime T: type, table: []T, pid: win32.DWORD) ?*T {
 	const cap = table.len;
-	const h: usize = pid % cap;
+	const h = probeHome(pid, cap);
 	var i = h;
 	while (true) {
 		if (table[i].active == 0 or table[i].pid == pid) return &table[i];
@@ -132,7 +138,7 @@ fn probeInsert(comptime T: type, table: []T, pid: win32.DWORD) ?*T {
 
 fn probeFind(comptime T: type, table: []T, pid: win32.DWORD) ?*T {
 	const cap = table.len;
-	const h: usize = pid % cap;
+	const h = probeHome(pid, cap);
 	var i = h;
 	while (true) {
 		if (table[i].active == 0) return null;
