@@ -869,8 +869,13 @@ pub fn snapshotProcesses(snapshots: [*]pt.SnapshotEntry, out_count: *i32, field:
 		heapFree(hi);
 		return null;
 	};
-	const old_snaps_raw = heapAlloc(pt.SNAPSHOT_CAPACITY * @sizeOf(pt.SnapshotEntry));
-	const old_snaps: [*]pt.SnapshotEntry = @ptrCast(@alignCast(old_snaps_raw.?));
+	const old_snaps_raw = heapAlloc(pt.SNAPSHOT_CAPACITY * @sizeOf(pt.SnapshotEntry)) orelse {
+		entries.deinit(win32heap.allocator);
+		heapFree(buf);
+		heapFree(hi);
+		return null;
+	};
+	const old_snaps: [*]pt.SnapshotEntry = @ptrCast(@alignCast(old_snaps_raw));
 	@memcpy(std.mem.sliceAsBytes(old_snaps[0..pt.SNAPSHOT_CAPACITY]), std.mem.sliceAsBytes(snapshots[0..pt.SNAPSHOT_CAPACITY]));
 	@memset(std.mem.sliceAsBytes(snapshots[0..pt.SNAPSHOT_CAPACITY]), 0);
 	var p: [*]u8 = buf;
