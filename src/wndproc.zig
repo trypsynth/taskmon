@@ -42,12 +42,12 @@ const PriorityEntry = struct {
 	label: win32.LPCWSTR,
 };
 const PRIORITY_CLASSES = [PRIORITY_CLASS_COUNT]PriorityEntry{
-	.{ .cls = win32.IDLE_PRIORITY_CLASS, .label = L("Idle") },
-	.{ .cls = win32.BELOW_NORMAL_PRIORITY_CLASS, .label = L("Below Normal") },
-	.{ .cls = win32.NORMAL_PRIORITY_CLASS, .label = L("Normal") },
-	.{ .cls = win32.ABOVE_NORMAL_PRIORITY_CLASS, .label = L("Above Normal") },
-	.{ .cls = win32.HIGH_PRIORITY_CLASS, .label = L("High") },
-	.{ .cls = win32.REALTIME_PRIORITY_CLASS, .label = L("Realtime") },
+	.{ .cls = win32.IDLE_PRIORITY_CLASS, .label = L("&Idle") },
+	.{ .cls = win32.BELOW_NORMAL_PRIORITY_CLASS, .label = L("&Below Normal") },
+	.{ .cls = win32.NORMAL_PRIORITY_CLASS, .label = L("&Normal") },
+	.{ .cls = win32.ABOVE_NORMAL_PRIORITY_CLASS, .label = L("&Above Normal") },
+	.{ .cls = win32.HIGH_PRIORITY_CLASS, .label = L("&High") },
+	.{ .cls = win32.REALTIME_PRIORITY_CLASS, .label = L("&Realtime") },
 };
 
 pub const CLASS_NAME = L("TaskmonWndClass").*;
@@ -163,11 +163,11 @@ fn showServiceMenu(hwnd: win32.HWND, point: win32.POINT) win32.LRESULT {
 	const running = services.getSelectedState() == win32.SERVICE_RUNNING;
 	const menu = win32.CreatePopupMenu();
 	if (menu == null) return 0;
-	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) win32.MF_GRAYED else 0), resource.ID_CTX_SVC_START, L("Start"));
-	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_STOP, L("Stop"));
-	_ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_SVC_RESTART, L("Restart"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) win32.MF_GRAYED else 0), resource.ID_CTX_SVC_START, L("&Start"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (running) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_STOP, L("S&top"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_SVC_RESTART, L("&Restart"));
 	_ = win32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (services.getSelectedPid() != 0) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_GOTO, L("Go to process"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING | (if (services.getSelectedPid() != 0) 0 else win32.MF_GRAYED), resource.ID_CTX_SVC_GOTO, L("&Go to process"));
 	_ = win32.TrackPopupMenu(menu, win32.TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, null);
 	_ = win32.DestroyMenu(menu);
 	return 0;
@@ -253,27 +253,27 @@ fn selectTab(index: i32) void {
 fn createMenuBar(hwnd: win32.HWND) void {
 	const bar = win32.CreateMenu();
 	const file = win32.CreatePopupMenu();
-	_ = win32.AppendMenuW(file, win32.MF_STRING, resource.ID_FILE_NEW_TASK, L("New task...\tCtrl+N"));
+	_ = win32.AppendMenuW(file, win32.MF_STRING, resource.ID_FILE_NEW_TASK, L("&New task...\tCtrl+N"));
 	_ = win32.AppendMenuW(file, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(file, win32.MF_STRING | (if (isElevated()) win32.MF_GRAYED else 0), resource.ID_FILE_RESTART_AS_ADMIN, L("Restart as administrator"));
+	_ = win32.AppendMenuW(file, win32.MF_STRING | (if (isElevated()) win32.MF_GRAYED else 0), resource.ID_FILE_RESTART_AS_ADMIN, L("Restart as &administrator"));
 	_ = win32.AppendMenuW(file, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(file, win32.MF_STRING, resource.ID_FILE_EXIT, L("Exit\tCtrl+Q"));
+	_ = win32.AppendMenuW(file, win32.MF_STRING, resource.ID_FILE_EXIT, L("E&xit\tCtrl+Q"));
 	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(file), L("&File"));
 	const view = win32.CreatePopupMenu();
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("Refresh\tF5"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_REFRESH, L("&Refresh\tF5"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND, L("Find...\tCtrl+F"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_NEXT, L("Find next\tF3"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_PREV, L("Find previous\tShift+F3"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND, L("&Find...\tCtrl+F"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_NEXT, L("Find &next\tF3"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_EDIT_FIND_PREV, L("Find &previous\tShift+F3"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_NEXT_TAB, L("Next tab\tCtrl+Tab"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_PREV_TAB, L("Previous tab\tCtrl+Shift+Tab"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_NEXT_TAB, L("Next &tab\tCtrl+Tab"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_PREV_TAB, L("Previous ta&b\tCtrl+Shift+Tab"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("Always on Top"));
-	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tree\tCtrl+T"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.always_on_top) win32.MF_CHECKED else 0), resource.ID_VIEW_ALWAYS_ON_TOP, L("&Always on Top"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING | (if (state.prefs.tree_mode) win32.MF_CHECKED else 0), resource.ID_VIEW_TREE_MODE, L("Process Tr&ee\tCtrl+T"));
 	_ = win32.AppendMenuW(view, win32.MF_SEPARATOR, 0, null);
-	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_SETTINGS, L("Settings...\tCtrl+,"));
-	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(view), L("View"));
+	_ = win32.AppendMenuW(view, win32.MF_STRING, resource.ID_VIEW_SETTINGS, L("&Settings...\tCtrl+,"));
+	_ = win32.AppendMenuW(bar, win32.MF_POPUP, @intFromPtr(view), L("&View"));
 	_ = win32.SetMenu(hwnd, bar);
 }
 
@@ -331,15 +331,15 @@ fn showProcessContextMenu(hwnd: win32.HWND, pid: win32.DWORD, point: win32.POINT
 	const menu = win32.CreatePopupMenu();
 	var path: [win32.MAX_PATH:0]u16 = std.mem.zeroes([win32.MAX_PATH:0]u16);
 	process.getProcessPath(pid, &path, @intCast(win32.MAX_PATH));
-	if (path[0] != 0) _ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_OPEN_LOCATION, L("Open file location"));
+	if (path[0] != 0) _ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_OPEN_LOCATION, L("&Open file location"));
 	if (process.isProcessSuspended(pid))
-		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_RESUME, L("Resume"))
+		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_RESUME, L("&Resume"))
 	else
-		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_SUSPEND, L("Suspend"));
-	_ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_END_TASK, L("End task\tDelete"));
-	if (include_end_tree) _ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_END_PROCESS_TREE, L("End process tree"));
+		_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_CTX_SUSPEND, L("&Suspend"));
+	_ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_END_TASK, L("&End task\tDelete"));
+	if (include_end_tree) _ = win32.AppendMenuW(menu, win32.MF_STRING, resource.ID_CTX_END_PROCESS_TREE, L("End process &tree"));
 	const pri_menu = buildPriorityMenu(pid);
-	_ = win32.AppendMenuW(menu, win32.MF_POPUP, @intFromPtr(pri_menu), L("Priority"));
+	_ = win32.AppendMenuW(menu, win32.MF_POPUP, @intFromPtr(pri_menu), L("&Priority"));
 	_ = win32.TrackPopupMenu(menu, win32.TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, null);
 	_ = win32.DestroyMenu(menu);
 }
@@ -709,8 +709,8 @@ pub fn wndProc(hwnd: win32.HWND, msg: win32.UINT, wp: win32.WPARAM, lp: win32.LP
 				tray.restore();
 			} else if (lp == win32.WM_RBUTTONUP) {
 				const menu = win32.CreatePopupMenu();
-				_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_TRAY_RESTORE, L("Restore"));
-				_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_TRAY_EXIT, L("Exit"));
+				_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_TRAY_RESTORE, L("&Restore"));
+				_ = win32.AppendMenuW(menu, win32.MF_STRING, ID_TRAY_EXIT, L("E&xit"));
 				var point: win32.POINT = undefined;
 				_ = win32.GetCursorPos(&point);
 				_ = win32.SetForegroundWindow(hwnd);
