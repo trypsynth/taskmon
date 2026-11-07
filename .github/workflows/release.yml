@@ -5,10 +5,17 @@ on:
       - 'v*.*.*'
     branches:
       - master
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+# Two quick pushes to master would otherwise race to force-move the nightly
+# tag, and the older run could finish last.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -47,7 +54,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.17.0-dev.1606+a06534d73
+          version: 0.17.1
 
       - name: Build
         run: zig build -Dtarget=${{ matrix.target }} --summary all
@@ -77,17 +84,21 @@ jobs:
         with:
           name: taskmon-${{ matrix.arch }}
           path: taskmon-*.zip
+          if-no-files-found: error
 
       - name: Upload Installer
         uses: actions/upload-artifact@v7
         with:
           name: taskmon-installer-${{ matrix.arch }}
           path: zig-out/bin/taskmon-setup-*.exe
+          if-no-files-found: error
 
   release:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -114,6 +125,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           draft: false
           prerelease: ${{ github.ref_type != 'tag' }}
+          fail_on_unmatched_files: true
           files: |
             ./artifacts/taskmon-x64/taskmon-x64.zip
             ./artifacts/taskmon-arm64/taskmon-arm64.zip
